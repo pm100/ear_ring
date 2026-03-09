@@ -1,0 +1,16 @@
+[package]
+name = "ear_ring_wasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ear_ring_core = { path = "../rust" }
+wasm-bindgen = "0.2"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+[dev-dependencies]

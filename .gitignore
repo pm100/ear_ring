@@ -34,3 +34,15 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+# Rust build artifacts
+target/
+
+# Android build outputs
+android/app/build/
+android/.gradle/
+android/build/
+
+# Compiled JS bundle (regenerated on build)
+android/app/src/main/assets/index.android.bundle
+android/app/src/main/assets/index.android.bundle.map
