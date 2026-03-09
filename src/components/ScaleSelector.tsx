@@ -19,7 +19,7 @@ export default function ScaleSelector({
 }: ScaleSelectorProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Root note</Text>
+      <Text style={styles.label}>Key</Text>
       {/* Note name row */}
       <View style={styles.row}>
         {NOTE_NAMES.map((name) => (

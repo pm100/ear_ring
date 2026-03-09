@@ -6,17 +6,28 @@ import { usePitchDetection, PitchResult } from '../src/hooks/usePitchDetection';
 import { staffPosition, freqToNote } from '../src/native/CoreBridge';
 import { midiLabel } from '../src/utils/musicTheory';
 
-const MAX_NOTES = 8; // max notes to display on staff at once
+const MAX_NOTES = 8;
+
+// Notes to use for simulation testing (note name → frequency in Hz)
+const TEST_NOTES: { label: string; hz: number }[] = [
+  { label: 'C4',  hz: 261.63 },
+  { label: 'E4',  hz: 329.63 },
+  { label: 'G4',  hz: 392.00 },
+  { label: 'A4',  hz: 440.00 },
+  { label: 'C5',  hz: 523.25 },
+];
 
 interface SetupNote {
   staffStep: number;
   color: NoteColor;
   label: string;
+  accidental?: 'sharp' | 'flat';
 }
 
 export default function SetupScreen() {
   const [notes, setNotes] = useState<SetupNote[]>([]);
   const [lastLabel, setLastLabel] = useState<string | null>(null);
+  const [simulating, setSimulating] = useState(false);
 
   const onNote = useCallback((result: PitchResult) => {
     const step = staffPosition(result.midi);
@@ -33,6 +44,13 @@ export default function SetupScreen() {
   }, []);
 
   const pitchDetection = usePitchDetection(onNote);
+
+  async function handleSimulate(hz: number, label: string) {
+    if (simulating) return;
+    setSimulating(true);
+    await pitchDetection.simulatePitch(hz, 2000);
+    setSimulating(false);
+  }
 
   async function handleListen() {
     await pitchDetection.startListening();
@@ -91,6 +109,24 @@ export default function SetupScreen() {
       <TouchableOpacity style={[styles.btn, styles.btnClear]} onPress={handleClear}>
         <Text style={styles.btnTextDim}>✕  Clear Staff</Text>
       </TouchableOpacity>
+
+      {/* ── Simulation test section ─────────────────────────────────── */}
+      <View style={styles.simSection}>
+        <Text style={styles.simTitle}>🧪 Simulate note (for testing)</Text>
+        <View style={styles.simRow}>
+          {TEST_NOTES.map((n) => (
+            <TouchableOpacity
+              key={n.label}
+              style={[styles.simBtn, simulating && styles.btnDisabled]}
+              onPress={() => handleSimulate(n.hz, n.label)}
+              disabled={simulating}
+            >
+              <Text style={styles.simBtnText}>{n.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {simulating && <Text style={styles.simHint}>Simulating… (2 s)</Text>}
+      </View>
     </ScrollView>
   );
 }
@@ -133,4 +169,18 @@ const styles = StyleSheet.create({
   },
   btnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
   btnTextDim: { color: '#94a3b8', fontSize: 16 },
+  simSection: { width: '100%', gap: 10, marginTop: 4 },
+  simTitle: { color: '#64748b', fontSize: 13, textAlign: 'center' },
+  simRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, flexWrap: 'wrap' },
+  simBtn: {
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#475569',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  simBtnText: { color: '#94a3b8', fontSize: 15, fontWeight: '600' },
+  btnDisabled: { opacity: 0.4 },
+  simHint: { color: '#6366f1', fontSize: 13, textAlign: 'center' },
 });

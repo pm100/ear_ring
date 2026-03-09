@@ -237,5 +237,61 @@ export function usePitchDetection(onNote: (result: PitchResult) => void) {
     return () => { stopRef.current?.(); };
   }, []);
 
-  return { startListening, stopListening, isListening, currentHz };
+  // ── Simulate a pitch for testing (feeds synthetic sine wave through the
+  //    same detection pipeline without needing a physical microphone) ────────
+  const simulatePitch = useCallback(async (freq: number, durationMs = 2000) => {
+    const core = await getCoreModule();
+    const SAMPLE_RATE = 44100;
+
+    // Own copy of the state machine (same logic as processSamples above)
+    let lastMidi = -1;
+    let stableStart = 0;
+    let reported = false;
+    let silenceStart = 0;
+    let potentialMidi = -1;
+    let potentialStart = 0;
+    let otherMidi = -1;
+    let otherFrames = 0;
+
+    function processSim(buf: Float32Array) {
+      let rms = 0;
+      for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
+      rms = Math.sqrt(rms / buf.length);
+      if (rms < SILENCE_RMS_THRESH) { silenceStart = silenceStart || Date.now(); return; }
+      silenceStart = 0;
+      const hz = core.detectPitch(buf, SAMPLE_RATE);
+      setCurrentHz(hz > 0 ? hz : 0);
+      if (hz <= 0) return;
+      const noteResult = core.freqToNote(hz);
+      if (!noteResult) return;
+      const { midi, cents } = noteResult;
+      if (!reported) {
+        if (midi === lastMidi) { otherMidi = -1; otherFrames = 0; }
+        else {
+          midi === otherMidi ? otherFrames++ : (otherMidi = midi, otherFrames = 1);
+          if (otherFrames >= GLITCH_FRAMES) { lastMidi = midi; stableStart = Date.now(); otherMidi = -1; otherFrames = 0; }
+        }
+        if (lastMidi === midi && Date.now() - stableStart >= STABILITY_MS) {
+          reported = true;
+          onNoteRef.current({ hz, midi, cents, confidence: Math.abs(cents) <= 30 ? 'high' : 'low' });
+        }
+      }
+    }
+
+    const totalFrames = Math.ceil((durationMs / 1000) * SAMPLE_RATE / BUFFER_SIZE);
+    let frame = 0;
+    const intervalMs = (BUFFER_SIZE / SAMPLE_RATE) * 1000; // real-time pace ≈ 93ms
+    const timer = setInterval(() => {
+      if (frame >= totalFrames) { clearInterval(timer); setCurrentHz(0); return; }
+      const buf = new Float32Array(BUFFER_SIZE);
+      const t0 = frame * BUFFER_SIZE;
+      for (let i = 0; i < BUFFER_SIZE; i++) {
+        buf[i] = 0.5 * Math.sin(2 * Math.PI * freq * (t0 + i) / SAMPLE_RATE);
+      }
+      processSim(buf);
+      frame++;
+    }, intervalMs);
+  }, []);
+
+  return { startListening, stopListening, simulatePitch, isListening, currentHz };
 }
