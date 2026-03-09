@@ -132,7 +132,7 @@ mod android_jni {
     use super::{detect_pitch, freq_to_note, generate_sequence, staff_position, Note, ScaleType};
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCoreModule_nativeDetectPitch(
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeDetectPitch(
         mut env: JNIEnv,
         _class: JClass,
         samples: jfloatArray,
@@ -154,7 +154,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCoreModule_nativeFreqToMidi(
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeFreqToMidi(
         _env: JNIEnv,
         _class: JClass,
         hz: jfloat,
@@ -166,7 +166,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCoreModule_nativeFreqToCents(
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeFreqToCents(
         _env: JNIEnv,
         _class: JClass,
         hz: jfloat,
@@ -178,7 +178,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCoreModule_nativeStaffPosition(
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeStaffPosition(
         _env: JNIEnv,
         _class: JClass,
         midi: jint,
@@ -187,7 +187,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCoreModule_nativeGenerateSequence(
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeGenerateSequence(
         mut env: JNIEnv,
         _class: JClass,
         root_midi: jint,

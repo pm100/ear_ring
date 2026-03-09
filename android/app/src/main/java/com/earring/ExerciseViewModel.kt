@@ -44,6 +44,10 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     val audioCapture = AudioCapture()
     val audioPlayback = AudioPlayback(application)
 
+    // Live pitch for the meter display (updated on every audio frame while listening)
+    private val _liveHz = MutableStateFlow(-1f)
+    val liveHz: StateFlow<Float> = _liveHz.asStateFlow()
+
     // Pitch stability tracking
     private var stableCount = 0
     private var stablePitchClass = -1
@@ -98,12 +102,14 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     fun startListening() {
         resetStability()
         _state.value = _state.value.copy(status = ExerciseStatus.LISTENING)
+        _liveHz.value = -1f
         audioCapture.start(onAudio = { samples -> processSamples(samples) })
     }
 
     fun stopListening() {
         audioCapture.stop()
         _state.value = _state.value.copy(status = ExerciseStatus.IDLE)
+        _liveHz.value = -1f
         resetStability()
     }
 
@@ -116,9 +122,11 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
 
         val hz = EarRingCore.detectPitch(samples, 44100)
         if (hz <= 0f) {
+            _liveHz.value = -1f
             resetStability()
             return
         }
+        _liveHz.value = hz
 
         val midi = EarRingCore.freqToMidi(hz)
         if (midi < 0) { resetStability(); return }

@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.earring.EarRingCore
 import com.earring.ExerciseStatus
 import com.earring.ExerciseViewModel
 import com.earring.MusicTheory
@@ -24,24 +25,14 @@ fun ExerciseScreen(
     onBack: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
+    val liveHz by viewModel.liveHz.collectAsState()
+    val liveMidi = if (liveHz > 0f) EarRingCore.freqToMidi(liveHz) else -1
 
     // Navigate to results when exercise is done
     LaunchedEffect(state.status) {
         if (state.status == ExerciseStatus.DONE) {
             viewModel.stopListening()
             onNavigateResults()
-        }
-    }
-
-    // Live pitch detection state for meter display
-    var liveHz by remember { mutableFloatStateOf(-1f) }
-    var liveMidi by remember { mutableIntStateOf(-1) }
-
-    // When listening: run pitch detection and update live display
-    LaunchedEffect(state.status) {
-        if (state.status != ExerciseStatus.LISTENING) {
-            liveHz = -1f
-            liveMidi = -1
         }
     }
 
@@ -108,20 +99,7 @@ fun ExerciseScreen(
                 ) { Text("▶ Play Sequence", fontSize = 17.sp) }
                 Spacer(Modifier.height(10.dp))
                 OutlinedButton(
-                    onClick = {
-                        // Start listening and wire live pitch to meter
-                        viewModel.audioCapture.start(onAudio = { samples ->
-                            val hz = com.earring.EarRingCore.detectPitch(samples, 44100)
-                            if (hz > 0f) {
-                                liveHz = hz
-                                liveMidi = com.earring.EarRingCore.freqToMidi(hz)
-                            } else {
-                                liveHz = -1f
-                                liveMidi = -1
-                            }
-                        })
-                        viewModel.startListening()
-                    },
+                    onClick = { viewModel.startListening() },
                     modifier = Modifier.fillMaxWidth().height(48.dp)
                 ) { Text("🎙 Start Listening", fontSize = 16.sp) }
             }
@@ -133,7 +111,7 @@ fun ExerciseScreen(
             }
             ExerciseStatus.LISTENING -> {
                 Button(
-                    onClick = { viewModel.stopListening(); liveHz = -1f; liveMidi = -1 },
+                    onClick = { viewModel.stopListening() },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     modifier = Modifier.fillMaxWidth().height(52.dp)
                 ) { Text("⏹ Stop Listening", fontSize = 17.sp) }

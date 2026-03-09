@@ -47,7 +47,7 @@ fun HomeScreen(
 
         // Root note selection
         SectionLabel("Root Note")
-        ChipRow(
+        WrappingChipRow(
             items = MusicTheory.NOTE_NAMES,
             selected = state.rootNote,
             onSelect = { viewModel.setRootNote(it) }
