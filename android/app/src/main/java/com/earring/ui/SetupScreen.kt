@@ -1,6 +1,6 @@
 package com.earring.ui
 
-import android.content.Context
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -11,30 +11,36 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.earring.AudioCapture
-import com.earring.AudioPlayback
 import com.earring.EarRingCore
 import com.earring.MusicTheory
-import com.earring.ui.components.MusicStaff
-import com.earring.ui.components.NoteState
 import com.earring.ui.components.PitchMeter
-import com.earring.ui.components.StaffNote
 
 @Composable
 fun SetupScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val audioCapture = remember { AudioCapture() }
-    val audioPlayback = remember { AudioPlayback(context) }
 
     var isListening by remember { mutableStateOf(false) }
     var detectedHz by remember { mutableFloatStateOf(-1f) }
     var detectedMidi by remember { mutableIntStateOf(-1) }
+    // Smoothed midi for display — only update when stable for a few frames
+    var displayMidi by remember { mutableIntStateOf(-1) }
+    var stableCount by remember { mutableIntStateOf(0) }
+    var lastMidi by remember { mutableIntStateOf(-1) }
 
-    DisposableEffect(Unit) {
-        onDispose {
-            audioCapture.stop()
-            audioPlayback.cancelPlayback()
-        }
+    fun stopAll() {
+        audioCapture.stop()
+        isListening = false
+        detectedHz = -1f
+        detectedMidi = -1
+        displayMidi = -1
+        stableCount = 0
+        lastMidi = -1
     }
+
+    BackHandler { stopAll(); onBack() }
+
+    DisposableEffect(Unit) { onDispose { audioCapture.stop() } }
 
     Column(
         modifier = Modifier
@@ -46,43 +52,35 @@ fun SetupScreen(onBack: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = {
-                audioCapture.stop()
-                audioPlayback.cancelPlayback()
-                onBack()
-            }) { Text("← Back") }
+            TextButton(onClick = { stopAll(); onBack() }) { Text("← Back") }
             Spacer(Modifier.weight(1f))
             Text("Mic Setup", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
         }
 
-        Spacer(Modifier.height(20.dp))
-        Text("Test your microphone — sing or play a note.", style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(24.dp))
+        Text("Sing or play a note to test your microphone.", style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(32.dp))
 
-        // Staff showing currently detected note
-        val staffNotes = if (detectedMidi >= 0)
-            listOf(StaffNote(midi = detectedMidi, state = NoteState.ACTIVE))
-        else emptyList()
-        MusicStaff(notes = staffNotes, modifier = Modifier.fillMaxWidth())
-
-        Spacer(Modifier.height(16.dp))
-
-        // Pitch meter
-        PitchMeter(detectedMidi = detectedMidi, detectedHz = detectedHz)
-
-        if (detectedMidi >= 0) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "${detectedHz.toInt()} Hz  •  ${MusicTheory.midiToLabel(detectedMidi)}",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.primary
-            )
+        // Large note name display
+        val noteLabel = if (displayMidi >= 0) MusicTheory.midiToLabel(displayMidi) else "—"
+        val hzLabel = if (detectedHz > 0f) "${detectedHz.toInt()} Hz" else ""
+        Text(
+            text = noteLabel,
+            fontSize = 72.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (displayMidi >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (hzLabel.isNotEmpty()) {
+            Text(hzLabel, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(24.dp))
 
-        // Listen toggle
+        PitchMeter(detectedMidi = displayMidi, detectedHz = detectedHz)
+
+        Spacer(Modifier.height(32.dp))
+
         if (!isListening) {
             Button(
                 onClick = {
@@ -91,10 +89,22 @@ fun SetupScreen(onBack: () -> Unit) {
                         val hz = EarRingCore.detectPitch(samples, 44100)
                         if (hz > 0f) {
                             detectedHz = hz
-                            detectedMidi = EarRingCore.freqToMidi(hz)
+                            val midi = EarRingCore.freqToMidi(hz)
+                            detectedMidi = midi
+                            // Stability: require 3 consecutive frames of same note before displaying
+                            if (midi == lastMidi) {
+                                stableCount++
+                                if (stableCount >= 3) displayMidi = midi
+                            } else {
+                                lastMidi = midi
+                                stableCount = 1
+                            }
                         } else {
                             detectedHz = -1f
                             detectedMidi = -1
+                            stableCount = 0
+                            lastMidi = -1
+                            // Keep displayMidi for a moment so it doesn't flicker to "—"
                         }
                     })
                 },
@@ -102,35 +112,11 @@ fun SetupScreen(onBack: () -> Unit) {
             ) { Text("🎙 Start Listening", fontSize = 17.sp) }
         } else {
             Button(
-                onClick = {
-                    isListening = false
-                    audioCapture.stop()
-                    detectedHz = -1f
-                    detectedMidi = -1
-                },
+                onClick = { stopAll() },
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 modifier = Modifier.fillMaxWidth().height(52.dp)
             ) { Text("⏹ Stop", fontSize = 17.sp) }
         }
-
-        Spacer(Modifier.height(24.dp))
-        Text("Play test notes:", style = MaterialTheme.typography.labelLarge)
-        Spacer(Modifier.height(10.dp))
-
-        // Test note buttons
-        val testNotes = listOf(60 to "C4", 64 to "E4", 67 to "G4", 69 to "A4", 72 to "C5")
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            testNotes.forEach { (midi, label) ->
-                OutlinedButton(
-                    onClick = { audioPlayback.playNote(midi) },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(label, fontSize = 13.sp)
-                }
-            }
-        }
     }
 }
+

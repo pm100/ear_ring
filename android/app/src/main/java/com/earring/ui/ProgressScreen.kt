@@ -1,5 +1,6 @@
 package com.earring.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -25,6 +26,8 @@ fun ProgressScreen(
     onBack: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
+
+    BackHandler { onBack() }
 
     Column(
         modifier = Modifier

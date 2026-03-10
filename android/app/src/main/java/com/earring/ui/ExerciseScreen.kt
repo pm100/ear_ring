@@ -1,5 +1,6 @@
 package com.earring.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,6 +29,14 @@ fun ExerciseScreen(
     val liveHz by viewModel.liveHz.collectAsState()
     val liveMidi = if (liveHz > 0f) EarRingCore.freqToMidi(liveHz) else -1
 
+    fun navigateBack() {
+        viewModel.stopListening()
+        viewModel.audioPlayback.cancelPlayback()
+        onBack()
+    }
+
+    BackHandler { navigateBack() }
+
     // Navigate to results when exercise is done
     LaunchedEffect(state.status) {
         if (state.status == ExerciseStatus.DONE) {
@@ -46,11 +55,7 @@ fun ExerciseScreen(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = {
-                viewModel.stopListening()
-                viewModel.audioPlayback.cancelPlayback()
-                onBack()
-            }) { Text("← Back") }
+            TextButton(onClick = { navigateBack() }) { Text("← Back") }
             Spacer(Modifier.weight(1f))
             Text(
                 text = "${MusicTheory.NOTE_NAMES[state.rootNote]}${state.octave} ${MusicTheory.SCALE_NAMES[state.scaleId]}",
