@@ -39,7 +39,7 @@ Layout: vertically scrollable column, 16dp/px padding, centred.
 
 ```
 [24dp space]
-"Ear Ring 🎵"          — 32sp bold, primary colour
+[Icon row: 48dp app icon (rounded 10dp corners) + "Ear Ring" 32sp bold primary — centred, 12dp gap]
 "Ear Training"         — 16sp, muted/secondary colour
 
 [28dp space]
