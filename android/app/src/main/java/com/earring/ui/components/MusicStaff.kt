@@ -8,9 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,8 +30,6 @@ fun MusicStaff(
     lineSpacingDp: Dp = 12.dp,
     fixedSpacingDp: Dp? = null
 ) {
-    val textMeasurer = rememberTextMeasurer()
-
     Canvas(
         modifier = modifier
             .fillMaxWidth()
@@ -54,13 +51,19 @@ fun MusicStaff(
             )
         }
 
-        // Draw treble clef symbol
-        drawText(
-            textMeasurer = textMeasurer,
-            text = "\uD834\uDD1E",
-            topLeft = Offset(4f, staffTop - lineSpacing * 1.5f),
-            style = TextStyle(fontSize = 56.sp, color = Color(0xFF333333))
-        )
+        // Draw treble clef symbol using native canvas for proper font fallback
+        drawIntoCanvas { canvas ->
+            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                textSize = lineSpacing * 4.8f
+                color = android.graphics.Color.parseColor("#333333")
+            }
+            canvas.nativeCanvas.drawText(
+                "\uD834\uDD1E",
+                4f,
+                staffTop + lineSpacing * 3.8f,
+                paint
+            )
+        }
 
         // Distribute notes horizontally
         val noteAreaStart = leftMargin + 20f
