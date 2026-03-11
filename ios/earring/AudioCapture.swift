@@ -1,6 +1,6 @@
 import AVFoundation
 
-class AudioCapture {
+class AudioCapture: @unchecked Sendable {
     private var engine: AVAudioEngine?
     private(set) var isRunning: Bool = false
 

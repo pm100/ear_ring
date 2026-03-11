@@ -93,12 +93,14 @@ class ExerciseModel: ObservableObject {
         resetStability()
         status = .listening
 
-        await audioCapture.start { [weak self] samples, sampleRate in
-            // Dispatch to main actor for all state mutations
-            Task { @MainActor [weak self] in
-                self?.processAudio(samples: samples, sampleRate: sampleRate)
+        let capture = audioCapture
+        await Task.detached(priority: .userInitiated) {
+            await capture.start { [weak self] samples, sampleRate in
+                Task { @MainActor [weak self] in
+                    self?.processAudio(samples: samples, sampleRate: sampleRate)
+                }
             }
-        }
+        }.value
     }
 
     func stopListening() {
@@ -161,11 +163,14 @@ class ExerciseModel: ObservableObject {
         liveCents = 0
         resetStability()
 
-        await audioCapture.start { [weak self] samples, sampleRate in
-            Task { @MainActor [weak self] in
-                self?.processAudioLive(samples: samples, sampleRate: sampleRate)
+        let capture = audioCapture
+        await Task.detached(priority: .userInitiated) {
+            await capture.start { [weak self] samples, sampleRate in
+                Task { @MainActor [weak self] in
+                    self?.processAudioLive(samples: samples, sampleRate: sampleRate)
+                }
             }
-        }
+        }.value
     }
 
     func stopLivePitchDetection() {

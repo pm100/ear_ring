@@ -211,7 +211,7 @@ struct HomeView: View {
             .padding(.horizontal, 16)
         }
         .background(Color(.systemBackground))
-        .toolbar(.hidden, for: .navigationBar)
+        .hideNavigationBar()
     }
 
     @ViewBuilder

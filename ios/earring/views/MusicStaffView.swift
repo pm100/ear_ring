@@ -43,7 +43,7 @@ struct MusicStaffView: View {
             ctx.draw(
                 Text("𝄞").font(.system(size: 56)),
                 at: CGPoint(x: 4, y: staffTop - lineSpacing * 1.5),
-                anchor: .leading
+                anchor: .topLeading
             )
 
             guard !_expectedNotes.isEmpty else { return }

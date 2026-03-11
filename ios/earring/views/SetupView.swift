@@ -102,7 +102,9 @@ struct SetupView: View {
 
     private func updateStability() {
         guard let midi = model.liveMidi else {
-            resetStabilityState()
+            // Silence: reset stability counters but keep note history visible
+            stabilityPitchClass = -1
+            stabilityCount = 0
             return
         }
         let pc = midi % 12

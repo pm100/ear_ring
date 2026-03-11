@@ -7,6 +7,17 @@ enum AppRoute: Hashable {
     case progress
 }
 
+extension View {
+    @ViewBuilder
+    func hideNavigationBar() -> some View {
+        if #available(iOS 18, *) {
+            self.toolbarVisibility(.hidden, for: .navigationBar)
+        } else {
+            self.toolbar(.hidden, for: .navigationBar)
+        }
+    }
+}
+
 struct ContentView: View {
     @State private var path = NavigationPath()
     @EnvironmentObject var exerciseModel: ExerciseModel
@@ -29,5 +40,6 @@ struct ContentView: View {
                 }
         }
         .tint(.indigo)
+        .hideNavigationBar()
     }
 }
