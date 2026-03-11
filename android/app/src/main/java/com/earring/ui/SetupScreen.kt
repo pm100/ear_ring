@@ -15,6 +15,7 @@ import com.earring.EarRingCore
 import com.earring.MusicTheory
 import com.earring.ui.components.MusicStaff
 import com.earring.ui.components.NoteState
+import com.earring.ui.components.PitchMeter
 import com.earring.ui.components.StaffNote
 
 @Composable
