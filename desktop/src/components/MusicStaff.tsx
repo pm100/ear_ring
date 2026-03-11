@@ -39,9 +39,12 @@ export default function MusicStaff({ sequence, currentNoteIndex, highlightIndex,
 
   const calcNoteY = (staffPos: number) => staffBottomY - (staffPos - 2) * (lineSpacing / 2);
 
-  const clefFontSize = 56;
-  const clefX = 4;
-  const clefY = staffTop - lineSpacing * 1.5;
+  const clefFontSize = 85;
+  const clefX = 2;
+  // SVG text y = baseline. With fontSize 85, the treble clef glyph sits
+  // roughly from (baseline - 85) to (baseline + 15). Position baseline so
+  // the clef spans the full staff height (staffTop to staffBottom + a bit).
+  const clefY = staffTop + 5.2 * lineSpacing;
 
   const noteAreaStart = leftMargin + 20;
   const noteAreaWidth = svgWidth - noteAreaStart - 20;
@@ -109,7 +112,7 @@ export default function MusicStaff({ sequence, currentNoteIndex, highlightIndex,
         return <line key={lineIdx} x1={leftMargin} y1={y} x2={svgWidth - 10} y2={y} stroke="#333333" strokeWidth="1.5" />;
       })}
 
-      <text x={clefX} y={clefY} fontSize={clefFontSize} fontFamily="serif" fill="#333" style={{ userSelect: 'none' }}>{'\uD834\uDD1E'}</text>
+      <text x={clefX} y={clefY} fontSize={clefFontSize} fontFamily="'Segoe UI Symbol','Apple Symbols','FreeSerif','Arial Unicode MS',serif" fill="#333" style={{ userSelect: 'none' }}>{'\uD834\uDD1E'}</text>
 
       {sequence.map((midi, i) => {
         const sp = staffPositions[i];
