@@ -330,3 +330,8 @@ Streak = number of consecutive calendar days with at least one session.
 SwiftUI cannot directly reference the app icon from `Assets.xcassets/AppIcon` as a UI image.
 **Exception:** Use `"Ear Ring 🎵"` as a plain bold Text title (32pt, primary colour) instead of
 the icon+text row. All other screens and elements must match the spec.
+
+### Desktop/Tauri — Mic Setup screen
+**Exception:** Show a `MusicStaff` above the large note name on the Mic Setup screen.
+Pass a single-note sequence `[currentMidi]` with `status="LISTENING"` when a note is detected,
+or an empty sequence when silent. This gives users a richer visual on the larger desktop screen.

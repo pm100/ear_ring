@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import PitchMeter from './PitchMeter';
+import MusicStaff from './MusicStaff';
 import { useAudioCapture } from '../hooks/useAudioCapture';
 
 interface Props {
@@ -12,6 +13,7 @@ const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 export default function SetupScreen({ onBack }: Props) {
   const [hz, setHz] = useState(0);
   const [noteName, setNoteName] = useState('\u2014');
+  const [currentMidi, setCurrentMidi] = useState<number>(-1);
   const [listening, setListening] = useState(false);
   const frameNotesRef = React.useRef<number[]>([]);
   const { start, stop } = useAudioCapture();
@@ -28,11 +30,13 @@ export default function SetupScreen({ onBack }: Props) {
         if (last.length === 3 && last[0] === last[1] && last[1] === last[2]) {
           const octave = Math.floor(midi / 12) - 1;
           setNoteName(`${NOTE_NAMES[pitchClass]}${octave}`);
+          setCurrentMidi(midi);
         }
       }
     } else {
       frameNotesRef.current = [];
       setNoteName('\u2014');
+      setCurrentMidi(-1);
     }
   }, []);
 
@@ -46,6 +50,7 @@ export default function SetupScreen({ onBack }: Props) {
     setListening(false);
     setHz(0);
     setNoteName('\u2014');
+    setCurrentMidi(-1);
     frameNotesRef.current = [];
   }, [stop]);
 
@@ -53,7 +58,8 @@ export default function SetupScreen({ onBack }: Props) {
     return () => stop();
   }, [stop]);
 
-  const active = hz > 0 && noteName !== '\u2014';
+  const active = hz > 0 && currentMidi >= 0;
+  const staffSequence = currentMidi >= 0 ? [currentMidi] : [];
 
   return (
     <div className="screen">
@@ -63,6 +69,14 @@ export default function SetupScreen({ onBack }: Props) {
       </div>
 
       <p className="setup-instruction">Sing or play a note to test your microphone.</p>
+
+      <MusicStaff
+        sequence={staffSequence}
+        currentNoteIndex={0}
+        highlightIndex={currentMidi >= 0 ? 0 : -1}
+        detected={[]}
+        status={active ? 'LISTENING' : 'IDLE'}
+      />
 
       <div
         className="setup-note-name"
