@@ -13,7 +13,9 @@ import androidx.compose.ui.unit.sp
 import com.earring.AudioCapture
 import com.earring.EarRingCore
 import com.earring.MusicTheory
-import com.earring.ui.components.PitchMeter
+import com.earring.ui.components.MusicStaff
+import com.earring.ui.components.NoteState
+import com.earring.ui.components.StaffNote
 
 @Composable
 fun SetupScreen(onBack: () -> Unit) {
@@ -60,7 +62,14 @@ fun SetupScreen(onBack: () -> Unit) {
 
         Spacer(Modifier.height(24.dp))
         Text("Sing or play a note to test your microphone.", style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(16.dp))
+
+        // Music staff — shows live detected note
+        MusicStaff(
+            notes = if (displayMidi >= 0) listOf(StaffNote(displayMidi, NoteState.ACTIVE)) else emptyList(),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(16.dp))
 
         // Large note name display
         val noteLabel = if (displayMidi >= 0) MusicTheory.midiToLabel(displayMidi) else "—"

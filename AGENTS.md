@@ -130,7 +130,11 @@ Layout: vertical column, 16dp padding.
 [24dp space]
 "Sing or play a note to test your microphone."   — bodyMedium, centred
 
-[32dp space]
+[16dp space]
+MusicStaff            — 160dp tall, shows live detected note as ACTIVE (blue)
+                        Empty staff (no note) when nothing detected
+
+[8dp space]
 Large note name       — 72sp bold, primary colour when detected, muted when "—"
 Hz display            — bodyMedium, muted, shown only when pitch detected
 
@@ -142,7 +146,7 @@ PitchMeter            — 90dp circle
   OR
 [⏹ Stop]             — full-width filled ERROR colour, 52dp, 17sp
 
-NO test note buttons. NO music staff.
+NO test note buttons.
 ```
 
 Pitch display stability: require 3 consecutive audio frames of the same pitch class
@@ -330,8 +334,3 @@ Streak = number of consecutive calendar days with at least one session.
 SwiftUI cannot directly reference the app icon from `Assets.xcassets/AppIcon` as a UI image.
 **Exception:** Use `"Ear Ring 🎵"` as a plain bold Text title (32pt, primary colour) instead of
 the icon+text row. All other screens and elements must match the spec.
-
-### Desktop/Tauri — Mic Setup screen
-**Exception:** Show a `MusicStaff` above the large note name on the Mic Setup screen.
-Pass a single-note sequence `[currentMidi]` with `status="LISTENING"` when a note is detected,
-or an empty sequence when silent. This gives users a richer visual on the larger desktop screen.

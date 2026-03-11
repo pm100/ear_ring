@@ -7,6 +7,7 @@ struct SetupView: View {
     // Pitch display stability: 3 consecutive frames with same pitch class
     @State private var displayedNote: String = "—"
     @State private var displayedHz: String? = nil
+    @State private var displayedMidi: Int = -1
     @State private var stabilityPitchClass: Int = -1
     @State private var stabilityCount: Int = 0
 
@@ -20,8 +21,17 @@ struct SetupView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
 
+            // ── Music staff ───────────────────────────────────────────────
+            Spacer().frame(height: 16)
+            MusicStaffView(
+                expectedNotes: displayedMidi >= 0 ? [displayedMidi] : [],
+                detectedNotes: [],
+                currentNoteIndex: displayedMidi >= 0 ? 0 : -1
+            )
+            .frame(height: 160)
+
             // ── Large note display ────────────────────────────────────────
-            Spacer().frame(height: 32)
+            Spacer().frame(height: 8)
             VStack(spacing: 4) {
                 Text(displayedNote)
                     .font(.system(size: 72, weight: .bold))
@@ -100,6 +110,7 @@ struct SetupView: View {
                 displayedNote = MusicTheory.midiToLabel(midi)
                 let hz = 440.0 * pow(2.0, Double(midi - 69) / 12.0)
                 displayedHz = String(format: "%.1f Hz", hz)
+                displayedMidi = midi
             }
         } else {
             stabilityPitchClass = pc
@@ -112,5 +123,6 @@ struct SetupView: View {
         stabilityCount = 0
         displayedNote = "—"
         displayedHz = nil
+        displayedMidi = -1
     }
 }
