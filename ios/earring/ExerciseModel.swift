@@ -30,6 +30,7 @@ class ExerciseModel: ObservableObject {
     @Published var score: Int = 0
     @Published var liveMidi: Int? = nil
     @Published var liveCents: Int = 0
+    @Published var liveFrameCount: Int = 0
 
     // MARK: Audio subsystems
 
@@ -119,6 +120,18 @@ class ExerciseModel: ObservableObject {
         status = .idle
     }
 
+    func resetToIdle() {
+        audioCapture.stop()
+        audioPlayback.cancelPlayback()
+        detectedNotes = []
+        currentNoteIndex = 0
+        score = 0
+        liveMidi = nil
+        liveCents = 0
+        liveFrameCount = 0
+        status = .idle
+    }
+
     func newRound() {
         cleanup()
         generateSequence()
@@ -205,6 +218,7 @@ class ExerciseModel: ObservableObject {
         if rms < silenceRMSThreshold {
             liveMidi = nil
             liveCents = 0
+            liveFrameCount &+= 1
             return
         }
 
@@ -215,6 +229,7 @@ class ExerciseModel: ObservableObject {
 
         liveMidi = midi
         liveCents = cents
+        liveFrameCount &+= 1
     }
 
     private func commitNote(midi: Int, cents: Int) {

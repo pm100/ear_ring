@@ -326,4 +326,7 @@ Streak = number of consecutive calendar days with at least one session.
 
 ## Platform Exceptions
 
-*None yet. Add platform-specific overrides here when instructed.*
+### iOS — Home Screen title row
+SwiftUI cannot directly reference the app icon from `Assets.xcassets/AppIcon` as a UI image.
+**Exception:** Use `"Ear Ring 🎵"` as a plain bold Text title (32pt, primary colour) instead of
+the icon+text row. All other screens and elements must match the spec.

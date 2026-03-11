@@ -4,106 +4,128 @@ struct ResultsView: View {
     @EnvironmentObject var model: ExerciseModel
     @Binding var path: NavigationPath
 
-    private var scoreColor: Color {
-        if model.score >= 80 { return .green }
-        if model.score >= 50 { return .orange }
-        return .red
+    private var scorePercent: Int { model.score }
+
+    private var scoreEmoji: String {
+        if scorePercent == 100 { return "🏆" }
+        if scorePercent >= 80  { return "🎉" }
+        if scorePercent >= 50  { return "👍" }
+        return "💪"
     }
 
-    private var correctCount: Int {
-        model.detectedNotes.filter { $0.isCorrect }.count
+    private var scoreColor: Color {
+        if scorePercent >= 80 { return .erSuccess }
+        if scorePercent >= 50 { return .erWarning }
+        return .erError
+    }
+
+    private var exerciseLabel: String {
+        "\(MusicTheory.midiToLabel(model.rootMidi)) \(MusicTheory.SCALE_NAMES[model.scaleId])"
     }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(alignment: .leading, spacing: 0) {
 
-                // Score circle
-                ZStack {
-                    Circle()
-                        .strokeBorder(scoreColor.opacity(0.2), lineWidth: 12)
-                    Circle()
-                        .trim(from: 0, to: CGFloat(model.score) / 100)
-                        .stroke(scoreColor, style: StrokeStyle(lineWidth: 12, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    VStack(spacing: 4) {
-                        Text("\(model.score)%")
-                            .font(.system(size: 44, weight: .bold, design: .rounded))
-                            .foregroundColor(scoreColor)
-                        Text("Score")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                // ── Score header ──────────────────────────────────────────
+                Spacer().frame(height: 32)
+                VStack(spacing: 4) {
+                    Text(scoreEmoji)
+                        .font(.system(size: 64))
+                    Text("\(scorePercent)%")
+                        .font(.system(size: 56, weight: .bold))
+                        .foregroundColor(scoreColor)
+                    Text("Score")
+                        .font(.title3)
+                        .foregroundColor(.erMuted)
+                    Spacer().frame(height: 8)
+                    Text(exerciseLabel)
+                        .font(.body)
                 }
-                .frame(width: 160, height: 160)
-                .padding(.top, 20)
+                .frame(maxWidth: .infinity)
 
-                Text("Correct: \(correctCount)/\(model.sequence.count) notes")
-                    .font(.headline)
-                    .foregroundColor(.secondary)
+                // ── Note by Note ──────────────────────────────────────────
+                Spacer().frame(height: 24)
+                Divider()
+                Spacer().frame(height: 16)
 
-                // Note-by-note breakdown
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Note Breakdown")
-                        .font(.headline)
-                        .padding(.bottom, 8)
+                Text("Note by Note")
+                    .font(.title3.weight(.semibold))
 
-                    ForEach(Array(model.sequence.enumerated()), id: \.offset) { index, expectedMidi in
-                        HStack {
-                            Text("#\(index + 1)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .frame(width: 28, alignment: .leading)
+                Spacer().frame(height: 8)
 
-                            Text(MusicTheory.midiToLabel(expectedMidi))
-                                .font(.body.weight(.medium))
+                ForEach(Array(model.sequence.enumerated()), id: \.offset) { index, expectedMidi in
+                    VStack(spacing: 0) {
+                        HStack(spacing: 8) {
+                            Text("\(index + 1).")
+                                .font(.body)
+                                .foregroundColor(.erMuted)
+                                .frame(width: 24, alignment: .leading)
+
+                            Text("Expected: \(MusicTheory.midiToLabel(expectedMidi))")
+                                .font(.body)
 
                             Spacer()
 
                             if index < model.detectedNotes.count {
-                                let detected = model.detectedNotes[index]
-                                Text(MusicTheory.midiToLabel(detected.midi))
+                                let d = model.detectedNotes[index]
+                                Text("Sung: \(MusicTheory.midiToLabel(d.midi))")
                                     .font(.body)
-                                    .foregroundColor(detected.isCorrect ? .green : .red)
-                                Image(systemName: detected.isCorrect
-                                      ? "checkmark.circle.fill"
-                                      : "xmark.circle.fill")
-                                    .foregroundColor(detected.isCorrect ? .green : .red)
+                                Text(d.isCorrect ? "✓" : "✗")
+                                    .font(.body.weight(.bold))
+                                    .foregroundColor(d.isCorrect ? .erSuccess : .erError)
                             } else {
+                                Text("Sung: —")
+                                    .font(.body)
+                                    .foregroundColor(.erMuted)
                                 Text("—")
-                                    .foregroundColor(.secondary)
-                                Image(systemName: "circle")
-                                    .foregroundColor(.secondary)
+                                    .font(.body)
+                                    .foregroundColor(.erMuted)
                             }
                         }
                         .padding(.vertical, 10)
 
-                        if index < model.sequence.count - 1 {
-                            Divider()
-                        }
+                        Divider()
+                            .foregroundColor(.erMuted.opacity(0.5))
                     }
                 }
-                .cardStyle()
 
-                // Action buttons
-                VStack(spacing: 12) {
-                    Button("New Exercise") {
+                // ── Action buttons ────────────────────────────────────────
+                Spacer().frame(height: 28)
+                VStack(spacing: 10) {
+                    Button("🔄 Try Again") {
+                        model.resetToIdle()
+                        path.removeLast()
+                    }
+                    .buttonStyle(PrimaryButtonStyle(height: 52, fontSize: 17))
+
+                    Button("🏠 New Exercise") {
                         model.newRound()
                         path = NavigationPath()
                     }
-                    .buttonStyle(PrimaryButtonStyle())
+                    .buttonStyle(OutlinedButtonStyle(height: 48, fontSize: 16))
 
-                    Button("View Progress") {
+                    Button("📊 View Progress") {
                         path.append(AppRoute.progress)
                     }
-                    .buttonStyle(SecondaryButtonStyle())
+                    .buttonStyle(OutlinedButtonStyle(height: 48, fontSize: 16))
                 }
-                .padding(.bottom, 30)
+                .padding(.bottom, 16)
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 16)
         }
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle("Results")
+        .background(Color(.systemBackground))
+        .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("← Back") { path.removeLast() }
+                    .foregroundColor(.erPrimary)
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Text("Results")
+                    .font(.subheadline.weight(.semibold))
+            }
+        }
     }
 }

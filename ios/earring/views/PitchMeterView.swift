@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct PitchMeterView: View {
-    var midi: Int?      // nil = silent / not detected
+    var midi: Int?       // nil = silent / not detected
     var isActive: Bool
 
     private var noteLabel: String {
@@ -9,28 +9,31 @@ struct PitchMeterView: View {
         return MusicTheory.midiToLabel(midi)
     }
 
+    private var isDetected: Bool { midi != nil }
+
     private var ringColor: Color {
-        guard isActive, midi != nil else { return .gray.opacity(0.3) }
-        return .green
+        isDetected ? .erSuccess : .erMuted
+    }
+
+    private var textColor: Color {
+        isDetected ? .erDark : .erMuted
+    }
+
+    private var fontSize: CGFloat {
+        noteLabel.count >= 3 ? 16 : 20
     }
 
     var body: some View {
-        GeometryReader { geo in
-            let size = min(geo.size.width, geo.size.height)
-            ZStack {
-                Circle()
-                    .strokeBorder(ringColor, lineWidth: size * 0.06)
-                    .animation(.easeInOut(duration: 0.2), value: ringColor)
+        ZStack {
+            Circle()
+                .strokeBorder(ringColor, lineWidth: 4)
+                .animation(.easeInOut(duration: 0.15), value: isDetected)
 
-                Text(noteLabel)
-                    .font(.system(size: size * 0.32, weight: .bold, design: .rounded))
-                    .foregroundColor(isActive && midi != nil ? .primary : .secondary)
-                    .minimumScaleFactor(0.5)
-                    .lineLimit(1)
-                    .padding(size * 0.1)
-            }
-            .frame(width: size, height: size)
-            .position(x: geo.size.width / 2, y: geo.size.height / 2)
+            Text(noteLabel)
+                .font(.system(size: fontSize, weight: .bold))
+                .foregroundColor(textColor)
+                .animation(.easeInOut(duration: 0.15), value: noteLabel)
         }
+        .frame(width: 90, height: 90)
     }
 }

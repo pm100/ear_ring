@@ -2,74 +2,115 @@ import SwiftUI
 
 struct SetupView: View {
     @EnvironmentObject var model: ExerciseModel
+    @Environment(\.dismiss) private var dismiss
+
+    // Pitch display stability: 3 consecutive frames with same pitch class
+    @State private var displayedNote: String = "—"
+    @State private var displayedHz: String? = nil
+    @State private var stabilityPitchClass: Int = -1
+    @State private var stabilityCount: Int = 0
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
+        VStack(alignment: .leading, spacing: 0) {
 
-                // Instructions
-                VStack(spacing: 8) {
-                    Image(systemName: "mic.circle.fill")
-                        .font(.system(size: 50))
-                        .foregroundColor(.indigo)
-                    Text("Microphone Test")
-                        .font(.title2.bold())
-                    Text("Sing or play a note to see it detected on the staff.")
-                        .multilineTextAlignment(.center)
-                        .foregroundColor(.secondary)
+            // ── Instruction text ──────────────────────────────────────────
+            Spacer().frame(height: 24)
+            Text("Sing or play a note to test your microphone.")
+                .font(.body)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+
+            // ── Large note display ────────────────────────────────────────
+            Spacer().frame(height: 32)
+            VStack(spacing: 4) {
+                Text(displayedNote)
+                    .font(.system(size: 72, weight: .bold))
+                    .foregroundColor(displayedNote == "—" ? .erMuted : .erPrimary)
+                    .frame(maxWidth: .infinity)
+
+                if let hz = displayedHz {
+                    Text(hz)
+                        .font(.body)
+                        .foregroundColor(.erMuted)
                 }
-                .padding(.top, 16)
-
-                // Live pitch meter
-                PitchMeterView(midi: model.liveMidi, isActive: model.isCapturing)
-                    .frame(width: 140, height: 140)
-
-                // Live staff showing detected note
-                MusicStaffView(
-                    expectedNotes: model.liveMidi.map { [$0] } ?? [],
-                    detectedNotes: []
-                )
-                .frame(height: 160)
-                .cardStyle()
-
-                // Start / stop toggle
-                Button(model.isCapturing ? "Stop Listening" : "Start Listening") {
-                    if model.isCapturing {
-                        model.stopLivePitchDetection()
-                    } else {
-                        Task { await model.startLivePitchDetection() }
-                    }
-                }
-                .buttonStyle(model.isCapturing ? SecondaryButtonStyle() : PrimaryButtonStyle())
-
-                // Test notes
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Test Notes")
-                        .font(.headline)
-                    HStack(spacing: 10) {
-                        ForEach([(60, "C4"), (64, "E4"), (67, "G4"), (69, "A4"), (72, "C5")],
-                                id: \.0) { midi, label in
-                            Button(label) {
-                                Task { await model.playTestNote(midi: midi) }
-                            }
-                            .buttonStyle(ChipButtonStyle(selected: false))
-                        }
-                    }
-                }
-                .cardStyle()
             }
-            .padding(.horizontal)
-            .padding(.bottom, 30)
+
+            // ── Pitch meter ───────────────────────────────────────────────
+            Spacer().frame(height: 24)
+            HStack {
+                Spacer()
+                PitchMeterView(midi: model.liveMidi, isActive: model.isCapturing)
+                    .frame(width: 90, height: 90)
+                Spacer()
+            }
+
+            // ── Start / Stop button ───────────────────────────────────────
+            Spacer().frame(height: 32)
+            if model.isCapturing {
+                Button("⏹ Stop") {
+                    model.stopLivePitchDetection()
+                    resetStabilityState()
+                }
+                .buttonStyle(ErrorButtonStyle(height: 52, fontSize: 17))
+            } else {
+                Button("🎙 Start Listening") {
+                    resetStabilityState()
+                    Task { await model.startLivePitchDetection() }
+                }
+                .buttonStyle(PrimaryButtonStyle(height: 52, fontSize: 17))
+            }
+
+            Spacer()
         }
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle("Mic Setup")
+        .padding(.horizontal, 16)
+        .background(Color(.systemBackground))
+        .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            Task { await model.startLivePitchDetection() }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("← Back") {
+                    model.stopLivePitchDetection()
+                    dismiss()
+                }
+                .foregroundColor(.erPrimary)
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Text("Mic Setup")
+                    .font(.subheadline.weight(.semibold))
+            }
         }
         .onDisappear {
             model.stopLivePitchDetection()
             model.cancelPlayback()
         }
+        .onChange(of: model.liveFrameCount) { _ in
+            updateStability()
+        }
+    }
+
+    private func updateStability() {
+        guard let midi = model.liveMidi else {
+            resetStabilityState()
+            return
+        }
+        let pc = midi % 12
+        if pc == stabilityPitchClass {
+            stabilityCount += 1
+            if stabilityCount >= 3 {
+                displayedNote = MusicTheory.midiToLabel(midi)
+                let hz = 440.0 * pow(2.0, Double(midi - 69) / 12.0)
+                displayedHz = String(format: "%.1f Hz", hz)
+            }
+        } else {
+            stabilityPitchClass = pc
+            stabilityCount = 1
+        }
+    }
+
+    private func resetStabilityState() {
+        stabilityPitchClass = -1
+        stabilityCount = 0
+        displayedNote = "—"
+        displayedHz = nil
     }
 }

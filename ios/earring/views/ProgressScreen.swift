@@ -3,6 +3,7 @@ import SwiftUI
 /// Named ProgressScreen to avoid conflict with SwiftUI's built-in ProgressView.
 struct ProgressScreen: View {
     @EnvironmentObject var progressModel: ProgressModel
+    @Environment(\.dismiss) private var dismiss
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -13,97 +14,86 @@ struct ProgressScreen: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(alignment: .leading, spacing: 0) {
 
-                // Streak card
-                HStack(spacing: 12) {
+                // ── Streak card ───────────────────────────────────────────
+                Spacer().frame(height: 16)
+                HStack(spacing: 16) {
                     Text("🔥")
-                        .font(.system(size: 40))
+                        .font(.system(size: 48))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(progressModel.streak)")
-                            .font(.system(size: 36, weight: .bold, design: .rounded))
-                        Text("session streak (≥80%)")
+                        Text("\(progressModel.streak) day streak")
+                            .font(.system(size: 28, weight: .bold))
+                        Text("consecutive days with a session")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.erMuted)
                     }
                     Spacer()
                 }
-                .cardStyle()
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(.secondarySystemBackground))
+                )
 
-                // Best by scale
-                if !progressModel.bestByScale.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Best by Scale")
-                            .font(.headline)
+                // ── Session history ───────────────────────────────────────
+                Spacer().frame(height: 24)
 
-                        ForEach(
-                            progressModel.bestByScale.sorted(by: { $0.value > $1.value }),
-                            id: \.key
-                        ) { scaleName, best in
-                            HStack {
-                                Text(scaleName)
-                                    .font(.subheadline)
-                                Spacer()
-                                Text("\(best)%")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundColor(best >= 80 ? .green : best >= 50 ? .orange : .red)
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                    .cardStyle()
-                }
-
-                // Session history
                 if progressModel.history.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "chart.bar.xaxis")
-                            .font(.system(size: 44))
-                            .foregroundColor(.secondary)
-                        Text("No sessions yet")
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 40)
+                    Text("No sessions yet. Complete an exercise to see your progress!")
+                        .font(.body)
+                        .foregroundColor(.erMuted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
+                        .multilineTextAlignment(.center)
                 } else {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Session History")
-                            .font(.headline)
+                    Text("Session History")
+                        .font(.title3.weight(.semibold))
+                    Spacer().frame(height: 12)
 
-                        ForEach(progressModel.history) { record in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(progressModel.history) { record in
+                        VStack(spacing: 0) {
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 4) {
                                     Text("\(record.rootLabel) \(record.scaleName)")
-                                        .font(.subheadline.weight(.medium))
+                                        .font(.body.weight(.medium))
                                     Text(Self.dateFormatter.string(from: record.date))
                                         .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(.erMuted)
                                     Text("\(record.length) notes")
                                         .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(.erMuted)
                                 }
                                 Spacer()
                                 Text("\(record.score)%")
                                     .font(.headline)
                                     .foregroundColor(
-                                        record.score >= 80 ? .green
-                                        : record.score >= 50 ? .orange
-                                        : .red)
+                                        record.score >= 80 ? .erSuccess
+                                        : record.score >= 50 ? .erWarning
+                                        : .erError)
                             }
-                            .padding(.vertical, 6)
+                            .padding(.vertical, 10)
                             Divider()
                         }
                     }
-                    .cardStyle()
                 }
 
-                Spacer(minLength: 30)
+                Spacer().frame(height: 16)
             }
-            .padding(.horizontal)
-            .padding(.top, 12)
+            .padding(.horizontal, 16)
         }
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle("Progress")
+        .background(Color(.systemBackground))
+        .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("← Back") { dismiss() }
+                    .foregroundColor(.erPrimary)
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Text("Progress")
+                    .font(.subheadline.weight(.semibold))
+            }
+        }
     }
 }

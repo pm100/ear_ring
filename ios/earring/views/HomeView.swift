@@ -1,6 +1,17 @@
 import SwiftUI
 
-// MARK: - Shared button / card styles
+// MARK: - Brand colours
+
+extension Color {
+    static let erPrimary = Color(red: 0.247, green: 0.318, blue: 0.710)  // #3F51B5
+    static let erSuccess = Color(red: 0.298, green: 0.686, blue: 0.314)  // #4CAF50
+    static let erError   = Color(red: 0.957, green: 0.263, blue: 0.212)  // #F44336
+    static let erWarning = Color(red: 1.000, green: 0.596, blue: 0.000)  // #FF9800
+    static let erMuted   = Color(red: 0.741, green: 0.741, blue: 0.741)  // #BDBDBD
+    static let erDark    = Color(red: 0.129, green: 0.129, blue: 0.129)  // #212121
+}
+
+// MARK: - Chip style (selected = filled primary, unselected = outlined primary)
 
 struct ChipButtonStyle: ButtonStyle {
     var selected: Bool
@@ -9,48 +20,81 @@ struct ChipButtonStyle: ButtonStyle {
         configuration.label
             .font(.callout.weight(.medium))
             .padding(.vertical, 6)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(selected ? Color.indigo : Color(.systemGray5))
+                    .fill(selected ? Color.erPrimary : Color.clear)
             )
-            .foregroundColor(selected ? .white : .primary)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.erPrimary, lineWidth: 1.5)
+                    .opacity(selected ? 0 : 1)
+            )
+            .foregroundColor(selected ? .white : .erPrimary)
             .scaleEffect(configuration.isPressed ? 0.95 : 1)
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 
+// MARK: - Primary filled button
+
 struct PrimaryButtonStyle: ButtonStyle {
+    var height: CGFloat = 52
+    var fontSize: CGFloat = 17
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.indigo)
-            )
+            .font(.system(size: fontSize, weight: .semibold))
+            .frame(maxWidth: .infinity, minHeight: height)
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color.erPrimary))
             .foregroundColor(.white)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 
-struct SecondaryButtonStyle: ButtonStyle {
+// MARK: - Outlined button
+
+struct OutlinedButtonStyle: ButtonStyle {
+    var height: CGFloat = 48
+    var fontSize: CGFloat = 16
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
-            .frame(maxWidth: .infinity)
-            .padding()
+            .font(.system(size: fontSize, weight: .semibold))
+            .frame(maxWidth: .infinity, minHeight: height)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color.indigo, lineWidth: 1.5)
+                    .strokeBorder(Color.erPrimary, lineWidth: 1.5)
             )
-            .foregroundColor(.indigo)
+            .foregroundColor(.erPrimary)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
+
+// MARK: - Error (red filled) button
+
+struct ErrorButtonStyle: ButtonStyle {
+    var height: CGFloat = 52
+    var fontSize: CGFloat = 17
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: fontSize, weight: .semibold))
+            .frame(maxWidth: .infinity, minHeight: height)
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color.erError))
+            .foregroundColor(.white)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+
+// Legacy alias so existing call-sites compile unchanged
+typealias SecondaryButtonStyle = OutlinedButtonStyle
+
+// MARK: - Card modifier (kept for any callers that need it)
 
 struct CardModifier: ViewModifier {
     func body(content: Content) -> some View {
@@ -65,9 +109,7 @@ struct CardModifier: ViewModifier {
 }
 
 extension View {
-    func cardStyle() -> some View {
-        modifier(CardModifier())
-    }
+    func cardStyle() -> some View { modifier(CardModifier()) }
 }
 
 // MARK: - HomeView
@@ -77,117 +119,107 @@ struct HomeView: View {
     @Binding var path: NavigationPath
 
     private var rootNoteIndex: Int { model.rootMidi % 12 }
-    private var rootOctave: Int { model.rootMidi / 12 - 1 }
+    private var rootOctave: Int    { model.rootMidi / 12 - 1 }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(alignment: .leading, spacing: 0) {
 
-                // Title area
+                // ── Title ──────────────────────────────────────────────────
                 VStack(spacing: 6) {
-                    Image(systemName: "music.note")
-                        .font(.system(size: 40))
-                        .foregroundColor(.indigo)
-                    Text("Ear Ring")
-                        .font(.largeTitle.bold())
-                    Text("Train your musical ear")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                    Text("Ear Ring 🎵")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundColor(.erPrimary)
+                    Text("Ear Training")
+                        .font(.system(size: 16))
+                        .foregroundColor(.erMuted)
                 }
-                .padding(.top, 20)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 24)
 
-                // Root note section
-                VStack(alignment: .leading, spacing: 10) {
-                    Label("Root Note", systemImage: "music.quarternote.3")
-                        .font(.headline)
-                    LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible()), count: 6),
-                        spacing: 8
-                    ) {
-                        ForEach(0..<12, id: \.self) { i in
-                            Button(MusicTheory.NOTE_NAMES[i]) {
-                                model.rootMidi = (rootOctave + 1) * 12 + i
-                            }
-                            .buttonStyle(ChipButtonStyle(selected: rootNoteIndex == i))
+                // ── Root Note ─────────────────────────────────────────────
+                sectionLabel("Root Note").padding(.top, 28)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 50))], spacing: 6) {
+                    ForEach(0..<12, id: \.self) { i in
+                        Button(MusicTheory.NOTE_NAMES[i]) {
+                            model.rootMidi = (rootOctave + 1) * 12 + i
                         }
+                        .buttonStyle(ChipButtonStyle(selected: rootNoteIndex == i))
                     }
                 }
-                .cardStyle()
 
-                // Octave section
-                VStack(alignment: .leading, spacing: 10) {
-                    Label("Octave", systemImage: "dial.medium")
-                        .font(.headline)
-                    HStack(spacing: 10) {
-                        ForEach([3, 4, 5], id: \.self) { oct in
-                            Button("\(oct)") {
-                                model.rootMidi = (oct + 1) * 12 + rootNoteIndex
-                            }
-                            .buttonStyle(ChipButtonStyle(selected: rootOctave == oct))
+                // ── Octave ────────────────────────────────────────────────
+                sectionLabel("Octave").padding(.top, 16)
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible()), count: 3),
+                    spacing: 6
+                ) {
+                    ForEach([3, 4, 5], id: \.self) { oct in
+                        Button("\(oct)") {
+                            model.rootMidi = (oct + 1) * 12 + rootNoteIndex
                         }
-                        Spacer()
+                        .buttonStyle(ChipButtonStyle(selected: rootOctave == oct))
                     }
                 }
-                .cardStyle()
 
-                // Scale section
-                VStack(alignment: .leading, spacing: 10) {
-                    Label("Scale", systemImage: "waveform.path")
-                        .font(.headline)
-                    LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible()), count: 2),
-                        spacing: 8
-                    ) {
-                        ForEach(0..<MusicTheory.SCALE_NAMES.count, id: \.self) { i in
-                            Button(MusicTheory.SCALE_NAMES[i]) {
-                                model.scaleId = i
-                            }
-                            .buttonStyle(ChipButtonStyle(selected: model.scaleId == i))
+                // ── Scale ─────────────────────────────────────────────────
+                sectionLabel("Scale").padding(.top, 16)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 6) {
+                    ForEach(0..<MusicTheory.SCALE_NAMES.count, id: \.self) { i in
+                        Button(MusicTheory.SCALE_NAMES[i]) {
+                            model.scaleId = i
                         }
+                        .buttonStyle(ChipButtonStyle(selected: model.scaleId == i))
                     }
                 }
-                .cardStyle()
 
-                // Sequence length section
-                VStack(alignment: .leading, spacing: 10) {
-                    Label("Sequence Length", systemImage: "list.number")
-                        .font(.headline)
-                    HStack(spacing: 8) {
-                        ForEach(2...8, id: \.self) { len in
-                            Button("\(len)") {
-                                model.sequenceLength = len
-                            }
-                            .buttonStyle(ChipButtonStyle(selected: model.sequenceLength == len))
+                // ── Sequence Length ───────────────────────────────────────
+                sectionLabel("Sequence Length").padding(.top, 16)
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible()), count: 7),
+                    spacing: 6
+                ) {
+                    ForEach(2...8, id: \.self) { len in
+                        Button("\(len)") {
+                            model.sequenceLength = len
                         }
-                        Spacer()
+                        .buttonStyle(ChipButtonStyle(selected: model.sequenceLength == len))
                     }
                 }
-                .cardStyle()
 
-                // Action buttons
-                VStack(spacing: 12) {
-                    Button("Start Exercise") {
+                // ── Action buttons ────────────────────────────────────────
+                VStack(spacing: 10) {
+                    Button("▶ Start Exercise") {
                         model.generateSequence()
                         path.append(AppRoute.exercise)
                     }
-                    .buttonStyle(PrimaryButtonStyle())
+                    .buttonStyle(PrimaryButtonStyle(height: 52, fontSize: 18))
 
-                    Button("Mic Setup") {
+                    Button("🎙 Mic Setup") {
                         path.append(AppRoute.setup)
                     }
-                    .buttonStyle(SecondaryButtonStyle())
+                    .buttonStyle(OutlinedButtonStyle(height: 48, fontSize: 16))
 
-                    Button("View Progress") {
+                    Button("📊 Progress") {
                         path.append(AppRoute.progress)
                     }
-                    .buttonStyle(SecondaryButtonStyle())
+                    .buttonStyle(OutlinedButtonStyle(height: 48, fontSize: 16))
                 }
-                .padding(.bottom, 30)
+                .padding(.top, 32)
+                .padding(.bottom, 16)
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 16)
         }
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle("Ear Ring")
-        .navigationBarTitleDisplayMode(.inline)
+        .background(Color(.systemBackground))
+        .toolbar(.hidden, for: .navigationBar)
+    }
+
+    @ViewBuilder
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.caption)
+            .foregroundColor(.erMuted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 6)
     }
 }
