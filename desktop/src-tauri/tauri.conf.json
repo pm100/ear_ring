@@ -19,7 +19,14 @@
       "active": true,
       "targets": "all",
       "identifier": "com.earring.desktop",
-      "icon": []
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/256x256.png",
+        "icons/512x512.png",
+        "icons/icon.ico"
+      ]
     },
     "security": { "csp": null },
     "windows": [
@@ -30,8 +37,10 @@
         "width": 480,
         "height": 820,
         "minWidth": 400,
-        "minHeight": 700
+        "minHeight": 700,
+        "fileDropEnabled": false
       }
-    ]
+    ],
+    "systemTray": null
   }
 }

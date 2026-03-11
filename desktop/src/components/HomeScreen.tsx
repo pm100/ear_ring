@@ -19,7 +19,10 @@ export default function HomeScreen({ exercise, onUpdateExercise, onStart, onSetu
 
   return (
     <div className="screen">
-      <h1 className="app-title">Ear Ring 🎵</h1>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 4 }}>
+        <img src="/icon.png" alt="Ear Ring" style={{ width: 48, height: 48, borderRadius: 10 }} />
+        <h1 className="app-title" style={{ margin: 0 }}>Ear Ring</h1>
+      </div>
       <p className="app-subtitle">Ear Training</p>
 
       <span className="section-label">Root Note</span>
