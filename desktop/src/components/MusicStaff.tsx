@@ -8,6 +8,7 @@ interface Props {
   highlightIndex: number;
   detected: { midi: number; correct: boolean }[];
   status: string;
+  fixedSpacing?: number;
 }
 
 const NOTE_NAMES_SHARP = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -26,7 +27,7 @@ function useStaffPositions(sequence: number[]) {
   return positions;
 }
 
-export default function MusicStaff({ sequence, currentNoteIndex, highlightIndex, detected, status }: Props) {
+export default function MusicStaff({ sequence, currentNoteIndex, highlightIndex, detected, status, fixedSpacing }: Props) {
   const staffPositions = useStaffPositions(sequence);
   const svgWidth = 500;
   const svgHeight = 160;
@@ -44,8 +45,7 @@ export default function MusicStaff({ sequence, currentNoteIndex, highlightIndex,
 
   const noteAreaStart = leftMargin + 20;
   const noteAreaWidth = svgWidth - noteAreaStart - 20;
-  const noteCount = Math.max(sequence.length, 1);
-  const noteStep = noteAreaWidth / noteCount;
+  const noteStep = fixedSpacing ?? noteAreaWidth / Math.max(sequence.length, 1);
   const calcNoteX = (i: number) => noteAreaStart + i * noteStep + noteStep / 2;
 
   const getNoteColor = (i: number): string => {

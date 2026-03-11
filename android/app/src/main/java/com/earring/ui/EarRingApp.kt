@@ -1,6 +1,8 @@
 package com.earring.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -45,8 +47,10 @@ fun EarRingApp() {
             )
         }
         composable(Routes.SETUP) {
+            val state by exerciseViewModel.state.collectAsState()
             SetupScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                octave = state.octave
             )
         }
         composable(Routes.RESULTS) {

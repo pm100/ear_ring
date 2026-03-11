@@ -132,8 +132,13 @@ Layout: vertical column, 16dp padding.
 
 [16dp space]
 MusicStaff            — 160dp tall, shows rolling note history left to right
-                        Each newly stable note is appended on the right (max 8 visible)
-                        Oldest note scrolls off left when full
+                        Notes are placed at fixed 44dp spacing from the LEFT end of the staff
+                        Each newly stable note is appended on the right
+                        When staff is full (8 notes), oldest scrolls off left, new note appears right
+                        Only notes within the valid MIDI range are added:
+                          midiMin = (octave + 1) * 12  (C at selected octave, e.g. C4 when octave=4)
+                          midiMax = midiMin + 23        (two octaves, e.g. B5 when octave=4)
+                        Max 8 notes visible; history capped at 8
                         Most recent note: ACTIVE colour (blue)
                         Previous notes: EXPECTED colour (hollow dark)
                         Empty staff when nothing detected yet
@@ -155,6 +160,10 @@ NO test note buttons.
 
 Pitch display stability: require 3 consecutive audio frames of the same pitch class
 before updating the displayed note. This prevents flickering.
+
+The staff visual style (lines, treble clef, note colours, positioning math) is
+**identical to the Exercise screen**. The only difference is that in Mic Setup the
+notes accumulate from live detection rather than from a pre-generated sequence.
 
 ---
 
@@ -249,7 +258,8 @@ B3=-1, A3=-2, … (diatonic steps from C4, sharps/flats share parent note's posi
 ```
 noteAreaStart = leftMargin + 20
 noteAreaWidth = totalWidth - noteAreaStart - 20
-noteStep      = noteAreaWidth / max(noteCount, 1)
+noteStep      = noteAreaWidth / max(noteCount, 1)   [Exercise screen: distributed evenly]
+noteStep      = 44dp (fixed)                         [Setup screen: fixed spacing, left-to-right]
 noteX         = noteAreaStart + index*noteStep + noteStep/2
 ```
 

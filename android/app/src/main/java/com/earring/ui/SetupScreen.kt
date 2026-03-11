@@ -19,9 +19,14 @@ import com.earring.ui.components.PitchMeter
 import com.earring.ui.components.StaffNote
 
 @Composable
-fun SetupScreen(onBack: () -> Unit) {
+fun SetupScreen(onBack: () -> Unit, octave: Int = 4) {
     val context = LocalContext.current
     val audioCapture = remember { AudioCapture() }
+
+    val noteStepDp = 44.dp
+    val midiMin = (octave + 1) * 12
+    val midiMax = midiMin + 23
+    val maxHistory = 8
 
     var isListening by remember { mutableStateOf(false) }
     var detectedHz by remember { mutableFloatStateOf(-1f) }
@@ -74,7 +79,8 @@ fun SetupScreen(onBack: () -> Unit) {
             notes = noteHistory.mapIndexed { i, m ->
                 StaffNote(m, if (i == noteHistory.size - 1) NoteState.ACTIVE else NoteState.EXPECTED)
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            fixedSpacingDp = noteStepDp
         )
         Spacer(Modifier.height(16.dp))
 
@@ -111,12 +117,14 @@ fun SetupScreen(onBack: () -> Unit) {
                             if (midi == lastMidi) {
                                 stableCount++
                                 if (stableCount >= 3) {
-                                    displayMidi = midi
-                                    // Add to rolling history when note changes
-                                    if (midi != lastAddedMidi) {
-                                        noteHistory.add(midi)
-                                        if (noteHistory.size > 8) noteHistory.removeAt(0)
-                                        lastAddedMidi = midi
+                                    if (midi >= midiMin && midi <= midiMax) {
+                                        displayMidi = midi
+                                        // Add to rolling history when note changes
+                                        if (midi != lastAddedMidi) {
+                                            noteHistory.add(midi)
+                                            if (noteHistory.size > maxHistory) noteHistory.removeAt(0)
+                                            lastAddedMidi = midi
+                                        }
                                     }
                                 }
                             } else {

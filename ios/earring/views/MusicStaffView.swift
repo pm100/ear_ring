@@ -4,6 +4,7 @@ struct MusicStaffView: View {
     var expectedNotes: [Int]          // MIDI note numbers
     var detectedNotes: [DetectedNote] // matched by index
     var currentNoteIndex: Int = -1    // -1 = none active
+    var fixedSpacing: CGFloat? = nil
 
     var body: some View {
         // Capture for Canvas closure
@@ -51,12 +52,18 @@ struct MusicStaffView: View {
             let noteAreaStart: CGFloat = leftMargin + 20
             let noteAreaWidth: CGFloat = size.width - noteAreaStart - 20
             let noteCount = _expectedNotes.count
-            let noteStep: CGFloat = noteAreaWidth / CGFloat(max(noteCount, 1))
+            let noteStep: CGFloat
+            if let fs = fixedSpacing {
+                noteStep = fs
+            } else {
+                noteStep = noteAreaWidth / CGFloat(max(noteCount, 1))
+            }
+            let calcNoteX = { (i: Int) -> CGFloat in noteAreaStart + CGFloat(i) * noteStep + noteStep / 2 }
 
             for i in 0..<noteCount {
                 let midi     = _expectedNotes[i]
                 let staffPos = EarRingCore.staffPosition(midi: midi)
-                let x: CGFloat = noteAreaStart + CGFloat(i) * noteStep + noteStep / 2
+                let x: CGFloat = calcNoteX(i)
                 let y = noteY(staffPos)
 
                 // ── Ledger lines below staff ───────────────────────────────

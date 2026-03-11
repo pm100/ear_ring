@@ -28,7 +28,8 @@ data class StaffNote(
 fun MusicStaff(
     notes: List<StaffNote>,
     modifier: Modifier = Modifier,
-    lineSpacingDp: Dp = 12.dp
+    lineSpacingDp: Dp = 12.dp,
+    fixedSpacingDp: Dp? = null
 ) {
     val textMeasurer = rememberTextMeasurer()
 
@@ -65,7 +66,7 @@ fun MusicStaff(
         val noteAreaStart = leftMargin + 20f
         val noteAreaWidth = size.width - noteAreaStart - 20f
         val noteCount = notes.size.coerceAtLeast(1)
-        val noteStep = noteAreaWidth / noteCount.toFloat()
+        val noteStep = if (fixedSpacingDp != null) fixedSpacingDp.toPx() else noteAreaWidth / noteCount.toFloat()
 
         notes.forEachIndexed { index, staffNote ->
             val staffPos = EarRingCore.staffPosition(staffNote.midi)

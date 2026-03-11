@@ -27,7 +27,8 @@ struct SetupView: View {
             MusicStaffView(
                 expectedNotes: noteHistory,
                 detectedNotes: [],
-                currentNoteIndex: noteHistory.count - 1
+                currentNoteIndex: noteHistory.count - 1,
+                fixedSpacing: 44
             )
             .frame(height: 160)
 
@@ -108,6 +109,10 @@ struct SetupView: View {
         if pc == stabilityPitchClass {
             stabilityCount += 1
             if stabilityCount >= 3 {
+                let octave = model.rootMidi / 12 - 1
+                let midiMin = (octave + 1) * 12
+                let midiMax = midiMin + 23
+                guard midi >= midiMin && midi <= midiMax else { return }
                 let isNewNote = midi != displayedMidi
                 displayedNote = MusicTheory.midiToLabel(midi)
                 let hz = 440.0 * pow(2.0, Double(midi - 69) / 12.0)

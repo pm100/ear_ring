@@ -95,7 +95,7 @@ export default function App() {
         />
       )}
       {screen === 'setup' && (
-        <SetupScreen onBack={() => setScreen('home')} />
+        <SetupScreen onBack={() => setScreen('home')} octave={exercise.octave} />
       )}
       {screen === 'results' && (
         <ResultsScreen

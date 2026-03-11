@@ -6,11 +6,12 @@ import { useAudioCapture } from '../hooks/useAudioCapture';
 
 interface Props {
   onBack: () => void;
+  octave: number;
 }
 
 const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
-export default function SetupScreen({ onBack }: Props) {
+export default function SetupScreen({ onBack, octave }: Props) {
   const [hz, setHz] = useState(0);
   const [noteName, setNoteName] = useState('\u2014');
   const [currentMidi, setCurrentMidi] = useState<number>(-1);
@@ -19,6 +20,10 @@ export default function SetupScreen({ onBack }: Props) {
   const frameNotesRef = React.useRef<number[]>([]);
   const lastAddedMidiRef = React.useRef<number>(-1);
   const { start, stop } = useAudioCapture();
+
+  const NOTE_STEP = 44;
+  const midiMin = (octave + 1) * 12;
+  const midiMax = midiMin + 23;
 
   const handleHz = useCallback(async (detectedHz: number) => {
     setHz(detectedHz);
@@ -30,8 +35,9 @@ export default function SetupScreen({ onBack }: Props) {
         if (frameNotesRef.current.length > 3) frameNotesRef.current.shift();
         const last = frameNotesRef.current;
         if (last.length === 3 && last[0] === last[1] && last[1] === last[2]) {
-          const octave = Math.floor(midi / 12) - 1;
-          setNoteName(`${NOTE_NAMES[pitchClass]}${octave}`);
+          const noteOctave = Math.floor(midi / 12) - 1;
+          if (midi < midiMin || midi > midiMax) return;
+          setNoteName(`${NOTE_NAMES[pitchClass]}${noteOctave}`);
           setCurrentMidi(midi);
           // Add to rolling history when note changes
           if (midi !== lastAddedMidiRef.current) {
@@ -89,6 +95,7 @@ export default function SetupScreen({ onBack }: Props) {
         highlightIndex={noteHistory.length - 1}
         detected={[]}
         status={noteHistory.length > 0 ? 'listening' : 'idle'}
+        fixedSpacing={NOTE_STEP}
       />
 
       <div
