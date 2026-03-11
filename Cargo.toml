@@ -3,4 +3,7 @@ members = [
     "rust",
     "rust_wasm",
 ]
+exclude = [
+    "desktop/src-tauri",
+]
 resolver = "2"

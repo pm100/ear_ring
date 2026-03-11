@@ -1,0 +1,65 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+use ear_ring_core::{detect_pitch, freq_to_note, generate_sequence, staff_position, Note, ScaleType};
+
+#[tauri::command]
+fn cmd_detect_pitch(samples: Vec<f32>, sample_rate: u32) -> f32 {
+    match detect_pitch(&samples, sample_rate) {
+        Some(hz) => hz,
+        None => -1.0,
+    }
+}
+
+#[tauri::command]
+fn cmd_freq_to_midi(hz: f32) -> i32 {
+    match freq_to_note(hz) {
+        Some((note, _)) => note.midi() as i32,
+        None => -1,
+    }
+}
+
+#[tauri::command]
+fn cmd_freq_to_cents(hz: f32) -> i32 {
+    match freq_to_note(hz) {
+        Some((_, cents)) => cents,
+        None => 0,
+    }
+}
+
+#[tauri::command]
+fn cmd_staff_position(midi: u8) -> i32 {
+    staff_position(Note::from_midi(midi))
+}
+
+#[tauri::command]
+fn cmd_generate_sequence(root_midi: u8, scale_id: u8, length: u8, seed: u64) -> Vec<u8> {
+    let scale = match scale_id {
+        0 => ScaleType::Major,
+        1 => ScaleType::NaturalMinor,
+        2 => ScaleType::HarmonicMinor,
+        3 => ScaleType::PentatonicMajor,
+        4 => ScaleType::PentatonicMinor,
+        5 => ScaleType::Dorian,
+        6 => ScaleType::Mixolydian,
+        7 => ScaleType::Blues,
+        _ => ScaleType::Major,
+    };
+    let root = Note::from_midi(root_midi);
+    generate_sequence(root, scale, length, seed)
+        .iter()
+        .map(|n| n.midi())
+        .collect()
+}
+
+fn main() {
+    tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            cmd_detect_pitch,
+            cmd_freq_to_midi,
+            cmd_freq_to_cents,
+            cmd_staff_position,
+            cmd_generate_sequence,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}

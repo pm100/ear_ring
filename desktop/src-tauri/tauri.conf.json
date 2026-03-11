@@ -1,0 +1,37 @@
+{
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist"
+  },
+  "package": {
+    "productName": "Ear Ring",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": { "all": false, "open": true },
+      "http": { "all": true, "scope": ["https://tonejs.github.io/**"] }
+    },
+    "bundle": {
+      "active": true,
+      "targets": "all",
+      "identifier": "com.earring.desktop",
+      "icon": []
+    },
+    "security": { "csp": null },
+    "windows": [
+      {
+        "fullscreen": false,
+        "resizable": true,
+        "title": "Ear Ring",
+        "width": 480,
+        "height": 820,
+        "minWidth": 400,
+        "minHeight": 700
+      }
+    ]
+  }
+}

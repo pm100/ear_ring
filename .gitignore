@@ -46,3 +46,7 @@ android/build/
 # Compiled JS bundle (regenerated on build)
 android/app/src/main/assets/index.android.bundle
 android/app/src/main/assets/index.android.bundle.map
+
+desktop/node_modules/
+desktop/dist/
+desktop/src-tauri/target/
