@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Indigo background -->
+  <rect width="1024" height="1024" fill="#3F51B5"/>
+
+  <!-- Earring clasp / hook ring at top — the "ring" in "Ear Ring" -->
+  <circle cx="530" cy="148" r="52" fill="none" stroke="white" stroke-width="36"/>
+
+  <!-- Stem (earring wire / note stem) -->
+  <rect x="510" y="195" width="40" height="400" rx="20" fill="white"/>
+
+  <!-- Note head (the earring pendant / musical note head) -->
+  <ellipse cx="418" cy="668" rx="138" ry="108"
+           transform="rotate(-20 418 668)" fill="white"/>
+
+  <!-- Five music staff lines to the right of the note — musical context -->
+  <line x1="590" y1="565" x2="920" y2="565" stroke="white" stroke-width="22" stroke-linecap="round" opacity="0.30"/>
+  <line x1="590" y1="625" x2="920" y2="625" stroke="white" stroke-width="22" stroke-linecap="round" opacity="0.30"/>
+  <line x1="590" y1="685" x2="920" y2="685" stroke="white" stroke-width="22" stroke-linecap="round" opacity="0.30"/>
+  <line x1="590" y1="745" x2="920" y2="745" stroke="white" stroke-width="22" stroke-linecap="round" opacity="0.30"/>
+  <line x1="590" y1="805" x2="920" y2="805" stroke="white" stroke-width="22" stroke-linecap="round" opacity="0.30"/>
+</svg>
