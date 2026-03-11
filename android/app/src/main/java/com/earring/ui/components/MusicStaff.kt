@@ -1,20 +1,23 @@
 package com.earring.ui.components
 
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.earring.DetectedNote
 import com.earring.EarRingCore
+import com.earring.R
 
 enum class NoteState { EXPECTED, CORRECT, INCORRECT, ACTIVE }
 
@@ -30,6 +33,12 @@ fun MusicStaff(
     lineSpacingDp: Dp = 12.dp,
     fixedSpacingDp: Dp? = null
 ) {
+    val context = LocalContext.current
+    val clefBitmap = remember {
+        BitmapFactory.decodeResource(context.resources, R.drawable.ic_treble_clef)
+            ?.asImageBitmap()
+    }
+
     Canvas(
         modifier = modifier
             .fillMaxWidth()
@@ -37,7 +46,8 @@ fun MusicStaff(
     ) {
         val lineSpacing = lineSpacingDp.toPx()
         val staffTop = size.height / 2f - 2 * lineSpacing
-        val leftMargin = 60f
+        // Left margin is proportional to line spacing so it scales with density
+        val leftMargin = lineSpacing * 4.2f
         val noteRadius = lineSpacing * 0.45f
 
         // Draw 5 staff lines
@@ -51,30 +61,27 @@ fun MusicStaff(
             )
         }
 
-        // Draw treble clef symbol using native canvas for proper font fallback
-        drawIntoCanvas { canvas ->
-            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                textSize = lineSpacing * 4.8f
-                color = android.graphics.Color.parseColor("#333333")
-            }
-            canvas.nativeCanvas.drawText(
-                "\uD834\uDD1E",
-                4f,
-                staffTop + lineSpacing * 3.8f,
-                paint
+        // Draw treble clef from bundled PNG (Android system fonts lack U+1D11E)
+        clefBitmap?.let { bmp ->
+            val clefH = (lineSpacing * 7f).toInt()
+            val clefW = (clefH * bmp.width.toFloat() / bmp.height.toFloat()).toInt()
+            val clefTop = (staffTop - lineSpacing * 1.5f).toInt()
+            drawImage(
+                image = bmp,
+                dstOffset = IntOffset(2, clefTop),
+                dstSize = IntSize(clefW, clefH)
             )
         }
 
         // Distribute notes horizontally
-        val noteAreaStart = leftMargin + 20f
-        val noteAreaWidth = size.width - noteAreaStart - 20f
+        val noteAreaStart = leftMargin + lineSpacing
+        val noteAreaWidth = size.width - noteAreaStart - 16f
         val noteCount = notes.size.coerceAtLeast(1)
         val noteStep = if (fixedSpacingDp != null) fixedSpacingDp.toPx() else noteAreaWidth / noteCount.toFloat()
 
         notes.forEachIndexed { index, staffNote ->
             val staffPos = EarRingCore.staffPosition(staffNote.midi)
-            // staffPos: C4=0, D4=1, ... each step = half line spacing
-            val staffCenter = staffTop + 2 * lineSpacing // line 3 = B4 area
+            val staffCenter = staffTop + 2 * lineSpacing
             val noteY = staffCenter - staffPos * (lineSpacing / 2f)
             val noteX = noteAreaStart + index * noteStep + noteStep / 2f
 
@@ -85,22 +92,11 @@ fun MusicStaff(
                 NoteState.ACTIVE -> Color(0xFF3F51B5)
             }
 
-            // Draw ledger lines if needed (outside staff lines 0-4)
             drawLedgerLines(noteX, noteY, staffTop, lineSpacing, noteRadius)
 
-            // Draw note head
-            drawCircle(
-                color = noteColor,
-                radius = noteRadius,
-                center = Offset(noteX, noteY)
-            )
-            // Hollow for expected notes
+            drawCircle(color = noteColor, radius = noteRadius, center = Offset(noteX, noteY))
             if (staffNote.state == NoteState.EXPECTED) {
-                drawCircle(
-                    color = Color.White,
-                    radius = noteRadius - 2.5f,
-                    center = Offset(noteX, noteY)
-                )
+                drawCircle(color = Color.White, radius = noteRadius - 2.5f, center = Offset(noteX, noteY))
             }
         }
     }
@@ -116,27 +112,15 @@ private fun DrawScope.drawLedgerLines(
     val staffBottom = staffTop + 4 * lineSpacing
     val ledgerWidth = noteRadius * 2.8f
 
-    // Above staff
     var y = staffTop - lineSpacing
     while (noteY <= y + 1f) {
-        drawLine(
-            color = Color(0xFF555555),
-            start = Offset(noteX - ledgerWidth, y),
-            end = Offset(noteX + ledgerWidth, y),
-            strokeWidth = 1.5f
-        )
+        drawLine(color = Color(0xFF555555), start = Offset(noteX - ledgerWidth, y), end = Offset(noteX + ledgerWidth, y), strokeWidth = 1.5f)
         y -= lineSpacing
     }
 
-    // Below staff
     y = staffBottom + lineSpacing
     while (noteY >= y - 1f) {
-        drawLine(
-            color = Color(0xFF555555),
-            start = Offset(noteX - ledgerWidth, y),
-            end = Offset(noteX + ledgerWidth, y),
-            strokeWidth = 1.5f
-        )
+        drawLine(color = Color(0xFF555555), start = Offset(noteX - ledgerWidth, y), end = Offset(noteX + ledgerWidth, y), strokeWidth = 1.5f)
         y += lineSpacing
     }
 }
