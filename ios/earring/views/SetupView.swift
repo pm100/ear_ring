@@ -8,6 +8,7 @@ struct SetupView: View {
     @State private var displayedNote: String = "—"
     @State private var displayedHz: String? = nil
     @State private var displayedMidi: Int = -1
+    @State private var noteHistory: [Int] = []
     @State private var stabilityPitchClass: Int = -1
     @State private var stabilityCount: Int = 0
 
@@ -24,9 +25,9 @@ struct SetupView: View {
             // ── Music staff ───────────────────────────────────────────────
             Spacer().frame(height: 16)
             MusicStaffView(
-                expectedNotes: displayedMidi >= 0 ? [displayedMidi] : [],
+                expectedNotes: noteHistory,
                 detectedNotes: [],
-                currentNoteIndex: displayedMidi >= 0 ? 0 : -1
+                currentNoteIndex: noteHistory.count - 1
             )
             .frame(height: 160)
 
@@ -107,10 +108,17 @@ struct SetupView: View {
         if pc == stabilityPitchClass {
             stabilityCount += 1
             if stabilityCount >= 3 {
+                let isNewNote = midi != displayedMidi
                 displayedNote = MusicTheory.midiToLabel(midi)
                 let hz = 440.0 * pow(2.0, Double(midi - 69) / 12.0)
                 displayedHz = String(format: "%.1f Hz", hz)
                 displayedMidi = midi
+                // Add to rolling history when note changes
+                if isNewNote {
+                    var h = noteHistory + [midi]
+                    if h.count > 8 { h.removeFirst() }
+                    noteHistory = h
+                }
             }
         } else {
             stabilityPitchClass = pc
@@ -124,5 +132,6 @@ struct SetupView: View {
         displayedNote = "—"
         displayedHz = nil
         displayedMidi = -1
+        noteHistory = []
     }
 }

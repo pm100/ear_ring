@@ -131,8 +131,12 @@ Layout: vertical column, 16dp padding.
 "Sing or play a note to test your microphone."   — bodyMedium, centred
 
 [16dp space]
-MusicStaff            — 160dp tall, shows live detected note as ACTIVE (blue)
-                        Empty staff (no note) when nothing detected
+MusicStaff            — 160dp tall, shows rolling note history left to right
+                        Each newly stable note is appended on the right (max 8 visible)
+                        Oldest note scrolls off left when full
+                        Most recent note: ACTIVE colour (blue)
+                        Previous notes: EXPECTED colour (hollow dark)
+                        Empty staff when nothing detected yet
 
 [8dp space]
 Large note name       — 72sp bold, primary colour when detected, muted when "—"

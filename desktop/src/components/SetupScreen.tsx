@@ -14,8 +14,10 @@ export default function SetupScreen({ onBack }: Props) {
   const [hz, setHz] = useState(0);
   const [noteName, setNoteName] = useState('\u2014');
   const [currentMidi, setCurrentMidi] = useState<number>(-1);
+  const [noteHistory, setNoteHistory] = useState<number[]>([]);
   const [listening, setListening] = useState(false);
   const frameNotesRef = React.useRef<number[]>([]);
+  const lastAddedMidiRef = React.useRef<number>(-1);
   const { start, stop } = useAudioCapture();
 
   const handleHz = useCallback(async (detectedHz: number) => {
@@ -31,6 +33,15 @@ export default function SetupScreen({ onBack }: Props) {
           const octave = Math.floor(midi / 12) - 1;
           setNoteName(`${NOTE_NAMES[pitchClass]}${octave}`);
           setCurrentMidi(midi);
+          // Add to rolling history when note changes
+          if (midi !== lastAddedMidiRef.current) {
+            setNoteHistory(prev => {
+              const next = [...prev, midi];
+              if (next.length > 8) next.shift();
+              return next;
+            });
+            lastAddedMidiRef.current = midi;
+          }
         }
       }
     } else {
@@ -51,6 +62,8 @@ export default function SetupScreen({ onBack }: Props) {
     setHz(0);
     setNoteName('\u2014');
     setCurrentMidi(-1);
+    setNoteHistory([]);
+    lastAddedMidiRef.current = -1;
     frameNotesRef.current = [];
   }, [stop]);
 
@@ -71,11 +84,11 @@ export default function SetupScreen({ onBack }: Props) {
       <p className="setup-instruction">Sing or play a note to test your microphone.</p>
 
       <MusicStaff
-        sequence={staffSequence}
-        currentNoteIndex={0}
-        highlightIndex={currentMidi >= 0 ? 0 : -1}
+        sequence={noteHistory}
+        currentNoteIndex={noteHistory.length - 1}
+        highlightIndex={noteHistory.length - 1}
         detected={[]}
-        status={active ? 'LISTENING' : 'IDLE'}
+        status={noteHistory.length > 0 ? 'listening' : 'idle'}
       />
 
       <div

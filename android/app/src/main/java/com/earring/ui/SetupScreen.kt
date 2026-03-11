@@ -26,10 +26,12 @@ fun SetupScreen(onBack: () -> Unit) {
     var isListening by remember { mutableStateOf(false) }
     var detectedHz by remember { mutableFloatStateOf(-1f) }
     var detectedMidi by remember { mutableIntStateOf(-1) }
-    // Smoothed midi for display — only update when stable for a few frames
     var displayMidi by remember { mutableIntStateOf(-1) }
     var stableCount by remember { mutableIntStateOf(0) }
     var lastMidi by remember { mutableIntStateOf(-1) }
+    // Rolling note history — accumulates stable notes left to right, max 8 visible
+    val noteHistory = remember { mutableStateListOf<Int>() }
+    var lastAddedMidi by remember { mutableIntStateOf(-1) }
 
     fun stopAll() {
         audioCapture.stop()
@@ -39,6 +41,8 @@ fun SetupScreen(onBack: () -> Unit) {
         displayMidi = -1
         stableCount = 0
         lastMidi = -1
+        noteHistory.clear()
+        lastAddedMidi = -1
     }
 
     BackHandler { stopAll(); onBack() }
@@ -65,9 +69,11 @@ fun SetupScreen(onBack: () -> Unit) {
         Text("Sing or play a note to test your microphone.", style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(16.dp))
 
-        // Music staff — shows live detected note
+        // Music staff — scrolling note history, newest note highlighted blue
         MusicStaff(
-            notes = if (displayMidi >= 0) listOf(StaffNote(displayMidi, NoteState.ACTIVE)) else emptyList(),
+            notes = noteHistory.mapIndexed { i, m ->
+                StaffNote(m, if (i == noteHistory.size - 1) NoteState.ACTIVE else NoteState.EXPECTED)
+            },
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(16.dp))
@@ -104,7 +110,15 @@ fun SetupScreen(onBack: () -> Unit) {
                             // Stability: require 3 consecutive frames of same note before displaying
                             if (midi == lastMidi) {
                                 stableCount++
-                                if (stableCount >= 3) displayMidi = midi
+                                if (stableCount >= 3) {
+                                    displayMidi = midi
+                                    // Add to rolling history when note changes
+                                    if (midi != lastAddedMidi) {
+                                        noteHistory.add(midi)
+                                        if (noteHistory.size > 8) noteHistory.removeAt(0)
+                                        lastAddedMidi = midi
+                                    }
+                                }
                             } else {
                                 lastMidi = midi
                                 stableCount = 1
