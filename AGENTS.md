@@ -256,10 +256,11 @@ Staff lines must start at x=5 (not leftMargin) so they visually pass through the
 
 **Treble clef** — size and position (all platforms):
 ```
-Android / iOS  : Unicode U+1D11E (𝄞), font size = lineSpacing * 3.5
-                 x = 4px from left edge
-                 Android: drawText baseline y = staffTop + lineSpacing * 3.0
-                 iOS:     topLeading anchor at CGPoint(x:4, y: staffTop - lineSpacing * 0.5)
+Android / iOS  : Unicode U+1D11E (𝄞), x = 4px from left edge
+                 Android: font size = lineSpacing * 3.5
+                          drawText baseline y = staffTop + lineSpacing * 3.0
+                 iOS:     font size = lineSpacing * 7  (iOS system font fallback renders smaller)
+                          topLeading anchor at CGPoint(x:4, y: staffTop - lineSpacing * 2.5)
 
 Tauri/desktop  : Pre-rendered PNG (desktop/public/treble_clef.png, 149×307px, transparent bg)
                  Generated via Windows GDI+ — see UI Debugging Guide for regen instructions.

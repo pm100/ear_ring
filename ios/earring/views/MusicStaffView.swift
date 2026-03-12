@@ -36,15 +36,16 @@ struct MusicStaffView: View {
                 let y = staffTop + CGFloat(i) * lineSpacing
                 var p = Path()
                 p.move(to: CGPoint(x: 5, y: y))
-                p.addLine(to: CGPoint(x: size.width, y: y))
+                p.addLine(to: CGPoint(x: size.width - 16, y: y))
                 ctx.stroke(p, with: staffLineShading, lineWidth: 1.5)
             }
 
             // ── Treble clef ────────────────────────────────────────────────
-            // font size = lineSpacing * 3.5, topLeading anchor at (x:4, y: staffTop - lineSpacing*0.5)
+            // iOS system font fallback for U+1D11E renders smaller than Android,
+            // so font size is scaled up to lineSpacing * 7 with adjusted y origin.
             ctx.draw(
-                Text("𝄞").font(.system(size: lineSpacing * 3.5)),
-                at: CGPoint(x: 4, y: staffTop - lineSpacing * 0.5),
+                Text("𝄞").font(.system(size: lineSpacing * 7)),
+                at: CGPoint(x: 4, y: staffTop - lineSpacing * 2.5),
                 anchor: .topLeading
             )
 
