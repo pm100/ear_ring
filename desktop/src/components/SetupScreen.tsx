@@ -13,7 +13,7 @@ const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
 export default function SetupScreen({ onBack, octave }: Props) {
   const [hz, setHz] = useState(0);
-  const [noteName, setNoteName] = useState('\u2014');
+  const [noteName, setNoteName] = useState('');
   const [currentMidi, setCurrentMidi] = useState<number>(-1);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
   const [listening, setListening] = useState(false);
@@ -52,7 +52,7 @@ export default function SetupScreen({ onBack, octave }: Props) {
       }
     } else {
       frameNotesRef.current = [];
-      setNoteName('\u2014');
+      setNoteName('');
       setCurrentMidi(-1);
     }
   }, []);
