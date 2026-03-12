@@ -2,12 +2,15 @@
 
 ## UI Consistency Rule
 
-**ALL platform versions of Ear Ring must have the same UI design.**
+**ALL UI changes must be applied to ALL platforms (Android, iOS, Tauri/desktop) simultaneously.**
 
 The canonical reference implementation is the **Android app** (`android/` directory).
 When building or modifying any platform (iOS, desktop/Tauri, web, etc.) you must
 replicate the Android UI exactly unless there is an explicit per-platform instruction
 in this file overriding a specific element.
+
+**When a UI change is requested with no platform specified, implement it on every platform
+in the same commit. Never apply a change to only one platform and consider the task done.**
 
 If you are given explicit instructions to make the UI different on a specific platform,
 document that exception in the **Platform Exceptions** section at the bottom of this file.
