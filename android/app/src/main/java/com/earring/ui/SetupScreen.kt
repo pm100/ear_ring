@@ -84,21 +84,6 @@ fun SetupScreen(onBack: () -> Unit, octave: Int = 4) {
         )
         Spacer(Modifier.height(16.dp))
 
-        // Large note name display
-        val noteLabel = if (displayMidi >= 0) MusicTheory.midiToLabel(displayMidi) else ""
-        val hzLabel = if (detectedHz > 0f) "${detectedHz.toInt()} Hz" else ""
-        Text(
-            text = noteLabel,
-            fontSize = 72.sp,
-            fontWeight = FontWeight.Bold,
-            color = if (displayMidi >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (hzLabel.isNotEmpty()) {
-            Text(hzLabel, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-
-        Spacer(Modifier.height(24.dp))
-
         PitchMeter(detectedMidi = displayMidi, detectedHz = detectedHz)
 
         Spacer(Modifier.height(32.dp))

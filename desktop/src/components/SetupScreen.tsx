@@ -9,11 +9,9 @@ interface Props {
   octave: number;
 }
 
-const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
 export default function SetupScreen({ onBack, octave }: Props) {
   const [hz, setHz] = useState(0);
-  const [noteName, setNoteName] = useState('');
   const [currentMidi, setCurrentMidi] = useState<number>(-1);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
   const [listening, setListening] = useState(false);
@@ -35,11 +33,8 @@ export default function SetupScreen({ onBack, octave }: Props) {
         if (frameNotesRef.current.length > 3) frameNotesRef.current.shift();
         const last = frameNotesRef.current;
         if (last.length === 3 && last[0] === last[1] && last[1] === last[2]) {
-          const noteOctave = Math.floor(midi / 12) - 1;
           if (midi < midiMin || midi > midiMax) return;
-          setNoteName(`${NOTE_NAMES[pitchClass]}${noteOctave}`);
           setCurrentMidi(midi);
-          // Add to rolling history when note changes
           if (midi !== lastAddedMidiRef.current) {
             setNoteHistory(prev => {
               const next = [...prev, midi];
@@ -52,7 +47,6 @@ export default function SetupScreen({ onBack, octave }: Props) {
       }
     } else {
       frameNotesRef.current = [];
-      setNoteName('');
       setCurrentMidi(-1);
     }
   }, []);
@@ -66,7 +60,6 @@ export default function SetupScreen({ onBack, octave }: Props) {
     stop();
     setListening(false);
     setHz(0);
-    setNoteName('');
     setCurrentMidi(-1);
     setNoteHistory([]);
     lastAddedMidiRef.current = -1;
@@ -76,9 +69,6 @@ export default function SetupScreen({ onBack, octave }: Props) {
   useEffect(() => {
     return () => stop();
   }, [stop]);
-
-  const active = hz > 0 && currentMidi >= 0;
-  const staffSequence = currentMidi >= 0 ? [currentMidi] : [];
 
   return (
     <div className="screen">
@@ -97,17 +87,6 @@ export default function SetupScreen({ onBack, octave }: Props) {
         status={noteHistory.length > 0 ? 'listening' : 'idle'}
         fixedSpacing={NOTE_STEP}
       />
-
-      <div
-        className="setup-note-name"
-        style={{ color: active ? 'var(--primary)' : 'var(--muted)' }}
-      >
-        {noteName}
-      </div>
-
-      <div className="setup-hz">
-        {hz > 0 ? `${hz.toFixed(1)} Hz` : ''}
-      </div>
 
       <div className="pitch-meter-circle">
         <PitchMeter hz={hz} />
