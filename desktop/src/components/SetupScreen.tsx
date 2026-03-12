@@ -66,7 +66,7 @@ export default function SetupScreen({ onBack, octave }: Props) {
     stop();
     setListening(false);
     setHz(0);
-    setNoteName('\u2014');
+    setNoteName('');
     setCurrentMidi(-1);
     setNoteHistory([]);
     lastAddedMidiRef.current = -1;
