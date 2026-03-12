@@ -15,6 +15,10 @@ in the same commit. Never apply a change to only one platform and consider the t
 If you are given explicit instructions to make the UI different on a specific platform,
 document that exception in the **Platform Exceptions** section at the bottom of this file.
 
+**After any UI change — sizes, positions, colours, layout, or new elements — you MUST update
+the relevant section of this file (AGENTS.md) to reflect the new values before considering
+the task complete. This keeps the spec accurate for future agents.**
+
 ---
 
 ## Screen Inventory
@@ -235,19 +239,34 @@ Canvas/SVG element, full width, **160dp/px tall**.
 ```
 lineSpacing = 12dp
 staffTop    = height/2 - 2*lineSpacing    (centres the 5-line staff vertically)
-leftMargin  = 60px (space for treble clef)
+leftMargin  = 60px (used for note placement only — NOT for staff line start)
 noteRadius  = lineSpacing * 0.45
 ```
 
 **5 horizontal staff lines** (colour #333333, 1.5px stroke):
 ```
+start x = 5px   ← lines begin at the LEFT EDGE, passing through the clef
+end   x = totalWidth - 16px (or svgWidth - 10 in Tauri)
 line 0 = staffTop + 0*lineSpacing
 line 1 = staffTop + 1*lineSpacing
 ...
 line 4 = staffTop + 4*lineSpacing   ← bottom line
 ```
+Staff lines must start at x=5 (not leftMargin) so they visually pass through the treble clef.
 
-**Treble clef** Unicode U+1D11E (𝄞), 56sp, drawn at x=4, y=staffTop - lineSpacing*1.5.
+**Treble clef** — size and position (all platforms):
+```
+Android / iOS  : Unicode U+1D11E (𝄞), font size = lineSpacing * 3.5
+                 x = 4px from left edge
+                 Android: drawText baseline y = staffTop + lineSpacing * 3.0
+                 iOS:     topLeading anchor at CGPoint(x:4, y: staffTop - lineSpacing * 0.5)
+
+Tauri/desktop  : Pre-rendered PNG (desktop/public/treble_clef.png, 149×307px, transparent bg)
+                 Generated via Windows GDI+ — see UI Debugging Guide for regen instructions.
+                 clefH = lineSpacing * 8       (spans 2 lineSpacings above and below staff)
+                 clefW = clefH * (149 / 307)   (preserves PNG aspect ratio ≈ 0.485)
+                 x = 2,  y = staffTop - lineSpacing * 2
+```
 
 **Note positioning** (uses `staff_position()` from Rust core):
 ```
@@ -351,3 +370,122 @@ Streak = number of consecutive calendar days with at least one session.
 SwiftUI cannot directly reference the app icon from `Assets.xcassets/AppIcon` as a UI image.
 **Exception:** Use `"Ear Ring 🎵"` as a plain bold Text title (32pt, primary colour) instead of
 the icon+text row. All other screens and elements must match the spec.
+
+---
+
+## UI Debugging Guide
+
+### Debugging the Android App (Emulator)
+
+**ADB location:** `$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe`
+
+**Launch the app:**
+```powershell
+$adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+& $adb shell am start -n com.earring/.MainActivity
+```
+
+**The debug build is slow to start** (~60–90 seconds for the splash to clear on first run due to JVM
+verification). Wait for the logcat message `Displayed com.earring/.MainActivity` before tapping.
+
+**Take a screenshot:**
+```powershell
+& $adb shell screencap -p /sdcard/screen.png
+& $adb pull /sdcard/screen.png C:\work\ear_ring\screen.png
+```
+
+**Tap at screen coordinates** (screen is 1080×2400 physical pixels; adb uses physical coords):
+```powershell
+& $adb shell input tap <x> <y>
+```
+Known approximate tap targets on the Home screen (1080×2400):
+- "Start Exercise" button: (540, 1810)
+- "Mic Setup" button: (540, 1968)
+- "Progress" button: (540, 2060)
+
+**Back navigation:**
+```powershell
+& $adb shell input keyevent 4
+```
+
+**View logcat for errors:**
+```powershell
+& $adb logcat -d 2>&1 | Select-String -Pattern "earring|EarRing|FATAL|AndroidRuntime" -CaseSensitive:$false | Select-Object -Last 30
+```
+
+**Build and install:**
+```powershell
+cd C:\work\ear_ring\android
+.\gradlew installDebug 2>&1 | Select-String -Pattern "BUILD|error:|FAILED|Installing"
+```
+
+---
+
+### Debugging the Tauri Desktop App
+
+**Start the dev server** (hot-reloads on file save — Vite reloads TSX, Rust changes require full rebuild):
+```powershell
+cd C:\work\ear_ring\desktop
+Start-Process powershell -ArgumentList "-NoProfile -Command `"cd C:\work\ear_ring\desktop; cargo tauri dev`"" -WindowStyle Normal
+```
+
+The window takes ~90 seconds to appear. Wait for `Ear Ring` to appear in `Get-Process | Where-Object { $_.MainWindowTitle -eq "Ear Ring" }`.
+
+**Take a screenshot of the Tauri window:**
+```powershell
+Add-Type -AssemblyName System.Drawing
+Add-Type @"
+using System; using System.Runtime.InteropServices;
+public class TauriCap {
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+    [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
+}
+"@
+$hwnd = (Get-Process | Where-Object { $_.MainWindowTitle -eq "Ear Ring" } | Select-Object -First 1).MainWindowHandle
+[TauriCap]::SetForegroundWindow($hwnd) | Out-Null
+Start-Sleep -Milliseconds 800
+$rect = New-Object TauriCap+RECT
+[TauriCap]::GetWindowRect($hwnd, [ref]$rect)
+$bmp = New-Object System.Drawing.Bitmap(($rect.R-$rect.L), ($rect.B-$rect.T))
+$g = [System.Drawing.Graphics]::FromImage($bmp)
+$g.CopyFromScreen($rect.L, $rect.T, 0, 0, $bmp.Size)
+$g.Dispose()
+$bmp.Save("C:\work\ear_ring\tauri_cap.png")
+```
+
+**IMPORTANT — window capture gotchas:**
+- The Copilot CLI terminal window may cover the Tauri app when taking screenshots.
+  Move the Tauri window clear of it first:
+  ```powershell
+  Add-Type @"
+  using System; using System.Runtime.InteropServices;
+  public class WM { [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr i, int x, int y, int cx, int cy, uint f); }
+  "@
+  [WM]::SetWindowPos($hwnd, [IntPtr](-1), 900, 50, 500, 860, 0x0040) | Out-Null  # HWND_TOPMOST
+  ```
+  Remember to clear HWND_TOPMOST after (`[IntPtr](-2)` = HWND_NOTOPMOST).
+
+- `CopyFromScreen` captures the LIVE screen pixels at the window's position — other windows
+  in front will appear in the capture. Ensure the Tauri window is topmost before capturing.
+
+**Navigate to a specific screen without clicking** (most reliable):
+Temporarily change the initial `useState` in `desktop/src/App.tsx`:
+```tsx
+// Change 'home' to 'setup', 'exercise', etc. — Vite hot-reloads instantly
+const [screen, setScreen] = useState<Screen>('setup');
+```
+Revert to `'home'` after capturing. Hot-reload takes ~2–3 seconds.
+
+**Treble clef PNG regeneration** (`desktop/public/treble_clef.png`):
+WebView2/Chromium cannot reliably render U+1D11E (𝄞) via CSS fonts.
+The PNG is pre-rendered using Windows GDI+ (System.Drawing) which has full access to
+Segoe UI Symbol. To regenerate:
+```powershell
+cd C:\work\ear_ring\icon
+node gen_desktop_clef.js
+```
+The script uses PowerShell GDI+ internally, then sharp for trimming. The output PNG has a
+**transparent background** (RGBA, channels=4). Do NOT use sharp's SVG renderer for this —
+libvips/rsvg does not have access to Windows system fonts and renders a fallback glyph.
+

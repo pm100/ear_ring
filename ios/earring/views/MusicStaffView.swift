@@ -31,18 +31,20 @@ struct MusicStaffView: View {
                 Color(red: 0.333, green: 0.333, blue: 0.333))
 
             // ── 5 staff lines ──────────────────────────────────────────────
+            // Start at x=5 (not leftMargin) so lines pass through the treble clef
             for i in 0..<5 {
                 let y = staffTop + CGFloat(i) * lineSpacing
                 var p = Path()
-                p.move(to: CGPoint(x: 0, y: y))
+                p.move(to: CGPoint(x: 5, y: y))
                 p.addLine(to: CGPoint(x: size.width, y: y))
                 ctx.stroke(p, with: staffLineShading, lineWidth: 1.5)
             }
 
             // ── Treble clef ────────────────────────────────────────────────
+            // font size = lineSpacing * 3.5, topLeading anchor at (x:4, y: staffTop - lineSpacing*0.5)
             ctx.draw(
-                Text("𝄞").font(.system(size: 56)),
-                at: CGPoint(x: 4, y: staffTop - lineSpacing * 1.5),
+                Text("𝄞").font(.system(size: lineSpacing * 3.5)),
+                at: CGPoint(x: 4, y: staffTop - lineSpacing * 0.5),
                 anchor: .topLeading
             )
 

@@ -40,12 +40,12 @@ fun MusicStaff(
         val leftMargin = 60f
         val noteRadius = lineSpacing * 0.45f
 
-        // Draw 5 staff lines
+        // Draw 5 staff lines — start at left edge (x=5) so they overlap the clef
         for (i in 0..4) {
             val y = staffTop + i * lineSpacing
             drawLine(
                 color = Color(0xFF333333),
-                start = Offset(leftMargin, y),
+                start = Offset(5f, y),
                 end = Offset(size.width - 16f, y),
                 strokeWidth = 1.5f
             )
@@ -54,13 +54,13 @@ fun MusicStaff(
         // Draw treble clef symbol using native canvas for proper font fallback
         drawIntoCanvas { canvas ->
             val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                textSize = lineSpacing * 4.8f
+                textSize = lineSpacing * 3.5f
                 color = android.graphics.Color.parseColor("#333333")
             }
             canvas.nativeCanvas.drawText(
                 "\uD834\uDD1E",
                 4f,
-                staffTop + lineSpacing * 3.8f,
+                staffTop + lineSpacing * 3.0f,
                 paint
             )
         }
