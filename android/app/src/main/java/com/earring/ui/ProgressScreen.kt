@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.earring.ProgressViewModel
 import com.earring.SessionRecord
+import com.earring.TestRecord
 
 @Composable
 fun ProgressScreen(
@@ -74,6 +75,30 @@ fun ProgressScreen(
             }
         }
 
+        Spacer(Modifier.height(12.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "${state.tests.size} recorded tests",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Average test score ${state.averageTestScore}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
         // Best by scale
         if (state.bestByScale.isNotEmpty()) {
             Spacer(Modifier.height(20.dp))
@@ -104,6 +129,23 @@ fun ProgressScreen(
         } else {
             state.sessions.forEach { session ->
                 SessionCard(session)
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+        Text("Recent Tests", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(8.dp))
+
+        if (state.tests.isEmpty()) {
+            Text(
+                "No tests recorded yet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            state.tests.take(10).forEach { test ->
+                TestCard(test)
                 Spacer(Modifier.height(8.dp))
             }
         }
@@ -153,5 +195,51 @@ private fun ScoreBadge(percent: Int) {
             .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {
         Text("$percent%", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+    }
+}
+
+@Composable
+private fun TestCard(test: TestRecord) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "${test.rootLabel}  ${test.scaleName}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        test.dateString,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                ScoreBadge(test.scorePercent)
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = if (test.passed) {
+                    "Passed in ${test.attemptsUsed}/${test.maxAttempts} tries"
+                } else {
+                    "Failed after ${test.maxAttempts} tries"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Expected: ${test.expectedNotes.joinToString(", ")}",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                "Detected: ${test.detectedNotes.joinToString(", ")}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }

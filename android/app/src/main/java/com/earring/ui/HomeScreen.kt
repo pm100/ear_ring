@@ -20,6 +20,8 @@ import com.earring.ExerciseViewModel
 import com.earring.MusicTheory
 import com.earring.R
 
+private val BPM_OPTIONS = listOf("60", "80", "100", "120", "140")
+
 @Composable
 fun HomeScreen(
     viewModel: ExerciseViewModel,
@@ -96,6 +98,22 @@ fun HomeScreen(
             selected = state.sequenceLength - 2,
             onSelect = { viewModel.setSequenceLength(it + 2) }
         )
+        Spacer(Modifier.height(16.dp))
+
+        SectionLabel("Tempo (BPM)")
+        ChipRow(
+            items = BPM_OPTIONS,
+            selected = BPM_OPTIONS.indexOf(state.tempoBpm.toString()).coerceAtLeast(0),
+            onSelect = { viewModel.setTempoBpm(BPM_OPTIONS[it].toInt()) }
+        )
+        Spacer(Modifier.height(16.dp))
+
+        SectionLabel("Display Test Notes")
+        ChipRow(
+            items = listOf("Hide", "Show"),
+            selected = if (state.showTestNotes) 1 else 0,
+            onSelect = { viewModel.setShowTestNotes(it == 1) }
+        )
         Spacer(Modifier.height(32.dp))
 
         Button(
@@ -140,6 +158,10 @@ private fun ChipRow(
     selected: Int,
     onSelect: (Int) -> Unit
 ) {
+    val chipColors = FilterChipDefaults.filterChipColors(
+        selectedContainerColor = MaterialTheme.colorScheme.primary,
+        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+    )
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -150,7 +172,8 @@ private fun ChipRow(
                 selected = isSelected,
                 onClick = { onSelect(index) },
                 label = { Text(label, fontSize = 13.sp) },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                colors = chipColors
             )
         }
     }
@@ -163,6 +186,10 @@ private fun WrappingChipRow(
     selected: Int,
     onSelect: (Int) -> Unit
 ) {
+    val chipColors = FilterChipDefaults.filterChipColors(
+        selectedContainerColor = MaterialTheme.colorScheme.primary,
+        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+    )
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -172,7 +199,8 @@ private fun WrappingChipRow(
             FilterChip(
                 selected = index == selected,
                 onClick = { onSelect(index) },
-                label = { Text(label, fontSize = 13.sp) }
+                label = { Text(label, fontSize = 13.sp) },
+                colors = chipColors
             )
         }
     }

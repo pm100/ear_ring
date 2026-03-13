@@ -23,9 +23,12 @@ struct SetupView: View {
             // ── Music staff ───────────────────────────────────────────────
             Spacer().frame(height: 16)
             MusicStaffView(
-                expectedNotes: noteHistory,
-                detectedNotes: [],
-                currentNoteIndex: noteHistory.count - 1,
+                notes: noteHistory.enumerated().map { index, midi in
+                    StaffDisplayNote(
+                        midi: midi,
+                        state: index == noteHistory.count - 1 ? .active : .expected
+                    )
+                },
                 fixedSpacing: 44
             )
             .frame(height: 160)

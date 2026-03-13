@@ -23,6 +23,7 @@ export function useAudioPlayback() {
   const bufferCache = useRef<Map<number, AudioBuffer>>(new Map());
   const cancelRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
 
   const getContext = useCallback(() => {
     if (!contextRef.current || contextRef.current.state === 'closed') {
@@ -61,21 +62,61 @@ export function useAudioPlayback() {
     source.buffer = buffer;
     source.playbackRate.value = Math.pow(2, (midi - sampleMidi) / 12);
     source.connect(ctx.destination);
+    activeSourcesRef.current.push(source);
+    source.onended = () => {
+      activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
+    };
     source.start();
   }, [loadSample, getContext]);
+
+  const playChord = useCallback(async (midis: number[], holdMs = 600) => {
+    cancelRef.current = false;
+    const ctx = getContext();
+    if (ctx.state === 'suspended') await ctx.resume();
+    const loaded = await Promise.all(midis.map(async midi => {
+      const sampleMidi = nearestSample(midi);
+      const buffer = await loadSample(midi);
+      return buffer ? { midi, sampleMidi, buffer } : null;
+    }));
+    if (cancelRef.current) return;
+    loaded.filter((item): item is NonNullable<typeof item> => item !== null).forEach(item => {
+      const source = ctx.createBufferSource();
+      source.buffer = item.buffer;
+      source.playbackRate.value = Math.pow(2, (item.midi - item.sampleMidi) / 12);
+      source.connect(ctx.destination);
+      activeSourcesRef.current.push(source);
+      source.onended = () => {
+        activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
+      };
+      source.start();
+    });
+    await new Promise(resolve => {
+      timeoutRef.current = setTimeout(resolve, holdMs);
+    });
+  }, [getContext, loadSample]);
 
   const cancelPlayback = useCallback(() => {
     cancelRef.current = true;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    activeSourcesRef.current.forEach(source => {
+      try {
+        source.stop();
+      } catch {
+        // source may already be stopped
+      }
+    });
+    activeSourcesRef.current = [];
   }, []);
 
   const playSequence = useCallback(async (
     midis: number[],
     onEach: (index: number) => void,
-    onDone: () => void
+    onDone: () => void,
+    bpm = 100
   ) => {
     cancelRef.current = false;
     await Promise.all(midis.map(m => loadSample(m)));
+    const stepMs = Math.max(150, Math.round(60000 / Math.max(1, bpm)));
 
     let i = 0;
     const playNext = async () => {
@@ -86,10 +127,10 @@ export function useAudioPlayback() {
       onEach(i);
       await playNote(midis[i]);
       i++;
-      timeoutRef.current = setTimeout(playNext, 600);
+      timeoutRef.current = setTimeout(playNext, stepMs);
     };
     await playNext();
   }, [loadSample, playNote]);
 
-  return { playNote, playSequence, cancelPlayback };
+  return { playNote, playChord, playSequence, cancelPlayback };
 }

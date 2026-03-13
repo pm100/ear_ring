@@ -1,20 +1,21 @@
 import React from 'react';
-import { ExerciseState } from '../types';
+import { ExerciseSettings } from '../types';
 
 interface Props {
-  exercise: ExerciseState;
-  onUpdateExercise: (updates: Partial<ExerciseState>) => void;
-  onStart: (rootNote: number, octave: number, scaleId: number, sequenceLength: number) => void;
+  settings: ExerciseSettings;
+  onUpdateSettings: React.Dispatch<React.SetStateAction<ExerciseSettings>>;
+  onStart: (rootNote: number, octave: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean) => void;
   onSetup: () => void;
   onProgress: () => void;
 }
 
 const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const SCALE_NAMES = ['Major','Natural Minor','Harmonic Minor','Pentatonic Major','Pentatonic Minor','Dorian','Mixolydian','Blues'];
+const BPM_OPTIONS = [60, 80, 100, 120, 140];
 
-export default function HomeScreen({ exercise, onUpdateExercise, onStart, onSetup, onProgress }: Props) {
+function HomeScreen({ settings, onUpdateSettings, onStart, onSetup, onProgress }: Props) {
   const handleStart = () => {
-    onStart(exercise.rootNote, exercise.octave, exercise.scaleId, exercise.sequenceLength);
+    onStart(settings.rootNote, settings.octave, settings.scaleId, settings.sequenceLength, settings.tempoBpm, settings.showTestNotes);
   };
 
   return (
@@ -30,8 +31,9 @@ export default function HomeScreen({ exercise, onUpdateExercise, onStart, onSetu
         {NOTE_NAMES.map((name, i) => (
           <button
             key={i}
-            className={`chip ${exercise.rootNote === i ? 'chip-selected' : ''}`}
-            onClick={() => onUpdateExercise({ rootNote: i })}
+            type="button"
+            className={`chip ${settings.rootNote === i ? 'chip-selected' : ''}`}
+            onClick={() => onUpdateSettings(prev => ({ ...prev, rootNote: i }))}
           >
             {name}
           </button>
@@ -43,8 +45,9 @@ export default function HomeScreen({ exercise, onUpdateExercise, onStart, onSetu
         {[3, 4, 5].map(oct => (
           <button
             key={oct}
-            className={`chip ${exercise.octave === oct ? 'chip-selected' : ''}`}
-            onClick={() => onUpdateExercise({ octave: oct })}
+            type="button"
+            className={`chip ${settings.octave === oct ? 'chip-selected' : ''}`}
+            onClick={() => onUpdateSettings(prev => ({ ...prev, octave: oct }))}
           >
             {oct}
           </button>
@@ -56,8 +59,9 @@ export default function HomeScreen({ exercise, onUpdateExercise, onStart, onSetu
         {SCALE_NAMES.map((name, i) => (
           <button
             key={i}
-            className={`chip ${exercise.scaleId === i ? 'chip-selected' : ''}`}
-            onClick={() => onUpdateExercise({ scaleId: i })}
+            type="button"
+            className={`chip ${settings.scaleId === i ? 'chip-selected' : ''}`}
+            onClick={() => onUpdateSettings(prev => ({ ...prev, scaleId: i }))}
           >
             {name}
           </button>
@@ -69,10 +73,39 @@ export default function HomeScreen({ exercise, onUpdateExercise, onStart, onSetu
         {[2, 3, 4, 5, 6, 7, 8].map(len => (
           <button
             key={len}
-            className={`chip ${exercise.sequenceLength === len ? 'chip-selected' : ''}`}
-            onClick={() => onUpdateExercise({ sequenceLength: len })}
+            type="button"
+            className={`chip ${settings.sequenceLength === len ? 'chip-selected' : ''}`}
+            onClick={() => onUpdateSettings(prev => ({ ...prev, sequenceLength: len }))}
           >
             {len}
+          </button>
+        ))}
+      </div>
+
+      <span className="section-label">Tempo (BPM)</span>
+      <div className="chip-row">
+        {BPM_OPTIONS.map(bpm => (
+          <button
+            key={bpm}
+            type="button"
+            className={`chip ${settings.tempoBpm === bpm ? 'chip-selected' : ''}`}
+            onClick={() => onUpdateSettings(prev => ({ ...prev, tempoBpm: bpm }))}
+          >
+            {bpm}
+          </button>
+        ))}
+      </div>
+
+      <span className="section-label">Display Test Notes</span>
+      <div className="chip-row">
+        {[false, true].map(show => (
+          <button
+            key={show ? 'show' : 'hide'}
+            type="button"
+            className={`chip ${settings.showTestNotes === show ? 'chip-selected' : ''}`}
+            onClick={() => onUpdateSettings(prev => ({ ...prev, showTestNotes: show }))}
+          >
+            {show ? 'Show' : 'Hide'}
           </button>
         ))}
       </div>
@@ -85,3 +118,5 @@ export default function HomeScreen({ exercise, onUpdateExercise, onStart, onSetu
     </div>
   );
 }
+
+export default React.memo(HomeScreen);

@@ -36,6 +36,23 @@ struct ProgressScreen: View {
                         .fill(Color(.secondarySystemBackground))
                 )
 
+                Spacer().frame(height: 12)
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(progressModel.tests.count) recorded tests")
+                            .font(.system(size: 22, weight: .bold))
+                        Text("Average test score \(progressModel.averageTestScore)%")
+                            .font(.caption)
+                            .foregroundColor(.erMuted)
+                    }
+                    Spacer()
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(.secondarySystemBackground))
+                )
+
                 // ── Session history ───────────────────────────────────────
                 Spacer().frame(height: 24)
 
@@ -78,11 +95,49 @@ struct ProgressScreen: View {
                     }
                 }
 
+                Spacer().frame(height: 24)
+                Text("Recent Tests")
+                    .font(.title3.weight(.semibold))
+                Spacer().frame(height: 12)
+
+                if progressModel.tests.isEmpty {
+                    Text("No tests recorded yet.")
+                        .font(.body)
+                        .foregroundColor(.erMuted)
+                } else {
+                    ForEach(progressModel.tests.prefix(10)) { record in
+                        VStack(spacing: 0) {
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("\(record.rootLabel) \(record.scaleName)")
+                                        .font(.body.weight(.medium))
+                                    Text(Self.dateFormatter.string(from: record.date))
+                                        .font(.caption)
+                                        .foregroundColor(.erMuted)
+                                    Text(record.passed ? "Passed in \(record.attemptsUsed)/\(record.maxAttempts) tries" : "Failed after \(record.maxAttempts) tries")
+                                        .font(.caption)
+                                        .foregroundColor(.erMuted)
+                                }
+                                Spacer()
+                                Text("\(record.score)%")
+                                    .font(.headline)
+                                    .foregroundColor(
+                                        record.score >= 80 ? .erSuccess
+                                        : record.score >= 50 ? .erWarning
+                                        : .erError)
+                            }
+                            .padding(.vertical, 10)
+                            Divider()
+                        }
+                    }
+                }
+
                 Spacer().frame(height: 16)
             }
             .padding(.horizontal, 16)
         }
         .background(Color(.systemBackground))
+        .onAppear { progressModel.reload() }
         .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

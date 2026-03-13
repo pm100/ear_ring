@@ -1,5 +1,27 @@
 # Ear Ring — Agent Instructions
 
+## Shared Logic Rule
+
+**Keep cross-platform app logic in the shared Rust core whenever practical.**
+
+Platform-specific code in Android, iOS, and desktop/Tauri should primarily handle:
+- UI rendering and navigation
+- audio input / microphone plumbing
+- audio output / playback plumbing
+- local platform persistence APIs
+
+Business rules and exercise behavior that must stay consistent across platforms should
+prefer Rust implementations first, including things like:
+- music-theory derivations
+- note correctness / scoring rules
+- exercise prompt generation
+- other deterministic exercise/session logic
+
+If logic must temporarily live in platform code, treat that as an exception and prefer
+moving it back into Rust in the next related change.
+
+---
+
 ## UI Consistency Rule
 
 **ALL UI changes must be applied to ALL platforms (Android, iOS, Tauri/desktop) simultaneously.**
@@ -27,11 +49,11 @@ Every platform must implement all 5 screens:
 
 | Screen | Navigation trigger |
 |--------|--------------------|
-| Home | App launch / "New Exercise" from Results |
+| Home | App launch / leaving Exercise via Back or Stop |
 | Exercise | "Start Exercise" from Home |
 | Mic Setup | "Mic Setup" from Home |
-| Results | Exercise completion (all notes done or wrong note) |
-| Progress | "Progress" from Home or Results |
+| Results | Reserved legacy screen; **not shown during continuous testing mode** |
+| Progress | "Progress" from Home |
 
 Back navigation (system back gesture AND an on-screen "← Back" button) must work on
 every screen except Home.
@@ -71,6 +93,16 @@ Chip grid (wrapping): Major | Natural Minor | Harmonic Minor |
 Section label: "Sequence Length"
 Chip row: 2  3  4  5  6  7  8   (single row, equal width)
 
+[16dp space]
+Section label: "Tempo (BPM)"
+Chip row: 60  80  100  120  140   (single row, equal width)
+  — Default selection: 100 BPM
+
+[16dp space]
+Section label: "Display Test Notes"
+Chip row: Hide  Show   (single row, equal width)
+  — Default selection: Hide
+
 [32dp space]
 [▶ Start Exercise]    — full-width filled primary button, 52dp tall, 18sp
 [🎙 Mic Setup]        — full-width outlined button, 48dp tall, 16sp
@@ -91,39 +123,108 @@ Layout: vertical column, 16dp padding, NOT scrollable.
 
 [8dp space]
 MusicStaff            — full width, 160dp tall (see Staff spec below)
+                        MUST start EMPTY for each attempt when "Display Test Notes" = Hide
+                        If "Display Test Notes" = Show:
+                          - draw the target sequence in EXPECTED black before listening starts
+                          - each correctly sung note turns its target note green
+                          - a wrong note replaces the current target slot with the detected note in red
+                        If "Display Test Notes" = Hide:
+                          - only detected/sung notes are shown on the staff
+                        Use the same left-to-right fixed 44dp note spacing as Mic Setup
+                        Correct notes: green
+                        Wrong notes: red
 
 [12dp space]
 Status text           — bodyLarge, muted colour, centred
-  IDLE:      "Press Play to hear the sequence"
-  PLAYING:   "Listen carefully…"
-  LISTENING: "Sing note N of M: NoteLabel"
-  DONE:      "Calculating score…"
+  PLAYING:     "Listen carefully…"
+  LISTENING:   "Sing note N of M"
+  RETRY_DELAY: "Wrong note. Replaying the same test…" OR
+               "Starting the next test…"
+  STOPPED:     "Testing stopped"
+
+[8dp space]
+Meta line             — bodyMedium, muted colour, centred
+  "Attempt A of R  •  Tests T  •  Score P%"
+  - `R` default = 5 and must be a configurable retry cap in code
+  - `P` is the running average percentage over all completed tests this session
 
 [16dp space]
 PitchMeter            — 90dp circle (see Pitch Meter spec below)
 
-[20dp space]
---- Buttons change based on status ---
-IDLE:
-  [▶ Play Sequence]   — full-width filled, 52dp, 17sp
-  [🎙 Start Listening] — full-width outlined, 48dp, 16sp
-
-PLAYING:
-  [⏹ Stop Playback]  — full-width outlined, 48dp, 16sp
-
-LISTENING:
-  [⏹ Stop Listening] — full-width filled ERROR colour, 52dp, 17sp
-
-DONE:
-  [CircularProgressIndicator / spinner]
+[24dp space]
+[⏹ Stop Testing]      — full-width filled ERROR colour, 52dp, 17sp
+  - Ends the continuous testing session immediately
+  - Returns the user to Home
+  - Saves the session summary if at least one test was completed
 
 [20dp space]
-Note tracker row (if sequence non-empty):
-  Label: "Notes:"
-  One column per note showing:
-    symbol:  ○ (pending) | → (current, primary colour) | ✓ (correct, green) | ✗ (wrong, red)
-    label:   note name below symbol, 10sp, muted
+Current attempt row (if one or more notes were detected this attempt):
+  Label: "Current attempt"
+  Render sung note labels only
+  Correct labels: green
+  Wrong labels: red
 ```
+
+Exercise dynamics:
+- Entering Exercise automatically starts the test loop. There is **no** Play button and **no** Start Listening button.
+- For each test:
+  1. Staff clears to empty
+  2. App plays a piano triad derived from the selected root/scale **as a chord** (simultaneous notes), not as an arpeggio
+  3. Wait an 800ms gap after the chord before the prompt starts
+  4. App plays the hidden test sequence
+  5. App automatically switches to listening mode
+- If the user sings a wrong note:
+  - show that wrong note on the staff in red
+  - keep the detected note visible on the staff for a few seconds
+  - pause 3 seconds
+  - replay the **same** test sequence
+- If "Display Test Notes" is enabled, expected notes are shown in black and the current slot updates to green/red as notes are judged.
+- Correct detected notes must be shown on the staff in green immediately.
+- Correct detected notes must remain visible on the staff until the next attempt or next test begins.
+- Display staff notes as proper note symbols: filled noteheads with stems, plus a sharp/flat accidental before the notehead when needed.
+- Retry the same test up to the retry cap (default 5 attempts total).
+- If the user gets the test right, or exhausts retries, immediately generate a **fresh** test and continue hands-free.
+- The user should be able to keep playing indefinitely without touching the app until they choose Stop/Back.
+- The hidden test sequence playback speed is controlled by the selected Home-screen tempo setting.
+- Per-test score:
+  - first-try success = 100%
+  - later successes scale down by attempt number
+  - exhausting all retries = 0%
+- Session score shown on the Exercise screen is the running average percentage across completed tests in the current session.
+
+Exercise control flow (canonical state machine):
+1. **Home -> Exercise**
+   - Tapping `Start Exercise` immediately navigates to Exercise and starts a continuous autonomous session.
+   - A new test is generated from the selected root, octave, scale, sequence length, tempo, and display-notes mode.
+2. **Attempt start**
+   - Increment / display the current attempt count for the active test.
+   - Reset per-attempt detected-note history.
+   - If `Display Test Notes = Hide`, the staff is blank at the start of the attempt.
+   - If `Display Test Notes = Show`, draw the target test notes in black before any audio plays.
+3. **Prompt playback**
+   - Play the tonic triad as a single chord.
+   - Wait the post-chord gap.
+   - Play the hidden test sequence at the selected BPM.
+4. **Auto listening**
+   - Transition to listening automatically with no user action.
+   - Evaluate live pitch using the same stability / spacing rules as Mic Setup.
+   - As each sung note is confirmed:
+     - correct note -> render it green on the staff
+     - wrong note -> render the detected note red in the current slot / current attempt history
+5. **Attempt resolution**
+   - If all notes are correct:
+     - compute the per-test percentage from the attempt number
+     - append a completed test-history record with timestamp, settings, attempt count, success, and score
+     - update the running session percentage
+     - after the short success delay, generate a fresh test and begin again at Attempt start
+   - If any note is wrong:
+     - keep the red wrong note visible for the configured delay
+     - if retries remain, replay the same test from Attempt start
+     - if retries are exhausted, record the failed test with `0%`, update the running session percentage, generate a fresh test, and begin again at Attempt start
+6. **Stopping**
+   - `Stop Testing`, on-screen Back, or system Back ends the continuous session immediately.
+   - If one or more tests were completed, persist the session summary plus per-test history to local storage before returning Home.
+   - Do **not** navigate to Results as part of this flow.
 
 ---
 
@@ -147,7 +248,7 @@ MusicStaff            — 160dp tall, shows rolling note history left to right
                           midiMax = midiMin + 23        (two octaves, e.g. B5 when octave=4)
                         Max 8 notes visible; history capped at 8
                         Most recent note: ACTIVE colour (blue)
-                        Previous notes: EXPECTED colour (hollow dark)
+                        Previous notes: EXPECTED colour (filled dark)
                         Empty staff when nothing detected yet
 
 [8dp space]
@@ -168,13 +269,17 @@ NO test note buttons.
 Pitch display stability: require 3 consecutive audio frames of the same pitch class
 before updating the displayed note. This prevents flickering.
 
-The staff visual style (lines, treble clef, note colours, positioning math) is
-**identical to the Exercise screen**. The only difference is that in Mic Setup the
-notes accumulate from live detection rather than from a pre-generated sequence.
+The staff visual style, horizontal spacing, and note-detection stability rules are
+**identical to the Exercise screen**. The only differences are:
+- Mic Setup has no right/wrong judgement
+- Mic Setup always shows rolling detected-note history
+- Exercise may optionally pre-draw the target notes when "Display Test Notes" is enabled
 
 ---
 
 ### Results Screen
+
+This screen remains in the codebase for compatibility, but it is **not** used by the continuous testing flow above.
 
 Layout: vertically scrollable column, 16dp padding, centred.
 
@@ -207,7 +312,7 @@ For each note (index, expectedLabel, detectedLabel, correct):
 [16dp space]
 ```
 
-Session is saved to persistent storage on first load of this screen.
+Do not rely on this screen for persistence in continuous testing mode.
 
 ---
 
@@ -228,6 +333,16 @@ Session history:
     Score percentage
     Date
     Sequence length
+
+Recorded tests summary:
+  Show total recorded test count and average test score
+
+Recent tests:
+  Show recent TestRecord rows/cards with:
+    Scale name + root note
+    Date/time
+    Pass/fail summary with attempts used
+    Score percentage
 ```
 
 ---
@@ -271,8 +386,8 @@ Tauri/desktop  : Pre-rendered PNG (desktop/public/treble_clef.png, 149×307px, t
 
 **Note positioning** (uses `staff_position()` from Rust core):
 ```
-staffCenter = staffTop + 2*lineSpacing   (third line ≈ B4)
-noteY = staffCenter - staffPos * (lineSpacing / 2)
+staffCenter = staffTop + 2*lineSpacing   (third line = B4, staffPos 6)
+noteY = staffCenter - (staffPos - 6) * (lineSpacing / 2)
 ```
 `staff_position()` returns: C4=0, D4=1, E4=2, F4=3, G4=4, A4=5, B4=6, C5=7,
 B3=-1, A3=-2, … (diatonic steps from C4, sharps/flats share parent note's position).
@@ -281,18 +396,25 @@ B3=-1, A3=-2, … (diatonic steps from C4, sharps/flats share parent note's posi
 ```
 noteAreaStart = leftMargin + 20
 noteAreaWidth = totalWidth - noteAreaStart - 20
-noteStep      = noteAreaWidth / max(noteCount, 1)   [Exercise screen: distributed evenly]
-noteStep      = 44dp (fixed)                         [Setup screen: fixed spacing, left-to-right]
+noteStep      = 44dp (fixed)                         [Exercise and Setup screens, left-to-right]
 noteX         = noteAreaStart + index*noteStep + noteStep/2
 ```
 
-**Note head colours**:
-| State    | Colour  | Style   |
-|----------|---------|---------|
-| EXPECTED | #333333 | hollow (filled then white inner circle, radius-2.5) |
-| ACTIVE   | #3F51B5 | filled solid |
-| CORRECT  | #4CAF50 | filled solid |
-| INCORRECT| #F44336 | filled solid |
+**Note symbol rendering**:
+- Use a filled oval notehead rotated slightly clockwise (quarter-note appearance)
+- Draw a stem for every note:
+  - notes below the B4 centre line (`staffPos < 6`) use an upward stem on the right side
+  - notes on/above the B4 centre line use a downward stem on the left side
+- If the pitch label contains a sharp or flat, draw `♯` or `♭` immediately before the notehead
+- Do not draw note-name text beneath the staff notes
+
+**Note colours**:
+| State    | Colour  |
+|----------|---------|
+| EXPECTED | #333333 |
+| ACTIVE   | #3F51B5 |
+| CORRECT  | #4CAF50 |
+| INCORRECT| #F44336 |
 
 **Ledger lines** (colour #555555, 1.5px stroke, width = noteRadius*2.8 each side):
 - Draw above staff: for each lineSpacing step above staffTop while noteY ≤ that line
@@ -336,6 +458,8 @@ Circular widget, **90dp/px diameter**.
 - Pitch-shift: find nearest available sample, playbackRate = 2^(delta_semitones/12)
 - Cache samples locally after first download
 - Sequence playback: 600ms between notes
+- Sequence playback interval: `60000 / bpm` milliseconds, where BPM is selected on the Home screen
+- Default test tempo: 100 BPM
 
 **Capture** — microphone for pitch detection:
 - Sample rate: 44100 Hz
@@ -344,9 +468,8 @@ Circular widget, **90dp/px diameter**.
 - Silence threshold: RMS < 0.003 → ignore frame
 
 **Pitch stability** (before confirming a sung note):
-- Require 2+ consecutive frames with same pitch class (midi % 12)
-- AND the stable pitch must be held for ≥ 450ms
-- Debounce: after confirming, ignore same pitch for 2× the hold duration
+- Require 3 consecutive frames with the same pitch class (midi % 12)
+- After confirming a pitch, do not confirm it again until the pitch class changes or silence resets stability
 - On confirm: compare pitch class of detected note with pitch class of expected sequence note
 
 ---
@@ -355,11 +478,32 @@ Circular widget, **90dp/px diameter**.
 
 Sessions stored as a list of records:
 ```
-{ date: string, scale: string, root: string, score: float, length: int }
+{ date: string, scale: string, root: string, score: float, length: int, testsCompleted?: int }
 ```
 - Android: SharedPreferences (JSON)
 - iOS: UserDefaults
 - Desktop: localStorage or a local file
+
+Every individual completed test must also be stored locally as history for future scoring/progress tuning. Store enough basic result data to reconstruct performance later, including:
+```
+{
+  date: string,
+  scale: string,
+  root: string,
+  score: int,
+  length: int,
+  attemptsUsed: int,
+  maxAttempts: int,
+  passed: bool,
+  expectedNotes: string[],
+  detectedNotes: string[]
+}
+```
+
+Persistence rules:
+- Save a `TestRecord` every time a test ends, whether passed or failed.
+- Save the session summary when the user stops/leaves Exercise after completing at least one test.
+- Continuous testing mode does **not** show Results before persistence; users later inspect outcomes from Home -> Progress.
 
 Streak = number of consecutive calendar days with at least one session.
 

@@ -117,6 +117,8 @@ extension View {
 struct HomeView: View {
     @EnvironmentObject var model: ExerciseModel
     @Binding var path: NavigationPath
+    private let bpmOptions = [60, 80, 100, 120, 140]
+    private let noteDisplayOptions = [false, true]
 
     private var rootNoteIndex: Int { model.rootMidi % 12 }
     private var rootOctave: Int    { model.rootMidi / 12 - 1 }
@@ -187,10 +189,36 @@ struct HomeView: View {
                     }
                 }
 
+                sectionLabel("Tempo (BPM)").padding(.top, 16)
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible()), count: bpmOptions.count),
+                    spacing: 6
+                ) {
+                    ForEach(bpmOptions, id: \.self) { bpm in
+                        Button("\(bpm)") {
+                            model.tempoBpm = bpm
+                        }
+                        .buttonStyle(ChipButtonStyle(selected: model.tempoBpm == bpm))
+                    }
+                }
+
+                sectionLabel("Display Test Notes").padding(.top, 16)
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible()), count: noteDisplayOptions.count),
+                    spacing: 6
+                ) {
+                    ForEach(noteDisplayOptions, id: \.self) { show in
+                        Button(show ? "Show" : "Hide") {
+                            model.showTestNotes = show
+                        }
+                        .buttonStyle(ChipButtonStyle(selected: model.showTestNotes == show))
+                    }
+                }
+
                 // ── Action buttons ────────────────────────────────────────
                 VStack(spacing: 10) {
                     Button("▶ Start Exercise") {
-                        model.generateSequence()
+                        model.startExerciseSession()
                         path.append(AppRoute.exercise)
                     }
                     .buttonStyle(PrimaryButtonStyle(height: 52, fontSize: 18))

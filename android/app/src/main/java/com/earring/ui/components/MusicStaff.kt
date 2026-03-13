@@ -12,9 +12,8 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.earring.DetectedNote
 import com.earring.EarRingCore
+import com.earring.MusicTheory
 
 enum class NoteState { EXPECTED, CORRECT, INCORRECT, ACTIVE }
 
@@ -39,6 +38,9 @@ fun MusicStaff(
         val staffTop = size.height / 2f - 2 * lineSpacing
         val leftMargin = 60f
         val noteRadius = lineSpacing * 0.45f
+        val noteHeadWidth = noteRadius * 2.3f
+        val noteHeadHeight = noteRadius * 1.7f
+        val stemLength = lineSpacing * 3.2f
 
         // Draw 5 staff lines — start at left edge (x=5) so they overlap the clef
         for (i in 0..4) {
@@ -73,9 +75,9 @@ fun MusicStaff(
 
         notes.forEachIndexed { index, staffNote ->
             val staffPos = EarRingCore.staffPosition(staffNote.midi)
-            // staffPos: C4=0, D4=1, ... each step = half line spacing
+            // staffPos: C4=0, D4=1, ... and B4=6, which sits on the centre line.
             val staffCenter = staffTop + 2 * lineSpacing // line 3 = B4 area
-            val noteY = staffCenter - staffPos * (lineSpacing / 2f)
+            val noteY = staffCenter - (staffPos - 6) * (lineSpacing / 2f)
             val noteX = noteAreaStart + index * noteStep + noteStep / 2f
 
             val noteColor = when (staffNote.state) {
@@ -84,24 +86,64 @@ fun MusicStaff(
                 NoteState.INCORRECT -> Color(0xFFF44336)
                 NoteState.ACTIVE -> Color(0xFF3F51B5)
             }
+            val noteLabel = MusicTheory.midiToLabel(staffNote.midi)
+            val accidental = when {
+                noteLabel.contains("#") -> "\u266f"
+                noteLabel.contains("b") || noteLabel.contains("\u266d") -> "\u266d"
+                else -> null
+            }
+            val stemUp = staffPos < 6
+            val stemX = if (stemUp) noteX + noteHeadWidth * 0.35f else noteX - noteHeadWidth * 0.35f
+            val stemEndY = if (stemUp) noteY - stemLength else noteY + stemLength
 
             // Draw ledger lines if needed (outside staff lines 0-4)
             drawLedgerLines(noteX, noteY, staffTop, lineSpacing, noteRadius)
 
-            // Draw note head
-            drawCircle(
-                color = noteColor,
-                radius = noteRadius,
-                center = Offset(noteX, noteY)
-            )
-            // Hollow for expected notes
-            if (staffNote.state == NoteState.EXPECTED) {
-                drawCircle(
-                    color = Color.White,
-                    radius = noteRadius - 2.5f,
-                    center = Offset(noteX, noteY)
+            drawIntoCanvas { canvas ->
+                val fillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    style = android.graphics.Paint.Style.FILL
+                    color = when (staffNote.state) {
+                        NoteState.EXPECTED -> android.graphics.Color.parseColor("#333333")
+                        NoteState.CORRECT -> android.graphics.Color.parseColor("#4CAF50")
+                        NoteState.INCORRECT -> android.graphics.Color.parseColor("#F44336")
+                        NoteState.ACTIVE -> android.graphics.Color.parseColor("#3F51B5")
+                    }
+                }
+                val nativeCanvas = canvas.nativeCanvas
+                nativeCanvas.save()
+                nativeCanvas.rotate(-20f, noteX, noteY)
+                nativeCanvas.drawOval(
+                    android.graphics.RectF(
+                        noteX - noteHeadWidth / 2f,
+                        noteY - noteHeadHeight / 2f,
+                        noteX + noteHeadWidth / 2f,
+                        noteY + noteHeadHeight / 2f
+                    ),
+                    fillPaint
                 )
+                nativeCanvas.restore()
+
+                accidental?.let {
+                    val accidentalPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                        textSize = lineSpacing * 1.8f
+                        color = fillPaint.color
+                        textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                    nativeCanvas.drawText(
+                        it,
+                        noteX - noteHeadWidth * 1.25f,
+                        noteY + lineSpacing * 0.4f,
+                        accidentalPaint
+                    )
+                }
             }
+
+            drawLine(
+                color = noteColor,
+                start = Offset(stemX, noteY),
+                end = Offset(stemX, stemEndY),
+                strokeWidth = 1.7f
+            )
         }
     }
 }

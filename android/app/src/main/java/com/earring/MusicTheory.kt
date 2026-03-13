@@ -29,7 +29,7 @@ object MusicTheory {
     fun midiPitchClass(midi: Int): Int = midi % 12
 
     fun isCorrect(detectedMidi: Int, cents: Int, expectedMidi: Int): Boolean {
-        return detectedMidi % 12 == expectedMidi % 12 && kotlin.math.abs(cents) <= 50
+        return EarRingCore.isCorrectNote(detectedMidi, cents, expectedMidi)
     }
 
     fun staffPosition(midi: Int): Int = EarRingCore.staffPosition(midi)

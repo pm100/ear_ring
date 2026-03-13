@@ -1,112 +1,123 @@
 import SwiftUI
 
+enum StaffNoteState {
+    case expected
+    case correct
+    case incorrect
+    case active
+}
+
+struct StaffDisplayNote: Identifiable {
+    let id = UUID()
+    let midi: Int
+    let state: StaffNoteState
+}
+
 struct MusicStaffView: View {
-    var expectedNotes: [Int]          // MIDI note numbers
-    var detectedNotes: [DetectedNote] // matched by index
-    var currentNoteIndex: Int = -1    // -1 = none active
+    var notes: [StaffDisplayNote]
     var fixedSpacing: CGFloat? = nil
 
     var body: some View {
-        // Capture for Canvas closure
-        let _detectedNotes  = detectedNotes
-        let _currentNoteIdx = currentNoteIndex
-        let _expectedNotes  = expectedNotes
-
-        return Canvas { ctx, size in
-            let lineSpacing: CGFloat  = 12
-            let staffTop: CGFloat     = size.height / 2 - 2 * lineSpacing
-            let leftMargin: CGFloat   = 60
-            let noteRadius: CGFloat   = lineSpacing * 0.45
-            let staffCenter: CGFloat  = staffTop + 2 * lineSpacing
+        Canvas { ctx, size in
+            let lineSpacing: CGFloat = 12
+            let staffTop: CGFloat = size.height / 2 - 2 * lineSpacing
+            let leftMargin: CGFloat = 60
+            let noteRadius: CGFloat = lineSpacing * 0.45
             let staffBottomY: CGFloat = staffTop + 4 * lineSpacing
-            let staffTopY: CGFloat    = staffTop
+            let staffCenter: CGFloat = staffTop + 2 * lineSpacing
+            let noteHeadWidth: CGFloat = noteRadius * 2.3
+            let noteHeadHeight: CGFloat = noteRadius * 1.7
+            let stemLength: CGFloat = lineSpacing * 3.2
 
-            // staffPos → y  (B4 = staffPos 6 sits on staffCenter)
             func noteY(_ staffPos: Int) -> CGFloat {
                 staffCenter - CGFloat(staffPos - 6) * (lineSpacing / 2)
             }
 
-            let staffLineShading = GraphicsContext.Shading.color(Color(white: 0.2))
-            let ledgerShading    = GraphicsContext.Shading.color(
-                Color(red: 0.333, green: 0.333, blue: 0.333))
-
-            // ── 5 staff lines ──────────────────────────────────────────────
-            // Start at x=5 (not leftMargin) so lines pass through the treble clef
             for i in 0..<5 {
                 let y = staffTop + CGFloat(i) * lineSpacing
                 var p = Path()
                 p.move(to: CGPoint(x: 5, y: y))
                 p.addLine(to: CGPoint(x: size.width - 16, y: y))
-                ctx.stroke(p, with: staffLineShading, lineWidth: 1.5)
+                ctx.stroke(p, with: .color(Color(white: 0.2)), lineWidth: 1.5)
             }
 
-            // ── Treble clef ────────────────────────────────────────────────
-            // iOS system font fallback for U+1D11E renders smaller than Android,
-            // so font size is scaled up to lineSpacing * 7 with adjusted y origin.
             ctx.draw(
-                Text("𝄞").font(.system(size: lineSpacing * 7)),
-                at: CGPoint(x: 4, y: staffTop - lineSpacing * 2.5),
+                Text("𝄞").font(.system(size: lineSpacing * 3.5)),
+                at: CGPoint(x: 4, y: staffTop - lineSpacing * 0.5),
                 anchor: .topLeading
             )
 
-            guard !_expectedNotes.isEmpty else { return }
+            guard !notes.isEmpty else { return }
 
-            // ── Note horizontal distribution ───────────────────────────────
             let noteAreaStart: CGFloat = leftMargin + 20
             let noteAreaWidth: CGFloat = size.width - noteAreaStart - 20
-            let noteCount = _expectedNotes.count
-            let noteStep: CGFloat
-            if let fs = fixedSpacing {
-                noteStep = fs
-            } else {
-                noteStep = noteAreaWidth / CGFloat(max(noteCount, 1))
-            }
-            let calcNoteX = { (i: Int) -> CGFloat in noteAreaStart + CGFloat(i) * noteStep + noteStep / 2 }
+            let noteStep = fixedSpacing ?? noteAreaWidth / CGFloat(max(notes.count, 1))
 
-            for i in 0..<noteCount {
-                let midi     = _expectedNotes[i]
-                let staffPos = EarRingCore.staffPosition(midi: midi)
-                let x: CGFloat = calcNoteX(i)
+            for (index, displayNote) in notes.enumerated() {
+                let staffPos = EarRingCore.staffPosition(midi: displayNote.midi)
+                let x = noteAreaStart + CGFloat(index) * noteStep + noteStep / 2
                 let y = noteY(staffPos)
+                let noteColor: Color = {
+                    switch displayNote.state {
+                    case .expected: return Color(white: 0.2)
+                    case .correct: return .erSuccess
+                    case .incorrect: return .erError
+                    case .active: return .erPrimary
+                    }
+                }()
+                let noteLabel = MusicTheory.midiToLabel(displayNote.midi)
+                let accidental: String? = {
+                    if noteLabel.contains("#") { return "♯" }
+                    if noteLabel.contains("b") || noteLabel.contains("♭") { return "♭" }
+                    return nil
+                }()
+                let stemUp = staffPos < 6
+                let stemX = stemUp ? x + noteHeadWidth * 0.35 : x - noteHeadWidth * 0.35
+                let stemEndY = stemUp ? y - stemLength : y + stemLength
 
-                // ── Ledger lines below staff ───────────────────────────────
                 var ledgerBelow = staffBottomY + lineSpacing
                 while y >= ledgerBelow - 0.5 {
                     var lp = Path()
                     lp.move(to: CGPoint(x: x - noteRadius * 2.8, y: ledgerBelow))
                     lp.addLine(to: CGPoint(x: x + noteRadius * 2.8, y: ledgerBelow))
-                    ctx.stroke(lp, with: ledgerShading, lineWidth: 1.5)
+                    ctx.stroke(lp, with: .color(Color(red: 0.333, green: 0.333, blue: 0.333)), lineWidth: 1.5)
                     ledgerBelow += lineSpacing
                 }
 
-                // ── Ledger lines above staff ───────────────────────────────
-                var ledgerAbove = staffTopY - lineSpacing
+                var ledgerAbove = staffTop - lineSpacing
                 while y <= ledgerAbove + 0.5 {
                     var lp = Path()
                     lp.move(to: CGPoint(x: x - noteRadius * 2.8, y: ledgerAbove))
                     lp.addLine(to: CGPoint(x: x + noteRadius * 2.8, y: ledgerAbove))
-                    ctx.stroke(lp, with: ledgerShading, lineWidth: 1.5)
+                    ctx.stroke(lp, with: .color(Color(red: 0.333, green: 0.333, blue: 0.333)), lineWidth: 1.5)
                     ledgerAbove -= lineSpacing
                 }
 
-                // ── Note head ──────────────────────────────────────────────
-                let rect   = CGRect(x: x - noteRadius, y: y - noteRadius,
-                                    width: noteRadius * 2, height: noteRadius * 2)
-                let circle = Path(ellipseIn: rect)
+                var stemPath = Path()
+                stemPath.move(to: CGPoint(x: stemX, y: y))
+                stemPath.addLine(to: CGPoint(x: stemX, y: stemEndY))
+                ctx.stroke(stemPath, with: .color(noteColor), lineWidth: 1.7)
 
-                // Determine colour / style
-                if i < _detectedNotes.count {
-                    let color: Color = _detectedNotes[i].isCorrect ? .erSuccess : .erError
-                    ctx.fill(circle, with: .color(color))
-                } else if i == _currentNoteIdx {
-                    ctx.fill(circle, with: .color(Color.erPrimary))
-                } else {
-                    // Expected: hollow — filled dark then white inner
-                    ctx.fill(circle, with: .color(Color(white: 0.2)))
-                    let innerR    = max(noteRadius - 2.5, 0.5)
-                    let innerRect = CGRect(x: x - innerR, y: y - innerR,
-                                          width: innerR * 2, height: innerR * 2)
-                    ctx.fill(Path(ellipseIn: innerRect), with: .color(.white))
+                let noteRect = CGRect(
+                    x: x - noteHeadWidth / 2,
+                    y: y - noteHeadHeight / 2,
+                    width: noteHeadWidth,
+                    height: noteHeadHeight
+                )
+                let rotation = CGAffineTransform(translationX: x, y: y)
+                    .rotated(by: -.pi / 9)
+                    .translatedBy(x: -x, y: -y)
+                let noteHead = Path(ellipseIn: noteRect).applying(rotation)
+                ctx.fill(noteHead, with: .color(noteColor))
+
+                if let accidental {
+                    ctx.draw(
+                        Text(accidental)
+                            .font(.system(size: lineSpacing * 1.8))
+                            .foregroundStyle(noteColor),
+                        at: CGPoint(x: x - noteHeadWidth * 1.25, y: y),
+                        anchor: .center
+                    )
                 }
             }
         }

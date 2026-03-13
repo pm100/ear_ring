@@ -76,13 +76,12 @@ rustup target add aarch64-linux-android x86_64-linux-android
 # Install cargo-ndk
 cargo install cargo-ndk
 
-# Build Rust library
-cargo ndk -t arm64-v8a -t x86_64 -o android/app/src/main/jniLibs build --release -p ear_ring_core
-
 # Build and install APK
 cd android
 ./gradlew installDebug
 ```
+
+The Android Gradle build rebuilds the Rust JNI library automatically into `android/app/build/generated/rustJniLibs/<variant>`. Do not check shared libraries into `android/app/src/main/jniLibs`.
 
 ### iOS
 
@@ -92,12 +91,10 @@ cd android
 # Install Rust iOS targets
 rustup target add aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
 
-# Build Rust as XCFramework (device + simulator)
-cargo build --target aarch64-apple-ios --release -p ear_ring_core
-cargo build --target aarch64-apple-ios-sim --release -p ear_ring_core
-
 # Then open ios/earring.xcodeproj in Xcode and build
 ```
+
+The Xcode target rebuilds the Rust iOS static library automatically into `ios/build/generated/rust/<configuration><platform>`. Do not check iOS Rust library artifacts into git or link directly from the shared `target` directory.
 
 ## Audio
 

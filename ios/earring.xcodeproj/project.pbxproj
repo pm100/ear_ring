@@ -134,6 +134,7 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "earring" */;
 			buildPhases = (
 				13B07F871A680F5B00A75B9A /* Sources */,
+				AA4000000000001A /* Build Rust Core */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 			);
@@ -189,6 +190,31 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		AA4000000000001A /* Build Rust Core */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/../Cargo.toml",
+				"$(SRCROOT)/../Cargo.lock",
+			);
+			name = "Build Rust Core";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(PROJECT_DIR)/build/generated/rust/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/libear_ring_core.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$PROJECT_DIR/build-rust.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		13B07F871A680F5B00A75B9A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -241,13 +267,9 @@
 					"-lc++",
 					"-lear_ring_core",
 				);
-				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
+				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/../target/aarch64-apple-ios/release",
-				);
-				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/../target/aarch64-apple-ios-sim/release",
+					"$(PROJECT_DIR)/build/generated/rust/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.name.earring;
 				PRODUCT_NAME = earring;
@@ -280,7 +302,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/../target/aarch64-apple-ios/release", "$(PROJECT_DIR)/../target/aarch64-apple-ios-sim/release",
+					"$(PROJECT_DIR)/build/generated/rust/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.name.earring;
 				PRODUCT_NAME = earring;

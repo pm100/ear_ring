@@ -122,11 +122,13 @@ class AudioPlayback(private val context: Context) {
 
     fun playSequence(
         midiNotes: List<Int>,
+        bpm: Int = 100,
         onEach: (Int) -> Unit = {},
         onDone: () -> Unit = {}
     ) {
         cancelPlayback()
         sequenceJob = scope.launch {
+            val stepMs = (60_000L / bpm.coerceAtLeast(1)).coerceAtLeast(150L)
             for ((index, midi) in midiNotes.withIndex()) {
                 if (!isActive) break
                 withContext(Dispatchers.Main) { onEach(index) }
@@ -136,8 +138,30 @@ class AudioPlayback(private val context: Context) {
                     val rate = pitchRate(midi, nearestMidi)
                     withContext(Dispatchers.Main) { playFile(sampleFile, rate) }
                 }
-                delay(600)
+                delay(stepMs)
             }
+            if (isActive) {
+                withContext(Dispatchers.Main) { onDone() }
+            }
+        }
+    }
+
+    fun playChord(
+        midiNotes: List<Int>,
+        holdMs: Long = 600L,
+        onDone: () -> Unit = {}
+    ) {
+        cancelPlayback()
+        sequenceJob = scope.launch {
+            val playable = midiNotes.mapNotNull { midi ->
+                val nearestMidi = nearestSampleMidi(midi)
+                val sampleFile = getCachedSample(nearestMidi) ?: return@mapNotNull null
+                sampleFile to pitchRate(midi, nearestMidi)
+            }
+            withContext(Dispatchers.Main) {
+                playable.forEach { (file, rate) -> playFile(file, rate) }
+            }
+            delay(holdMs)
             if (isActive) {
                 withContext(Dispatchers.Main) { onDone() }
             }

@@ -42,7 +42,6 @@ fun EarRingApp() {
         composable(Routes.EXERCISE) {
             ExerciseScreen(
                 viewModel = exerciseViewModel,
-                onNavigateResults = { navController.navigate(Routes.RESULTS) },
                 onBack = { navController.popBackStack() }
             )
         }

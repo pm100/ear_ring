@@ -42,6 +42,7 @@ target/
 android/app/build/
 android/.gradle/
 android/build/
+android/app/src/main/jniLibs/
 
 # Compiled JS bundle (regenerated on build)
 android/app/src/main/assets/index.android.bundle

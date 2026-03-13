@@ -1,8 +1,6 @@
 import Foundation
 import UIKit
 
-// MARK: - Data types
-
 struct DetectedNote {
     var midi: Int
     var cents: Int
@@ -10,153 +8,85 @@ struct DetectedNote {
 }
 
 enum ExerciseStatus {
-    case idle, playing, listening, done
+    case playing
+    case listening
+    case retryDelay
+    case stopped
 }
-
-// MARK: - ExerciseModel
 
 @MainActor
 class ExerciseModel: ObservableObject {
-
-    // MARK: Published state
-
-    @Published var rootMidi: Int = 60       // C4
-    @Published var scaleId: Int = 0         // Major
+    @Published var rootMidi: Int = 60
+    @Published var scaleId: Int = 0
     @Published var sequenceLength: Int = 4
+    @Published var tempoBpm: Int = 100
+    @Published var showTestNotes: Bool = false
     @Published var sequence: [Int] = []
     @Published var detectedNotes: [DetectedNote] = []
-    @Published var status: ExerciseStatus = .idle
+    @Published var status: ExerciseStatus = .stopped
     @Published var currentNoteIndex: Int = 0
     @Published var score: Int = 0
     @Published var liveMidi: Int? = nil
     @Published var liveCents: Int = 0
     @Published var liveFrameCount: Int = 0
-
-    // MARK: Audio subsystems
+    @Published var currentAttempt: Int = 1
+    @Published var maxAttempts: Int = 5
+    @Published var testsCompleted: Int = 0
 
     let audioCapture = AudioCapture()
     private let audioPlayback = AudioPlayback()
 
-    // MARK: Stability tracking
-
+    private var cumulativeScore: Int = 0
     private var stabilityPitchClass: Int = -1
-    private var stabilityStartTime: Date = .distantPast
-    private var stabilityFired: Bool = false
-
-    let stabilityDuration: TimeInterval = 0.45
-    let silenceRMSThreshold: Float = 0.003
-
-    // MARK: Computed helpers
+    private var stabilityCount: Int = 0
+    private var pitchConsumed: Bool = false
+    private var sessionPersisted = false
+    private let silenceRMSThreshold: Float = 0.003
+    private let retryDelayNanoseconds: UInt64 = 3_000_000_000
+    private let introGapNanoseconds: UInt64 = 800_000_000
 
     var isCapturing: Bool { audioCapture.isRunning }
+    var isSessionRunning: Bool { status != .stopped }
 
-    var allCorrect: Bool {
-        guard detectedNotes.count == sequence.count, !sequence.isEmpty else { return false }
-        return detectedNotes.allSatisfy { $0.isCorrect }
-    }
-
-    // MARK: - Public API
-
-    func generateSequence() {
-        let seed = UInt64(Date().timeIntervalSince1970 * 1000)
-        sequence = EarRingCore.generateSequence(
-            rootMidi: rootMidi,
-            scaleId: scaleId,
-            length: sequenceLength,
-            seed: seed
-        )
-        detectedNotes = []
-        currentNoteIndex = 0
+    func startExerciseSession() {
+        cleanup()
+        sessionPersisted = false
+        cumulativeScore = 0
+        testsCompleted = 0
         score = 0
-        status = .idle
-        liveMidi = nil
-        liveCents = 0
+        currentAttempt = 1
+        maxAttempts = 5
+        Task { await startFreshTest() }
     }
 
-    func playSequence() async {
-        guard !sequence.isEmpty else { return }
-        status = .playing
-        audioPlayback.resetCancellation()
-
-        await audioPlayback.playSequence(notes: sequence) { _ in
-            // Could highlight the current note in the UI if needed
-        }
-
-        if status == .playing {
-            status = .idle
-        }
-    }
-
-    func startListening() async {
+    func stopExerciseSession() {
+        cleanup()
+        saveSessionIfNeeded()
         detectedNotes = []
         currentNoteIndex = 0
-        resetStability()
-        status = .listening
-
-        let capture = audioCapture
-        await Task.detached(priority: .userInitiated) {
-            await capture.start { [weak self] samples, sampleRate in
-                Task { @MainActor [weak self] in
-                    self?.processAudio(samples: samples, sampleRate: sampleRate)
-                }
-            }
-        }.value
-    }
-
-    func stopListening() {
-        audioCapture.stop()
-        computeScore()
-        status = .done
-    }
-
-    func cancelPlayback() {
-        audioPlayback.cancelPlayback()
-        if status == .playing {
-            status = .idle
-        }
+        status = .stopped
     }
 
     func cleanup() {
         audioCapture.stop()
         audioPlayback.cancelPlayback()
-        status = .idle
+        liveMidi = nil
+        liveCents = 0
+        resetStability()
     }
 
     func resetToIdle() {
-        audioCapture.stop()
-        audioPlayback.cancelPlayback()
-        detectedNotes = []
-        currentNoteIndex = 0
-        score = 0
-        liveMidi = nil
-        liveCents = 0
-        liveFrameCount = 0
-        status = .idle
+        stopExerciseSession()
     }
 
     func newRound() {
-        cleanup()
-        generateSequence()
-    }
-
-    func retryExercise() async {
-        audioCapture.stop()
-        detectedNotes = []
-        currentNoteIndex = 0
-        score = 0
-        liveMidi = nil
-        liveCents = 0
-        status = .idle
-        resetStability()
-        await startListening()
+        startExerciseSession()
     }
 
     func playTestNote(midi: Int) async {
         audioPlayback.resetCancellation()
         await audioPlayback.playNote(midi: midi)
     }
-
-    // MARK: - Live pitch detection (no scoring)
 
     func startLivePitchDetection() async {
         liveMidi = nil
@@ -179,13 +109,65 @@ class ExerciseModel: ObservableObject {
         liveCents = 0
     }
 
-    // MARK: - Private audio processing
+    private func startFreshTest() async {
+        let seed = UInt64(Date().timeIntervalSince1970 * 1000)
+        sequence = EarRingCore.generateSequence(
+            rootMidi: rootMidi,
+            scaleId: scaleId,
+            length: sequenceLength,
+            seed: seed
+        )
+        detectedNotes = []
+        currentNoteIndex = 0
+        currentAttempt = 1
+        status = .playing
+        await playPrompt()
+    }
+
+    private func retryCurrentTest(attempt: Int) async {
+        detectedNotes = []
+        currentNoteIndex = 0
+        currentAttempt = attempt
+        status = .playing
+        await playPrompt()
+    }
+
+    private func playPrompt() async {
+        guard !sequence.isEmpty else { return }
+        status = .playing
+        audioPlayback.resetCancellation()
+        await audioPlayback.playChord(notes: EarRingCore.introChord(rootMidi: rootMidi, scaleId: scaleId))
+        guard status == .playing else { return }
+        try? await Task.sleep(nanoseconds: introGapNanoseconds)
+        guard status == .playing else { return }
+        await audioPlayback.playSequence(notes: sequence, bpm: tempoBpm) { _ in }
+        if status == .playing {
+            await startListening()
+        }
+    }
+
+    private func startListening() async {
+        detectedNotes = []
+        currentNoteIndex = 0
+        resetStability()
+        status = .listening
+        liveMidi = nil
+        liveCents = 0
+
+        let capture = audioCapture
+        await Task.detached(priority: .userInitiated) {
+            await capture.start { [weak self] samples, sampleRate in
+                Task { @MainActor [weak self] in
+                    self?.processAudio(samples: samples, sampleRate: sampleRate)
+                }
+            }
+        }.value
+    }
 
     private func processAudio(samples: [Float], sampleRate: UInt32) {
         guard status == .listening else { return }
 
         let rms = computeRMS(samples)
-
         if rms < silenceRMSThreshold {
             resetStability()
             liveMidi = nil
@@ -200,20 +182,18 @@ class ExerciseModel: ObservableObject {
 
         liveMidi = midi
         liveCents = cents
+        let pitchClass = midi % 12
 
-        let pc = MusicTheory.pitchClass(midi)
-        let now = Date()
-
-        if pc == stabilityPitchClass {
-            if !stabilityFired &&
-               now.timeIntervalSince(stabilityStartTime) >= stabilityDuration {
-                stabilityFired = true
+        if pitchClass == stabilityPitchClass {
+            stabilityCount += 1
+            if !pitchConsumed && stabilityCount >= 3 {
+                pitchConsumed = true
                 commitNote(midi: midi, cents: cents)
             }
         } else {
-            stabilityPitchClass = pc
-            stabilityStartTime = now
-            stabilityFired = false
+            stabilityPitchClass = pitchClass
+            stabilityCount = 1
+            pitchConsumed = false
         }
     }
 
@@ -241,33 +221,88 @@ class ExerciseModel: ObservableObject {
         guard currentNoteIndex < sequence.count else { return }
 
         let expectedMidi = sequence[currentNoteIndex]
-        let correct = MusicTheory.isCorrect(
-            detectedMidi: midi, cents: cents, expectedMidi: expectedMidi)
-
-        detectedNotes.append(DetectedNote(midi: midi, cents: cents, isCorrect: correct))
+        let correct = EarRingCore.isCorrectNote(detectedMidi: midi, cents: cents, expectedMidi: expectedMidi)
+        let note = DetectedNote(midi: midi, cents: cents, isCorrect: correct)
+        detectedNotes.append(note)
         currentNoteIndex += 1
 
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(correct ? .success : .error)
-
         resetStability()
 
-        if currentNoteIndex >= sequence.count {
-            stopListening()
+        if correct {
+            if currentNoteIndex >= sequence.count {
+                audioCapture.stop()
+                completeTest(passed: true, attemptsUsed: currentAttempt, attemptNotes: detectedNotes)
+            }
+        } else {
+            audioCapture.stop()
+            status = .retryDelay
+            if currentAttempt >= maxAttempts {
+                completeTest(passed: false, attemptsUsed: currentAttempt, attemptNotes: detectedNotes)
+            } else {
+                Task {
+                    try? await Task.sleep(nanoseconds: retryDelayNanoseconds)
+                    guard self.isSessionRunning else { return }
+                    await self.retryCurrentTest(attempt: self.currentAttempt + 1)
+                }
+            }
         }
     }
 
-    private func computeScore() {
-        let total = sequence.count
-        guard total > 0 else { score = 0; return }
-        let correct = detectedNotes.filter { $0.isCorrect }.count
-        score = Int(Double(correct) / Double(total) * 100)
+    private func completeTest(passed: Bool, attemptsUsed: Int, attemptNotes: [DetectedNote]) {
+        let testScore = EarRingCore.testScore(maxAttempts: maxAttempts, attemptsUsed: attemptsUsed, passed: passed)
+        cumulativeScore += testScore
+        testsCompleted += 1
+        score = testsCompleted == 0 ? 0 : cumulativeScore / testsCompleted
+        status = .retryDelay
+        persistTestRecord(score: testScore, attemptsUsed: attemptsUsed, passed: passed, attemptNotes: attemptNotes)
+
+        Task {
+            try? await Task.sleep(nanoseconds: retryDelayNanoseconds)
+            guard self.isSessionRunning else { return }
+            await self.startFreshTest()
+        }
+    }
+
+    private func persistTestRecord(score: Int, attemptsUsed: Int, passed: Bool, attemptNotes: [DetectedNote]) {
+        ProgressStore.appendTest(
+            TestRecord(
+                id: UUID(),
+                date: Date(),
+                scaleName: MusicTheory.SCALE_NAMES[scaleId],
+                rootLabel: MusicTheory.midiToLabel(rootMidi),
+                score: score,
+                attemptsUsed: attemptsUsed,
+                maxAttempts: maxAttempts,
+                passed: passed,
+                length: sequenceLength,
+                expectedNotes: sequence.map(MusicTheory.midiToLabel),
+                detectedNotes: attemptNotes.map { MusicTheory.midiToLabel($0.midi) }
+            )
+        )
+    }
+
+    private func saveSessionIfNeeded() {
+        guard !sessionPersisted, testsCompleted > 0 else { return }
+        ProgressStore.appendSession(
+            SessionRecord(
+                id: UUID(),
+                date: Date(),
+                scaleName: MusicTheory.SCALE_NAMES[scaleId],
+                rootLabel: MusicTheory.midiToLabel(rootMidi),
+                score: score,
+                length: sequenceLength,
+                testsCompleted: testsCompleted
+            )
+        )
+        sessionPersisted = true
     }
 
     private func resetStability() {
         stabilityPitchClass = -1
-        stabilityStartTime = .distantPast
-        stabilityFired = false
+        stabilityCount = 0
+        pitchConsumed = false
     }
 
     private func computeRMS(_ samples: [Float]) -> Float {

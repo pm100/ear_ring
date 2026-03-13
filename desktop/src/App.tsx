@@ -1,35 +1,43 @@
 import React, { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
-import { Screen, ExerciseState, SessionRecord } from './types';
+import { Screen, ExerciseSettings, ExerciseState } from './types';
 import HomeScreen from './components/HomeScreen';
 import ExerciseScreen from './components/ExerciseScreen';
 import SetupScreen from './components/SetupScreen';
 import ResultsScreen from './components/ResultsScreen';
 import ProgressScreen from './components/ProgressScreen';
 
-const SCALE_NAMES = ['Major', 'Natural Minor', 'Harmonic Minor', 'Pentatonic Major', 'Pentatonic Minor', 'Dorian', 'Mixolydian', 'Blues'];
-const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
-const defaultExercise: ExerciseState = {
+const defaultSettings: ExerciseSettings = {
   rootNote: 0,
   octave: 4,
   scaleId: 0,
   sequenceLength: 4,
+  tempoBpm: 100,
+  showTestNotes: false,
+};
+
+const defaultExercise: ExerciseState = {
+  ...defaultSettings,
   sequence: [],
   detected: [],
-  status: 'idle',
+  status: 'stopped',
   currentNoteIndex: 0,
   highlightIndex: -1,
+  currentAttempt: 1,
+  maxAttempts: 5,
+  testsCompleted: 0,
+  cumulativeScorePercent: 0,
+  sessionRunning: false,
 };
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
+  const [settings, setSettings] = useState<ExerciseSettings>(defaultSettings);
   const [exercise, setExercise] = useState<ExerciseState>(defaultExercise);
 
-  const startExercise = useCallback(async (rootNote: number, octave: number, scaleId: number, sequenceLength: number) => {
-    // MIDI formula: C4=60, so midi = (octave+1)*12 + rootNote
+  const startExercise = useCallback(async (rootNote: number, octave: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean) => {
     const midi = (octave + 1) * 12 + rootNote;
-    const seed = BigInt(Date.now());
+    const seed = Date.now();
     try {
       const sequence = await invoke<number[]>('cmd_generate_sequence', {
         rootMidi: midi,
@@ -42,11 +50,18 @@ export default function App() {
         octave,
         scaleId,
         sequenceLength,
+        tempoBpm,
+        showTestNotes,
         sequence,
         detected: [],
-        status: 'idle',
+        status: 'playing',
         currentNoteIndex: 0,
         highlightIndex: -1,
+        currentAttempt: 1,
+        maxAttempts: 5,
+        testsCompleted: 0,
+        cumulativeScorePercent: 0,
+        sessionRunning: true,
       });
       setScreen('exercise');
     } catch (e) {
@@ -54,33 +69,27 @@ export default function App() {
     }
   }, []);
 
-  const finishExercise = useCallback((detected: ExerciseState['detected']) => {
-    setExercise(prev => ({ ...prev, detected, status: 'done' }));
-    const correct = detected.filter(d => d.correct).length;
-    const score = detected.length > 0 ? Math.round((correct / detected.length) * 100) : 0;
-    const record: SessionRecord = {
-      date: new Date().toISOString(),
-      scale: SCALE_NAMES[exercise.scaleId] || 'Major',
-      root: NOTE_NAMES[exercise.rootNote] || 'C',
-      score,
-      length: exercise.sequenceLength,
-    };
-    const existing: SessionRecord[] = JSON.parse(localStorage.getItem('ear_ring_sessions') || '[]');
-    existing.unshift(record);
-    localStorage.setItem('ear_ring_sessions', JSON.stringify(existing.slice(0, 100)));
-    setScreen('results');
-  }, [exercise.scaleId, exercise.rootNote, exercise.sequenceLength]);
-
-  const updateExercise = useCallback((updates: Partial<ExerciseState>) => {
-    setExercise(prev => ({ ...prev, ...updates }));
+  const stopExercise = useCallback(() => {
+    setExercise(prev => ({
+      ...prev,
+      sequence: [],
+      detected: [],
+      status: 'stopped',
+      currentNoteIndex: 0,
+      currentAttempt: 1,
+      testsCompleted: 0,
+      cumulativeScorePercent: 0,
+      sessionRunning: false,
+    }));
+    setScreen('home');
   }, []);
 
   return (
     <div className="app-container">
       {screen === 'home' && (
         <HomeScreen
-          exercise={exercise}
-          onUpdateExercise={updateExercise}
+          settings={settings}
+          onUpdateSettings={setSettings}
           onStart={startExercise}
           onSetup={() => setScreen('setup')}
           onProgress={() => setScreen('progress')}
@@ -89,13 +98,11 @@ export default function App() {
       {screen === 'exercise' && (
         <ExerciseScreen
           exercise={exercise}
-          onUpdateExercise={updateExercise}
-          onFinish={finishExercise}
-          onBack={() => setScreen('home')}
+          onStop={stopExercise}
         />
       )}
       {screen === 'setup' && (
-        <SetupScreen onBack={() => setScreen('home')} octave={exercise.octave} />
+        <SetupScreen onBack={() => setScreen('home')} octave={settings.octave} />
       )}
       {screen === 'results' && (
         <ResultsScreen

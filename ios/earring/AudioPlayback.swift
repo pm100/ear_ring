@@ -55,7 +55,7 @@ class AudioPlayback {
 
     // MARK: - Public API
 
-    func playNote(midi: Int) async {
+    func playNote(midi: Int, holdNanoseconds: UInt64 = 600_000_000) async {
         guard !isCancelled else { return }
 
         let sample = nearestSample(for: midi)
@@ -74,7 +74,7 @@ class AudioPlayback {
             player.play()
             players.append(player)
 
-            try await Task.sleep(nanoseconds: 600_000_000) // 600 ms gap
+            try await Task.sleep(nanoseconds: holdNanoseconds)
 
             players.removeAll { $0 === player }
         } catch {
@@ -82,11 +82,53 @@ class AudioPlayback {
         }
     }
 
-    func playSequence(notes: [Int], onNoteStart: @escaping (Int) -> Void) async {
+    func playSequence(notes: [Int], bpm: Int = 100, onNoteStart: @escaping (Int) -> Void) async {
+        let stepNanoseconds = UInt64(max(150, 60_000 / max(1, bpm))) * 1_000_000
         for midi in notes {
             guard !isCancelled else { return }
             onNoteStart(midi)
-            await playNote(midi: midi)
+            await playNote(midi: midi, holdNanoseconds: stepNanoseconds)
+        }
+    }
+
+    func playChord(notes: [Int], holdMs: UInt64 = 600) async {
+        guard !isCancelled else { return }
+        do {
+            let samples = try await withThrowingTaskGroup(of: (URL, Float)?.self) { group in
+                for midi in notes {
+                    group.addTask { [weak self] in
+                        guard let self else { return nil }
+                        let sample = self.nearestSample(for: midi)
+                        let url = try await self.downloadIfNeeded(name: sample.name)
+                        let deltaSemitones = midi - sample.midi
+                        let rate = Float(pow(2.0, Double(deltaSemitones) / 12.0))
+                        return (url, rate)
+                    }
+                }
+
+                var results: [(URL, Float)] = []
+                for try await result in group {
+                    if let result {
+                        results.append(result)
+                    }
+                }
+                return results
+            }
+
+            guard !isCancelled else { return }
+
+            for (url, rate) in samples {
+                let player = try AVAudioPlayer(contentsOf: url)
+                player.enableRate = true
+                player.prepareToPlay()
+                player.rate = rate
+                player.play()
+                players.append(player)
+            }
+
+            try await Task.sleep(nanoseconds: holdMs * 1_000_000)
+        } catch {
+            print("[AudioPlayback] Error playing chord: \(error)")
         }
     }
 }

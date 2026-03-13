@@ -1,34 +1,13 @@
 import React from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
-import { useEffect, useState } from 'react';
+import { StaffDisplayNote } from '../types';
+import { midiToLabel, staffPositionForMidi } from '../music';
 
 interface Props {
-  sequence: number[];
-  currentNoteIndex: number;
-  highlightIndex: number;
-  detected: { midi: number; correct: boolean }[];
-  status: string;
+  notes: StaffDisplayNote[];
   fixedSpacing?: number;
 }
 
-const NOTE_NAMES_SHARP = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-
-function midiToLabel(midi: number): string {
-  const octave = Math.floor(midi / 12) - 1;
-  return `${NOTE_NAMES_SHARP[midi % 12]}${octave}`;
-}
-
-function useStaffPositions(sequence: number[]) {
-  const [positions, setPositions] = useState<number[]>([]);
-  useEffect(() => {
-    if (sequence.length === 0) { setPositions([]); return; }
-    Promise.all(sequence.map(midi => invoke<number>('cmd_staff_position', { midi }))).then(setPositions);
-  }, [sequence]);
-  return positions;
-}
-
-export default function MusicStaff({ sequence, currentNoteIndex, highlightIndex, detected, status, fixedSpacing }: Props) {
-  const staffPositions = useStaffPositions(sequence);
+export default function MusicStaff({ notes, fixedSpacing }: Props) {
   const svgWidth = 500;
   const svgHeight = 160;
   const lineSpacing = 12;
@@ -36,35 +15,30 @@ export default function MusicStaff({ sequence, currentNoteIndex, highlightIndex,
   const leftMargin = 60;
   const noteRadius = lineSpacing * 0.45;
   const staffBottomY = staffTop + 4 * lineSpacing;
+  const staffCenter = staffTop + 2 * lineSpacing;
 
-  const calcNoteY = (staffPos: number) => staffBottomY - (staffPos - 2) * (lineSpacing / 2);
+  const calcNoteY = (staffPos: number) => staffCenter - (staffPos - 6) * (lineSpacing / 2);
 
-  // Clef image: 149×307 PNG (GDI+ rendered, trimmed), aspect ratio ≈ 0.485.
-  // 8 lineSpacings tall: 2 above top staff line, 2 below bottom staff line.
   const clefH = lineSpacing * 8;
   const clefW = clefH * (149 / 307);
   const clefImgY = staffTop - lineSpacing * 2;
 
   const noteAreaStart = leftMargin + 20;
   const noteAreaWidth = svgWidth - noteAreaStart - 20;
-  const noteStep = fixedSpacing ?? noteAreaWidth / Math.max(sequence.length, 1);
+  const noteStep = fixedSpacing ?? noteAreaWidth / Math.max(notes.length, 1);
   const calcNoteX = (i: number) => noteAreaStart + i * noteStep + noteStep / 2;
 
-  const getNoteColor = (i: number): string => {
-    if (i < detected.length) return detected[i].correct ? '#4CAF50' : '#F44336';
-    if (i === highlightIndex && status === 'playing') return '#3F51B5';
-    if (i === currentNoteIndex && status === 'listening') return '#3F51B5';
-    return '#333333';
-  };
-
-  const isFilled = (i: number): boolean => {
-    if (i < detected.length) return true;
-    if (i === highlightIndex && status === 'playing') return true;
-    if (i === currentNoteIndex && status === 'listening') return true;
-    return false;
-  };
-
   const ledgerLineHalfWidth = noteRadius * 2.8;
+  const noteHeadRx = noteRadius * 1.15;
+  const noteHeadRy = noteRadius * 0.85;
+  const stemLength = lineSpacing * 3.2;
+
+  const accidentalForMidi = (midi: number): string | null => {
+    const label = midiToLabel(midi);
+    if (label.includes('#')) return '\u266f';
+    if (label.includes('b') || label.includes('\u266d')) return '\u266d';
+    return null;
+  };
 
   const getLedgerLines = (staffPos: number, cx: number): React.ReactNode[] => {
     const lines: React.ReactNode[] = [];
@@ -104,6 +78,15 @@ export default function MusicStaff({ sequence, currentNoteIndex, highlightIndex,
     return lines;
   };
 
+  const colorForState = (state: StaffDisplayNote['state']) => {
+    switch (state) {
+      case 'correct': return '#4CAF50';
+      case 'incorrect': return '#F44336';
+      case 'active': return '#3F51B5';
+      default: return '#333333';
+    }
+  };
+
   return (
     <svg width="100%" viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ display: 'block' }}>
       {[0, 1, 2, 3, 4].map(lineIdx => {
@@ -113,44 +96,51 @@ export default function MusicStaff({ sequence, currentNoteIndex, highlightIndex,
 
       <image href="treble_clef.png" x={2} y={clefImgY} width={clefW} height={clefH} />
 
-      {sequence.map((midi, i) => {
-        const sp = staffPositions[i];
-        if (sp === undefined) return null;
+      {notes.map((note, i) => {
+        const sp = staffPositionForMidi(note.midi);
         const cx = calcNoteX(i);
         const cy = calcNoteY(sp);
-        const color = getNoteColor(i);
-        const filled = isFilled(i);
+        const color = colorForState(note.state);
         const ledgers = getLedgerLines(sp, cx);
+        const stemUp = sp < 6;
+        const accidental = accidentalForMidi(note.midi);
+        const stemX = stemUp ? cx + noteHeadRx * 0.9 : cx - noteHeadRx * 0.9;
+        const stemY2 = stemUp ? cy - stemLength : cy + stemLength;
 
         return (
-          <g key={i}>
+          <g key={`${note.midi}-${i}`}>
             {ledgers}
-            <circle
+            {accidental && (
+              <text
+                x={cx - noteHeadRx * 2.4}
+                y={cy + 4}
+                textAnchor="middle"
+                fontSize={lineSpacing * 1.8}
+                fill={color}
+                style={{ userSelect: 'none' }}
+              >
+                {accidental}
+              </text>
+            )}
+            <ellipse
               cx={cx}
               cy={cy}
-              r={noteRadius}
+              rx={noteHeadRx}
+              ry={noteHeadRy}
               fill={color}
               stroke={color}
               strokeWidth="1.5"
+              transform={`rotate(-20 ${cx} ${cy})`}
             />
-            {!filled && (
-              <circle
-                cx={cx}
-                cy={cy}
-                r={noteRadius - 2.5}
-                fill="white"
-              />
-            )}
-            <text
-              x={cx}
-              y={cy + noteRadius + 12}
-              textAnchor="middle"
-              fontSize="10"
-              fill={color}
-              style={{ userSelect: 'none' }}
-            >
-              {midiToLabel(midi)}
-            </text>
+            <line
+              x1={stemX}
+              y1={cy}
+              x2={stemX}
+              y2={stemY2}
+              stroke={color}
+              strokeWidth="1.7"
+              strokeLinecap="round"
+            />
           </g>
         );
       })}

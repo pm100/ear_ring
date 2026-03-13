@@ -7,10 +7,14 @@ export function useAudioCapture() {
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const callbackRef = useRef<((hz: number) => void) | null>(null);
+  const activeRef = useRef(false);
+  const detectInFlightRef = useRef(false);
 
   const start = useCallback(async (onHz: (hz: number) => void) => {
     try {
+      activeRef.current = true;
       callbackRef.current = onHz;
+      detectInFlightRef.current = false;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
@@ -24,18 +28,24 @@ export function useAudioCapture() {
       processorRef.current = processor;
 
       processor.onaudioprocess = async (event) => {
+        if (!activeRef.current || detectInFlightRef.current) {
+          return;
+        }
         const channelData = event.inputBuffer.getChannelData(0);
         const samples = Array.from(channelData);
+        detectInFlightRef.current = true;
         try {
           const hz = await invoke<number>('cmd_detect_pitch', {
             samples,
             sampleRate: 44100,
           });
-          if (callbackRef.current) {
+          if (activeRef.current && callbackRef.current) {
             callbackRef.current(hz);
           }
         } catch (_e) {
           // ignore
+        } finally {
+          detectInFlightRef.current = false;
         }
       };
 
@@ -47,6 +57,8 @@ export function useAudioCapture() {
   }, []);
 
   const stop = useCallback(() => {
+    activeRef.current = false;
+    detectInFlightRef.current = false;
     if (processorRef.current) {
       processorRef.current.disconnect();
       processorRef.current = null;

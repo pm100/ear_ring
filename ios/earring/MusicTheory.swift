@@ -42,7 +42,7 @@ struct MusicTheory {
 
     /// A detected note is correct if same pitch class AND within ±50 cents.
     static func isCorrect(detectedMidi: Int, cents: Int, expectedMidi: Int) -> Bool {
-        return pitchClass(detectedMidi) == pitchClass(expectedMidi) && abs(cents) <= 50
+        return EarRingCore.isCorrectNote(detectedMidi: detectedMidi, cents: cents, expectedMidi: expectedMidi)
     }
 
     /// Diatonic staff position (delegates to EarRingCore Rust FFI).

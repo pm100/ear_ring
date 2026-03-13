@@ -2,8 +2,8 @@ pub mod music_theory;
 pub mod pitch_detection;
 
 pub use music_theory::{
-    freq_to_note, generate_sequence, midi_to_freq, scale_notes, staff_position, Note, NoteName,
-    ScaleType,
+    freq_to_note, generate_sequence, intro_chord, is_correct_note, midi_to_freq, scale_notes,
+    staff_position, test_score, Note, NoteName, ScaleType,
 };
 pub use pitch_detection::detect_pitch;
 
@@ -121,6 +121,58 @@ pub extern "C" fn ear_ring_generate_sequence(
     notes.len() as c_int
 }
 
+/// Build a 3-note intro chord as MIDI note numbers.
+#[no_mangle]
+pub extern "C" fn ear_ring_intro_chord(
+    root_midi: c_uchar,
+    scale_id: c_uchar,
+    out_buf: *mut c_uchar,
+) -> c_int {
+    if out_buf.is_null() {
+        return -1;
+    }
+    let scale = match scale_id {
+        0 => ScaleType::Major,
+        1 => ScaleType::NaturalMinor,
+        2 => ScaleType::HarmonicMinor,
+        3 => ScaleType::PentatonicMajor,
+        4 => ScaleType::PentatonicMinor,
+        5 => ScaleType::Dorian,
+        6 => ScaleType::Mixolydian,
+        7 => ScaleType::Blues,
+        _ => return -1,
+    };
+    let root = Note::from_midi(root_midi);
+    let notes = intro_chord(root, scale);
+    let out = unsafe { std::slice::from_raw_parts_mut(out_buf, notes.len()) };
+    for (i, note) in notes.iter().enumerate() {
+        out[i] = note.midi();
+    }
+    notes.len() as c_int
+}
+
+#[no_mangle]
+pub extern "C" fn ear_ring_is_correct_note(
+    detected_midi: c_uchar,
+    cents: c_int,
+    expected_midi: c_uchar,
+) -> c_int {
+    if is_correct_note(detected_midi, cents, expected_midi) {
+        1
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn ear_ring_test_score(
+    max_attempts: c_uchar,
+    attempts_used: c_uchar,
+    passed: c_int,
+) -> c_int {
+    test_score(max_attempts, attempts_used, passed != 0) as c_int
+}
+
 // ── Android JNI exports ───────────────────────────────────────────────────────
 // Exported with the exact symbol names the Kotlin EarRingCoreModule expects.
 #[cfg(target_os = "android")]
@@ -129,7 +181,10 @@ mod android_jni {
     use jni::sys::{jfloat, jfloatArray, jint, jintArray, jlong};
     use jni::JNIEnv;
 
-    use super::{detect_pitch, freq_to_note, generate_sequence, staff_position, Note, ScaleType};
+    use super::{
+        detect_pitch, freq_to_note, generate_sequence, intro_chord, is_correct_note,
+        staff_position, test_score, Note, ScaleType,
+    };
 
     #[no_mangle]
     pub extern "system" fn Java_com_earring_EarRingCore_nativeDetectPitch(
@@ -216,5 +271,61 @@ mod android_jni {
         };
         let _ = env.set_int_array_region(&arr, 0, &midi_vals);
         arr.into_raw()
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeIntroChord(
+        mut env: JNIEnv,
+        _class: JClass,
+        root_midi: jint,
+        scale_id: jint,
+    ) -> jintArray {
+        let scale = match scale_id {
+            0 => ScaleType::Major,
+            1 => ScaleType::NaturalMinor,
+            2 => ScaleType::HarmonicMinor,
+            3 => ScaleType::PentatonicMajor,
+            4 => ScaleType::PentatonicMinor,
+            5 => ScaleType::Dorian,
+            6 => ScaleType::Mixolydian,
+            7 => ScaleType::Blues,
+            _ => ScaleType::Major,
+        };
+        let root = Note::from_midi(root_midi as u8);
+        let notes = intro_chord(root, scale);
+        let midi_vals: Vec<jint> = notes.iter().map(|n| n.midi() as jint).collect();
+
+        let arr: JIntArray = match env.new_int_array(midi_vals.len() as i32) {
+            Ok(a) => a,
+            Err(_) => return std::ptr::null_mut(),
+        };
+        let _ = env.set_int_array_region(&arr, 0, &midi_vals);
+        arr.into_raw()
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeIsCorrectNote(
+        _env: JNIEnv,
+        _class: JClass,
+        detected_midi: jint,
+        cents: jint,
+        expected_midi: jint,
+    ) -> jint {
+        if is_correct_note(detected_midi as u8, cents, expected_midi as u8) {
+            1
+        } else {
+            0
+        }
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeTestScore(
+        _env: JNIEnv,
+        _class: JClass,
+        max_attempts: jint,
+        attempts_used: jint,
+        passed: jint,
+    ) -> jint {
+        test_score(max_attempts as u8, attempts_used as u8, passed != 0) as jint
     }
 }

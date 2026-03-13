@@ -1,5 +1,6 @@
 export type Screen = 'home' | 'exercise' | 'setup' | 'results' | 'progress';
-export type ExerciseStatus = 'idle' | 'playing' | 'listening' | 'done';
+export type ExerciseStatus = 'playing' | 'listening' | 'retry_delay' | 'stopped';
+export type StaffNoteState = 'expected' | 'correct' | 'incorrect' | 'active';
 
 export interface DetectedNote {
   midi: number;
@@ -7,16 +8,37 @@ export interface DetectedNote {
   correct: boolean;
 }
 
+export interface StaffDisplayNote {
+  midi: number;
+  state: StaffNoteState;
+}
+
+export interface ExerciseSettings {
+  rootNote: number;
+  octave: number;
+  scaleId: number;
+  sequenceLength: number;
+  tempoBpm: number;
+  showTestNotes: boolean;
+}
+
 export interface ExerciseState {
-  rootNote: number;   // 0-11
-  octave: number;     // 3-5
-  scaleId: number;    // 0-7
-  sequenceLength: number; // 2-8
+  rootNote: number;
+  octave: number;
+  scaleId: number;
+  sequenceLength: number;
+  tempoBpm: number;
+  showTestNotes: boolean;
   sequence: number[]; // MIDI values
   detected: DetectedNote[];
   status: ExerciseStatus;
   currentNoteIndex: number;
   highlightIndex: number;
+  currentAttempt: number;
+  maxAttempts: number;
+  testsCompleted: number;
+  cumulativeScorePercent: number;
+  sessionRunning: boolean;
 }
 
 export interface SessionRecord {
@@ -25,4 +47,18 @@ export interface SessionRecord {
   root: string;
   score: number;
   length: number;
+  testsCompleted?: number;
+}
+
+export interface TestRecord {
+  date: string;
+  scale: string;
+  root: string;
+  score: number;
+  length: number;
+  attemptsUsed: number;
+  maxAttempts: number;
+  passed: boolean;
+  expectedNotes: string[];
+  detectedNotes: string[];
 }

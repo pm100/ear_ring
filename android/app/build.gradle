@@ -3,6 +3,14 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+def repoRoot = rootProject.projectDir.parentFile
+def rustProjectDir = new File(repoRoot, 'rust')
+def rustManifest = new File(rustProjectDir, 'Cargo.toml')
+def workspaceManifest = new File(repoRoot, 'Cargo.toml')
+def workspaceLockfile = new File(repoRoot, 'Cargo.lock')
+def cargoExecutable = org.gradle.internal.os.OperatingSystem.current().isWindows() ? 'cargo.exe' : 'cargo'
+def rustJniOutputDir = { variantName -> layout.buildDirectory.dir("generated/rustJniLibs/${variantName}") }
+
 android {
     namespace 'com.earring'
     compileSdk 35
@@ -40,9 +48,65 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = '17' }
+    sourceSets {
+        debug {
+            jniLibs.srcDirs += [rustJniOutputDir('debug').get().asFile.absolutePath]
+        }
+        release {
+            jniLibs.srcDirs += [rustJniOutputDir('release').get().asFile.absolutePath]
+        }
+    }
     packagingOptions {
         jniLibs { useLegacyPackaging = true }
     }
+}
+
+def configureRustJniTask = { task, variantName ->
+    def outputDirProvider = rustJniOutputDir(variantName)
+    task.group = 'build'
+    task.description = "Build shared Rust JNI libraries for the ${variantName} Android variant."
+    task.workingDir = repoRoot
+    task.inputs.files(
+        fileTree(dir: rustProjectDir, include: ['src/**/*.rs']),
+        rustManifest,
+        workspaceManifest,
+        workspaceLockfile
+    )
+    task.outputs.dir(outputDirProvider)
+    task.doFirst {
+        def outputDir = outputDirProvider.get().asFile
+        delete(outputDir)
+        outputDir.mkdirs()
+
+        def args = [
+            'ndk',
+            '-t', 'arm64-v8a',
+            '-t', 'x86_64',
+            '-o', outputDir.absolutePath,
+            'build'
+        ]
+        if (variantName == 'release') {
+            args << '--release'
+        }
+        args += ['-p', 'ear_ring_core']
+        commandLine(([cargoExecutable] + args) as Object[])
+    }
+}
+
+tasks.register('buildRustJniDebug', Exec) {
+    configureRustJniTask(delegate, 'debug')
+}
+
+tasks.register('buildRustJniRelease', Exec) {
+    configureRustJniTask(delegate, 'release')
+}
+
+tasks.matching { it.name == 'mergeDebugJniLibFolders' }.configureEach {
+    dependsOn(tasks.named('buildRustJniDebug'))
+}
+
+tasks.matching { it.name == 'mergeReleaseJniLibFolders' }.configureEach {
+    dependsOn(tasks.named('buildRustJniRelease'))
 }
 
 dependencies {

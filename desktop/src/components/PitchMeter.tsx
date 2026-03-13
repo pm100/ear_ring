@@ -1,30 +1,13 @@
 import React from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
+import { hzToLabel } from '../music';
 
 interface Props {
   hz: number;
 }
 
-const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-
 export default function PitchMeter({ hz }: Props) {
-  const [noteName, setNoteName] = useState('\u2014');
-
-  useEffect(() => {
-    if (hz <= 0) {
-      setNoteName('\u2014');
-      return;
-    }
-    invoke<number>('cmd_freq_to_midi', { hz }).then((m) => {
-      if (m >= 0) {
-        const octave = Math.floor(m / 12) - 1;
-        setNoteName(`${NOTE_NAMES[m % 12]}${octave}`);
-      } else {
-        setNoteName('\u2014');
-      }
-    });
-  }, [hz]);
+  const noteName = useMemo(() => hzToLabel(hz), [hz]);
 
   const active = hz > 0;
   const ringColor = active ? '#4CAF50' : '#BDBDBD';

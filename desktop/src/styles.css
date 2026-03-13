@@ -221,6 +221,13 @@ body {
   margin: 12px 0;
 }
 
+.exercise-meta {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
 /* Pitch Meter */
 .pitch-meter-circle {
   display: flex;

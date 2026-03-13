@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
 import PitchMeter from './PitchMeter';
 import MusicStaff from './MusicStaff';
 import { useAudioCapture } from '../hooks/useAudioCapture';
+import { freqToMidi } from '../music';
 
 interface Props {
   onBack: () => void;
@@ -26,7 +26,7 @@ export default function SetupScreen({ onBack, octave }: Props) {
   const handleHz = useCallback(async (detectedHz: number) => {
     setHz(detectedHz);
     if (detectedHz > 0) {
-      const midi = await invoke<number>('cmd_freq_to_midi', { hz: detectedHz });
+      const midi = freqToMidi(detectedHz);
       if (midi >= 0) {
         const pitchClass = midi % 12;
         frameNotesRef.current.push(pitchClass);
@@ -80,11 +80,10 @@ export default function SetupScreen({ onBack, octave }: Props) {
       <p className="setup-instruction">Sing or play a note to test your microphone.</p>
 
       <MusicStaff
-        sequence={noteHistory}
-        currentNoteIndex={noteHistory.length - 1}
-        highlightIndex={noteHistory.length - 1}
-        detected={[]}
-        status={noteHistory.length > 0 ? 'listening' : 'idle'}
+        notes={noteHistory.map((midi, index) => ({
+          midi,
+          state: index === noteHistory.length - 1 ? 'active' : 'expected',
+        }))}
         fixedSpacing={NOTE_STEP}
       />
 

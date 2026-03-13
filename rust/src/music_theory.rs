@@ -209,6 +209,36 @@ pub fn generate_sequence(root: Note, scale: ScaleType, length: u8, seed: u64) ->
         .collect()
 }
 
+/// Build a tonic triad-style intro chord from the selected scale.
+/// Uses scale degrees 1, 3, and 5 when available, falling back to the last
+/// available degree for shorter scales.
+pub fn intro_chord(root: Note, scale: ScaleType) -> Vec<Note> {
+    let notes = scale_notes(root, scale);
+    if notes.is_empty() {
+        return vec![root];
+    }
+    let third_idx = usize::min(2, notes.len() - 1);
+    let fifth_idx = usize::min(4, notes.len() - 1);
+    vec![notes[0], notes[third_idx], notes[fifth_idx]]
+}
+
+/// Whether a detected note matches the expected note class and is within the
+/// allowed cents tolerance.
+pub fn is_correct_note(detected_midi: u8, cents: i32, expected_midi: u8) -> bool {
+    detected_midi % 12 == expected_midi % 12 && cents.abs() <= 50
+}
+
+/// Score a test attempt as a percentage.
+/// First-try success yields 100, later successes scale down by attempt count,
+/// and total failure yields 0.
+pub fn test_score(max_attempts: u8, attempts_used: u8, passed: bool) -> u8 {
+    if !passed || max_attempts == 0 {
+        return 0;
+    }
+    let weighted = max_attempts.saturating_sub(attempts_used).saturating_add(1);
+    (((weighted as f32) * 100.0) / (max_attempts as f32)).floor() as u8
+}
+
 // ── Staff position ────────────────────────────────────────────────────────────
 
 /// Treble-clef staff position for a note.
@@ -297,5 +327,27 @@ mod tests {
         assert_eq!(staff_position(Note::new(NoteName::D, 4)), 1);
         assert_eq!(staff_position(Note::new(NoteName::C, 5)), 7);
         assert_eq!(staff_position(Note::new(NoteName::B, 3)), -1);
+    }
+
+    #[test]
+    fn test_intro_chord_uses_scale_degrees() {
+        let root = Note::new(NoteName::C, 4);
+        let chord = intro_chord(root, ScaleType::Major);
+        let midis: Vec<_> = chord.into_iter().map(|n| n.midi()).collect();
+        assert_eq!(midis, vec![60, 64, 67]);
+    }
+
+    #[test]
+    fn test_is_correct_note() {
+        assert!(is_correct_note(60, 0, 72));
+        assert!(!is_correct_note(61, 0, 72));
+        assert!(!is_correct_note(60, 80, 72));
+    }
+
+    #[test]
+    fn test_test_score() {
+        assert_eq!(test_score(5, 1, true), 100);
+        assert_eq!(test_score(5, 3, true), 60);
+        assert_eq!(test_score(5, 5, false), 0);
     }
 }
