@@ -31,14 +31,18 @@ int32_t ear_ring_staff_position(uint8_t midi);
 
 /// Generate a sequence of MIDI notes from a given scale.
 /// Returns the count of notes written into out_buf on success, -1 on failure.
-/// @param root_midi  Root note MIDI number
-/// @param scale_id   Scale identifier (0–7)
-/// @param length     Number of notes to generate
-/// @param seed       Random seed for reproducible generation
-/// @param out_buf    Output buffer (must be at least `length` bytes)
-int32_t ear_ring_generate_sequence(uint8_t root_midi,
+/// @param root_chroma  Pitch class of the root note (0=C … 11=B)
+/// @param scale_id     Scale identifier (0–7)
+/// @param length       Number of notes to generate
+/// @param range_start  Lowest accepted MIDI note (inclusive)
+/// @param range_end    Highest accepted MIDI note (inclusive)
+/// @param seed         Random seed for reproducible generation
+/// @param out_buf      Output buffer (must be at least `length` bytes)
+int32_t ear_ring_generate_sequence(uint8_t root_chroma,
                                     uint8_t scale_id,
                                     uint8_t length,
+                                    uint8_t range_start,
+                                    uint8_t range_end,
                                     uint64_t seed,
                                     uint8_t *out_buf);
 

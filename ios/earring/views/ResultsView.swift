@@ -115,13 +115,8 @@ struct ResultsView: View {
             .padding(.horizontal, 16)
         }
         .background(Color(.systemBackground))
-        .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button("← Back") { path.removeLast() }
-                    .foregroundColor(.erPrimary)
-            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Text("Results")
                     .font(.subheadline.weight(.semibold))

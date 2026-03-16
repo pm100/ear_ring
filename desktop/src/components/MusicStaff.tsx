@@ -94,7 +94,7 @@ export default function MusicStaff({ notes, fixedSpacing }: Props) {
         return <line key={lineIdx} x1={5} y1={y} x2={svgWidth - 10} y2={y} stroke="#333333" strokeWidth="1.5" />;
       })}
 
-      <image href="treble_clef.png" x={2} y={clefImgY} width={clefW} height={clefH} />
+      <image href="/treble_clef.png" x={2} y={clefImgY} width={clefW} height={clefH} />
 
       {notes.map((note, i) => {
         const sp = staffPositionForMidi(note.midi);

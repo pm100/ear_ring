@@ -82,19 +82,22 @@ pub extern "C" fn ear_ring_staff_position(midi: c_uchar) -> c_int {
 
 /// Generate a sequence of MIDI note numbers.
 ///
-/// * `root_midi`   – MIDI number of the root note
-/// * `scale_id`    – 0=Major, 1=NaturalMinor, 2=HarmonicMinor, 3=PentatonicMajor,
-///                   4=PentatonicMinor, 5=Dorian, 6=Mixolydian, 7=Blues
+/// * `root_chroma` – pitch class of the root note (0 = C, 1 = C#, …, 11 = B)
+/// * `scale_id`    – 0=Major, 1=NaturalMinor, 2=HarmonicMinor, 3=Dorian, 4=Mixolydian
 /// * `length`      – number of notes to generate
+/// * `range_start` – lowest accepted MIDI note (inclusive)
+/// * `range_end`   – highest accepted MIDI note (inclusive)
 /// * `seed`        – random seed for reproducibility
 /// * `out_buf`     – caller-allocated buffer of at least `length` bytes
 ///
 /// Returns the number of notes written, or -1 on error.
 #[no_mangle]
 pub extern "C" fn ear_ring_generate_sequence(
-    root_midi: c_uchar,
+    root_chroma: c_uchar,
     scale_id: c_uchar,
     length: c_uchar,
+    range_start: c_uchar,
+    range_end: c_uchar,
     seed: u64,
     out_buf: *mut c_uchar,
 ) -> c_int {
@@ -105,15 +108,11 @@ pub extern "C" fn ear_ring_generate_sequence(
         0 => ScaleType::Major,
         1 => ScaleType::NaturalMinor,
         2 => ScaleType::HarmonicMinor,
-        3 => ScaleType::PentatonicMajor,
-        4 => ScaleType::PentatonicMinor,
-        5 => ScaleType::Dorian,
-        6 => ScaleType::Mixolydian,
-        7 => ScaleType::Blues,
+        3 => ScaleType::Dorian,
+        4 => ScaleType::Mixolydian,
         _ => return -1,
     };
-    let root = Note::from_midi(root_midi);
-    let notes = generate_sequence(root, scale, length, seed);
+    let notes = generate_sequence(root_chroma, scale, range_start, range_end, length, seed);
     let out = unsafe { std::slice::from_raw_parts_mut(out_buf, length as usize) };
     for (i, note) in notes.iter().enumerate() {
         out[i] = note.midi();
@@ -135,11 +134,8 @@ pub extern "C" fn ear_ring_intro_chord(
         0 => ScaleType::Major,
         1 => ScaleType::NaturalMinor,
         2 => ScaleType::HarmonicMinor,
-        3 => ScaleType::PentatonicMajor,
-        4 => ScaleType::PentatonicMinor,
-        5 => ScaleType::Dorian,
-        6 => ScaleType::Mixolydian,
-        7 => ScaleType::Blues,
+        3 => ScaleType::Dorian,
+        4 => ScaleType::Mixolydian,
         _ => return -1,
     };
     let root = Note::from_midi(root_midi);
@@ -245,24 +241,29 @@ mod android_jni {
     pub extern "system" fn Java_com_earring_EarRingCore_nativeGenerateSequence(
         mut env: JNIEnv,
         _class: JClass,
-        root_midi: jint,
+        root_chroma: jint,
         scale_id: jint,
         length: jint,
+        range_start: jint,
+        range_end: jint,
         seed: jlong,
     ) -> jintArray {
         let scale = match scale_id {
             0 => ScaleType::Major,
             1 => ScaleType::NaturalMinor,
             2 => ScaleType::HarmonicMinor,
-            3 => ScaleType::PentatonicMajor,
-            4 => ScaleType::PentatonicMinor,
-            5 => ScaleType::Dorian,
-            6 => ScaleType::Mixolydian,
-            7 => ScaleType::Blues,
+            3 => ScaleType::Dorian,
+            4 => ScaleType::Mixolydian,
             _ => ScaleType::Major,
         };
-        let root = Note::from_midi(root_midi as u8);
-        let notes = generate_sequence(root, scale, length as u8, seed as u64);
+        let notes = generate_sequence(
+            root_chroma as u8,
+            scale,
+            range_start as u8,
+            range_end as u8,
+            length as u8,
+            seed as u64,
+        );
         let midi_vals: Vec<jint> = notes.iter().map(|n| n.midi() as jint).collect();
 
         let arr: JIntArray = match env.new_int_array(midi_vals.len() as i32) {
@@ -284,11 +285,8 @@ mod android_jni {
             0 => ScaleType::Major,
             1 => ScaleType::NaturalMinor,
             2 => ScaleType::HarmonicMinor,
-            3 => ScaleType::PentatonicMajor,
-            4 => ScaleType::PentatonicMinor,
-            5 => ScaleType::Dorian,
-            6 => ScaleType::Mixolydian,
-            7 => ScaleType::Blues,
+            3 => ScaleType::Dorian,
+            4 => ScaleType::Mixolydian,
             _ => ScaleType::Major,
         };
         let root = Note::from_midi(root_midi as u8);

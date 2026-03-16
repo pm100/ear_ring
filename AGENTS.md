@@ -55,8 +55,9 @@ Every platform must implement all 5 screens:
 | Results | Reserved legacy screen; **not shown during continuous testing mode** |
 | Progress | "Progress" from Home |
 
-Back navigation (system back gesture AND an on-screen "← Back" button) must work on
-every screen except Home.
+Back navigation must work on every screen except Home.
+- **Android & iOS**: system back gesture only — no on-screen "← Back" button.
+- **Desktop/Tauri**: on-screen "← Back" button (no system back gesture available).
 
 ---
 
@@ -72,22 +73,30 @@ Layout: vertically scrollable column, 16dp/px padding, centred.
 "Ear Training"         — 16sp, muted/secondary colour
 
 [28dp space]
-Section label: "Root Note"
+Section label: "Key"
 Chip grid (wrapping): C  C#  D  D#  E  F  F#  G  G#  A  A#  B
   — 12 chips, must WRAP across multiple rows (FlowRow / flexWrap)
   — Selected chip: filled with primary colour
   — Unselected: outlined
+  — Selecting a new key auto-resets the range to one octave from the new key closest to middle C
 
 [16dp space]
-Section label: "Octave"
-Chip row: 3  4  5   (single row, equal width)
+Section label: "Range  (RangeLow – RangeHigh)"   — label updates dynamically with current range
+PianoRangePicker
+  — Interactive piano keyboard, MIDI 36 (C2) to MIDI 84 (C6), 4 octaves, 29 white keys
+  — Horizontally scrollable; white keys 22dp wide × 80dp tall; black keys 14dp wide × 52dp tall
+  — Primary-colour handle circles (9dp radius) above each endpoint (rangeStart, rangeEnd)
+  — Connected by a primary-colour line; primary highlight on keys within the selected range
+  — Handle area: 22dp tall above the keyboard
+  — Drag a handle to resize range (minimum span = 12 semitones); tap elsewhere to shift range
+  — Default: one octave (12 semitones) from rootNote, using the octave closest to middle C
+    e.g. root=C → (C4, B4) = MIDI 60–71; root=G → (G3, F#4) = MIDI 55–65
 
 [16dp space]
 Section label: "Scale"
 Chip grid (wrapping): Major | Natural Minor | Harmonic Minor |
-                      Pentatonic Major | Pentatonic Minor |
-                      Dorian | Mixolydian | Blues
-  — 8 chips, must wrap
+                      Dorian | Mixolydian
+  — 5 chips, must wrap
 
 [16dp space]
 Section label: "Sequence Length"
@@ -119,7 +128,7 @@ Section labels: small/label typography, muted colour, left-aligned, 6dp bottom m
 Layout: vertical column, 16dp padding, NOT scrollable.
 
 ```
-[← Back]              [RootNoteOctave ScaleName]   (row: back left, title right)
+                        [Key RangeLow–RangeHigh ScaleName]   (centred title; system back gesture)
 
 [8dp space]
 MusicStaff            — full width, 160dp tall (see Staff spec below)
@@ -233,7 +242,7 @@ Exercise control flow (canonical state machine):
 Layout: vertical column, 16dp padding.
 
 ```
-[← Back]              [Mic Setup]        (row: back left, title right)
+                        [Mic Setup]        (centred title; system back gesture)
 
 [24dp space]
 "Sing or play a note to test your microphone."   — bodyMedium, centred
@@ -259,21 +268,19 @@ Hz display            — bodyMedium, muted, shown only when pitch detected
 PitchMeter            — 90dp circle
 
 [32dp space]
-[🎙 Start Listening]  — full-width filled, 52dp, 17sp
-  OR
 [⏹ Stop]             — full-width filled ERROR colour, 52dp, 17sp
+  Stops listening and returns to Home.
+
+Mic Setup **starts listening automatically on entry** — there is no Start Listening button.
 
 NO test note buttons.
 ```
 
-Pitch display stability: require 3 consecutive audio frames of the same pitch class
-before updating the displayed note. This prevents flickering.
-
-The staff visual style, horizontal spacing, and note-detection stability rules are
-**identical to the Exercise screen**. The only differences are:
-- Mic Setup has no right/wrong judgement
-- Mic Setup always shows rolling detected-note history
-- Exercise may optionally pre-draw the target notes when "Display Test Notes" is enabled
+The staff visual style, horizontal spacing, and note-detection pipeline are
+**shared with the Exercise screen** — both screens use identical detection and display
+dynamics. The only differences are what happens after a note is confirmed:
+- **Mic Setup**: append the confirmed note to the rolling staff history (no judgement)
+- **Exercise**: compare the confirmed note against the expected sequence (see Exercise screen spec)
 
 ---
 
@@ -321,7 +328,7 @@ Do not rely on this screen for persistence in continuous testing mode.
 Layout: vertically scrollable column, 16dp padding.
 
 ```
-[← Back]              [Progress]         (row: back left, title right)
+                        [Progress]         (centred title; system back gesture)
 
 Streak card:
   🔥 N day streak     — prominent display
@@ -461,16 +468,18 @@ Circular widget, **90dp/px diameter**.
 - Sequence playback interval: `60000 / bpm` milliseconds, where BPM is selected on the Home screen
 - Default test tempo: 100 BPM
 
-**Capture** — microphone for pitch detection:
+**Shared pitch detection pipeline** — used identically by both Mic Setup and Exercise screens:
 - Sample rate: 44100 Hz
 - Buffer size: 4096 samples
 - Pass raw f32 PCM to Rust `detect_pitch()`
 - Silence threshold: RMS < 0.003 → ignore frame
-
-**Pitch stability** (before confirming a sung note):
-- Require 3 consecutive frames with the same pitch class (midi % 12)
+- Require 3 consecutive frames with the same pitch class (midi % 12) before confirming a note
 - After confirming a pitch, do not confirm it again until the pitch class changes or silence resets stability
-- On confirm: compare pitch class of detected note with pitch class of expected sequence note
+- The detection and display dynamics (stability rules, note rendering, staff updates) must use the same code path on each platform; only the post-confirmation action differs per screen
+
+**On confirm — Mic Setup**: append the detected note to the rolling staff history; no judgement or comparison.
+
+**On confirm — Exercise**: compare the pitch class of the detected note against the pitch class of the current expected sequence note; render correct (green) or incorrect (red) accordingly.
 
 ---
 

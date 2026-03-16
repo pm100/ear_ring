@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ExerciseView: View {
     @EnvironmentObject var model: ExerciseModel
@@ -80,23 +81,18 @@ struct ExerciseView: View {
         }
         .padding(.horizontal, 16)
         .background(Color(.systemBackground))
-        .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button("← Back") {
-                    model.stopExerciseSession()
-                    progressModel.reload()
-                    path = NavigationPath()
-                }
-                .foregroundColor(.erPrimary)
-            }
             ToolbarItem(placement: .navigationBarTrailing) {
-                Text("\(MusicTheory.midiToLabel(model.rootMidi)) \(MusicTheory.SCALE_NAMES[model.scaleId])")
+                Text("\(model.rangeLabel) \(MusicTheory.SCALE_NAMES[model.scaleId])")
                     .font(.subheadline.weight(.semibold))
             }
         }
+        .onAppear {
+            UIApplication.shared.isIdleTimerDisabled = true
+        }
         .onDisappear {
+            UIApplication.shared.isIdleTimerDisabled = false
             if model.isSessionRunning {
                 model.stopExerciseSession()
                 progressModel.reload()

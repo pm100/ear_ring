@@ -6,11 +6,12 @@ import { freqToMidi } from '../music';
 
 interface Props {
   onBack: () => void;
-  octave: number;
+  rangeStart: number;
+  rangeEnd: number;
 }
 
 
-export default function SetupScreen({ onBack, octave }: Props) {
+export default function SetupScreen({ onBack, rangeStart, rangeEnd }: Props) {
   const [hz, setHz] = useState(0);
   const [currentMidi, setCurrentMidi] = useState<number>(-1);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
@@ -20,8 +21,8 @@ export default function SetupScreen({ onBack, octave }: Props) {
   const { start, stop } = useAudioCapture();
 
   const NOTE_STEP = 44;
-  const midiMin = (octave + 1) * 12;
-  const midiMax = midiMin + 23;
+  const midiMin = rangeStart;
+  const midiMax = rangeEnd;
 
   const handleHz = useCallback(async (detectedHz: number) => {
     setHz(detectedHz);

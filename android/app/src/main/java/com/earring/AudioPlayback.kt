@@ -2,6 +2,7 @@ package com.earring
 
 import android.content.Context
 import android.media.MediaPlayer
+import android.media.PlaybackParams
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -93,7 +94,7 @@ class AudioPlayback(private val context: Context) {
             val player = MediaPlayer().apply {
                 setDataSource(file.absolutePath)
                 prepare()
-                playbackParams = playbackParams.setSpeed(rate.coerceIn(0.5f, 2.0f))
+                playbackParams = PlaybackParams().setPitch(rate.coerceIn(0.5f, 2.0f))
                 setOnCompletionListener {
                     it.release()
                     synchronized(activePlayers) { activePlayers.remove(it) }

@@ -28,10 +28,11 @@ struct EarRingCore {
 
     /// Generate a sequence of MIDI notes from the given scale.
     /// - Returns: Array of MIDI note integers, empty on failure.
-    static func generateSequence(rootMidi: Int, scaleId: Int, length: Int, seed: UInt64) -> [Int] {
+    static func generateSequence(rootChroma: Int, scaleId: Int, length: Int, rangeStart: Int, rangeEnd: Int, seed: UInt64) -> [Int] {
         var buf = [UInt8](repeating: 0, count: length)
         let count = ear_ring_generate_sequence(
-            UInt8(rootMidi), UInt8(scaleId), UInt8(length), seed, &buf)
+            UInt8(rootChroma), UInt8(scaleId), UInt8(length),
+            UInt8(rangeStart), UInt8(rangeEnd), seed, &buf)
         guard count > 0 else { return [] }
         return buf.prefix(Int(count)).map { Int($0) }
     }

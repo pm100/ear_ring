@@ -15,7 +15,8 @@ export interface StaffDisplayNote {
 
 export interface ExerciseSettings {
   rootNote: number;
-  octave: number;
+  rangeStart: number;
+  rangeEnd: number;
   scaleId: number;
   sequenceLength: number;
   tempoBpm: number;
@@ -24,7 +25,8 @@ export interface ExerciseSettings {
 
 export interface ExerciseState {
   rootNote: number;
-  octave: number;
+  rangeStart: number;
+  rangeEnd: number;
   scaleId: number;
   sequenceLength: number;
   tempoBpm: number;

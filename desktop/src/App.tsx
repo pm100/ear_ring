@@ -7,14 +7,34 @@ import SetupScreen from './components/SetupScreen';
 import ResultsScreen from './components/ResultsScreen';
 import ProgressScreen from './components/ProgressScreen';
 
-const defaultSettings: ExerciseSettings = {
-  rootNote: 0,
-  octave: 4,
-  scaleId: 0,
-  sequenceLength: 4,
-  tempoBpm: 100,
-  showTestNotes: false,
-};
+const defaultSettings: ExerciseSettings = (() => {
+  const rootNote = 0;  // C
+  // One octave from rootNote closest to middle C (MIDI 60)
+  let rangeStart = 60;
+  for (let oct = 2; oct <= 6; oct++) {
+    const c = (oct + 1) * 12 + rootNote;
+    if (Math.abs(c - 60) < Math.abs(rangeStart - 60)) rangeStart = c;
+  }
+  return {
+    rootNote,
+    rangeStart,
+    rangeEnd: rangeStart + 11,
+    scaleId: 0,
+    sequenceLength: 4,
+    tempoBpm: 100,
+    showTestNotes: false,
+  };
+})();
+
+/** Return the MIDI range (one octave) for a given pitch class closest to middle C. */
+function defaultRangeForKey(rootNote: number): [number, number] {
+  let best = 60 + rootNote;
+  for (let oct = 2; oct <= 6; oct++) {
+    const candidate = (oct + 1) * 12 + rootNote;
+    if (Math.abs(candidate - 60) < Math.abs(best - 60)) best = candidate;
+  }
+  return [best, best + 11];
+}
 
 const defaultExercise: ExerciseState = {
   ...defaultSettings,
@@ -35,19 +55,21 @@ export default function App() {
   const [settings, setSettings] = useState<ExerciseSettings>(defaultSettings);
   const [exercise, setExercise] = useState<ExerciseState>(defaultExercise);
 
-  const startExercise = useCallback(async (rootNote: number, octave: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean) => {
-    const midi = (octave + 1) * 12 + rootNote;
+  const startExercise = useCallback(async (rootNote: number, rangeStart: number, rangeEnd: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean) => {
     const seed = Date.now();
     try {
       const sequence = await invoke<number[]>('cmd_generate_sequence', {
-        rootMidi: midi,
+        rootChroma: rootNote,
         scaleId,
         length: sequenceLength,
+        rangeStart,
+        rangeEnd,
         seed,
       });
       setExercise({
         rootNote,
-        octave,
+        rangeStart,
+        rangeEnd,
         scaleId,
         sequenceLength,
         tempoBpm,
@@ -102,7 +124,7 @@ export default function App() {
         />
       )}
       {screen === 'setup' && (
-        <SetupScreen onBack={() => setScreen('home')} octave={settings.octave} />
+        <SetupScreen onBack={() => setScreen('home')} rangeStart={settings.rangeStart} rangeEnd={settings.rangeEnd} />
       )}
       {screen === 'results' && (
         <ResultsScreen

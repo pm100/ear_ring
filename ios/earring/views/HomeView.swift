@@ -120,9 +120,6 @@ struct HomeView: View {
     private let bpmOptions = [60, 80, 100, 120, 140]
     private let noteDisplayOptions = [false, true]
 
-    private var rootNoteIndex: Int { model.rootMidi % 12 }
-    private var rootOctave: Int    { model.rootMidi / 12 - 1 }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -139,30 +136,26 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 24)
 
-                // ── Root Note ─────────────────────────────────────────────
-                sectionLabel("Root Note").padding(.top, 28)
+                // ── Key ───────────────────────────────────────────────────
+                sectionLabel("Key").padding(.top, 28)
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 50))], spacing: 6) {
                     ForEach(0..<12, id: \.self) { i in
                         Button(MusicTheory.NOTE_NAMES[i]) {
-                            model.rootMidi = (rootOctave + 1) * 12 + i
+                            model.rootNote = i
+                            model.updateRangeForKey()
                         }
-                        .buttonStyle(ChipButtonStyle(selected: rootNoteIndex == i))
+                        .buttonStyle(ChipButtonStyle(selected: model.rootNote == i))
                     }
                 }
 
-                // ── Octave ────────────────────────────────────────────────
-                sectionLabel("Octave").padding(.top, 16)
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible()), count: 3),
-                    spacing: 6
-                ) {
-                    ForEach([3, 4, 5], id: \.self) { oct in
-                        Button("\(oct)") {
-                            model.rootMidi = (oct + 1) * 12 + rootNoteIndex
-                        }
-                        .buttonStyle(ChipButtonStyle(selected: rootOctave == oct))
-                    }
-                }
+                // ── Range (piano keyboard) ────────────────────────────────
+                sectionLabel("Range  (\(model.rangeLabel))").padding(.top, 16)
+                PianoRangePickerView(
+                    rangeStart: model.rangeStart,
+                    rangeEnd: model.rangeEnd,
+                    onRangeChange: { s, e in model.rangeStart = s; model.rangeEnd = e }
+                )
+                .frame(height: 102)
 
                 // ── Scale ─────────────────────────────────────────────────
                 sectionLabel("Scale").padding(.top, 16)

@@ -3,29 +3,23 @@ import Foundation
 struct MusicTheory {
 
     static let NOTE_NAMES: [String] = [
-        "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
+        "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"
     ]
 
     static let SCALE_NAMES: [String] = [
         "Major",
         "Natural Minor",
         "Harmonic Minor",
-        "Pentatonic Major",
-        "Pentatonic Minor",
         "Dorian",
-        "Mixolydian",
-        "Blues"
+        "Mixolydian"
     ]
 
     static let SCALE_INTERVALS: [[Int]] = [
         [0, 2, 4, 5, 7, 9, 11],    // Major
         [0, 2, 3, 5, 7, 8, 10],    // Natural Minor
         [0, 2, 3, 5, 7, 8, 11],    // Harmonic Minor
-        [0, 2, 4, 7, 9],           // Pentatonic Major
-        [0, 3, 5, 7, 10],          // Pentatonic Minor
         [0, 2, 3, 5, 7, 9, 10],    // Dorian
-        [0, 2, 4, 5, 7, 9, 10],    // Mixolydian
-        [0, 3, 5, 6, 7, 10]        // Blues
+        [0, 2, 4, 5, 7, 9, 10]     // Mixolydian
     ]
 
     /// Returns a human-readable label like "C4" or "A#3".

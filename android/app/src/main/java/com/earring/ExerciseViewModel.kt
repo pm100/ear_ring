@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlin.math.sqrt
+
 
 data class DetectedNote(val midi: Int, val cents: Int, val correct: Boolean)
 
@@ -21,7 +21,8 @@ enum class ExerciseStatus { PLAYING, LISTENING, RETRY_DELAY, STOPPED }
 
 data class ExerciseState(
     val rootNote: Int = 0,
-    val octave: Int = 4,
+    val rangeStart: Int = 60,   // MIDI of range low bound (default C4)
+    val rangeEnd: Int = 71,     // MIDI of range high bound (default B4)
     val scaleId: Int = 0,
     val sequenceLength: Int = 4,
     val tempoBpm: Int = 100,
@@ -38,30 +39,38 @@ data class ExerciseState(
     val cumulativeScorePercent: Int = 0,
     val sessionRunning: Boolean = false
 ) {
-    val rootMidi: Int get() = (octave + 1) * 12 + rootNote
+    /** MIDI of the root note at or just below rangeStart (used for intro chord). */
+    val rootMidi: Int get() = rangeStart - ((rangeStart - rootNote + 12) % 12)
     val averageScorePercent: Int get() =
         if (testsCompleted == 0) 0 else cumulativeScorePercent / testsCompleted
     val score: Float get() = averageScorePercent / 100f
+    val rangeLabel: String get() =
+        "${MusicTheory.midiToLabel(rangeStart)}–${MusicTheory.midiToLabel(rangeEnd)}"
+
+    companion object {
+        /** One octave from the instance of rootNote closest to middle C (MIDI 60). */
+        fun defaultRange(rootNote: Int): Pair<Int, Int> {
+            val best = (2..6).map { oct -> (oct + 1) * 12 + rootNote }
+                .minByOrNull { kotlin.math.abs(it - 60) }!!
+            return Pair(best, best + 11)
+        }
+    }
 }
 
 private const val DEFAULT_MAX_ATTEMPTS = 5
 private const val RETRY_DELAY_MS = 3000L
 private const val INTRO_GAP_MS = 800L
+// Gap between the last note of the sequence ending and mic start.
+// Piano sustain continues after `onDone` fires; this silence lets it fade so
+// the mic doesn't immediately pick up speaker resonance as a "sung" note.
+private const val POST_SEQUENCE_GAP_MS = 700L
 
 class ExerciseViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow(ExerciseState())
     val state: StateFlow<ExerciseState> = _state.asStateFlow()
 
-    val audioCapture = AudioCapture()
     val audioPlayback = AudioPlayback(application)
-
-    private val _liveHz = MutableStateFlow(-1f)
-    val liveHz: StateFlow<Float> = _liveHz.asStateFlow()
-
-    private var stableCount = 0
-    private var stablePitchClass = -1
-    private var pitchConsumed = false
     private var sessionPersisted = false
 
     private val vibrator: Vibrator by lazy {
@@ -73,18 +82,19 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun setRootNote(note: Int) { _state.value = _state.value.copy(rootNote = note) }
-    fun setOctave(octave: Int) { _state.value = _state.value.copy(octave = octave) }
+    fun setRootNote(note: Int) {
+        val (start, end) = ExerciseState.defaultRange(note)
+        _state.value = _state.value.copy(rootNote = note, rangeStart = start, rangeEnd = end)
+    }
+    fun setRange(start: Int, end: Int) { _state.value = _state.value.copy(rangeStart = start, rangeEnd = end) }
     fun setScaleId(id: Int) { _state.value = _state.value.copy(scaleId = id) }
     fun setSequenceLength(len: Int) { _state.value = _state.value.copy(sequenceLength = len) }
     fun setTempoBpm(bpm: Int) { _state.value = _state.value.copy(tempoBpm = bpm) }
     fun setShowTestNotes(show: Boolean) { _state.value = _state.value.copy(showTestNotes = show) }
 
     fun startExercise() {
-        stopAllAudio()
+        audioPlayback.cancelPlayback()
         sessionPersisted = false
-        resetStability()
-        _liveHz.value = -1f
         _state.value = _state.value.copy(
             sequence = emptyList(),
             detected = emptyList(),
@@ -103,9 +113,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
 
     fun stopExercise() {
         val shouldSave = _state.value.testsCompleted > 0
-        stopAllAudio()
-        resetStability()
-        _liveHz.value = -1f
+        audioPlayback.cancelPlayback()
         if (shouldSave) {
             saveSessionSummary()
         }
@@ -127,9 +135,11 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         if (!state.sessionRunning) return
         val seed = System.currentTimeMillis()
         val sequence = EarRingCore.generateSequence(
-            state.rootMidi,
+            state.rootNote,
             state.scaleId,
             state.sequenceLength,
+            state.rangeStart,
+            state.rangeEnd,
             seed
         ).toList()
         _state.value = state.copy(
@@ -160,8 +170,6 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     private fun playPrompt() {
         val state = _state.value
         if (!state.sessionRunning || state.sequence.isEmpty()) return
-        resetStability()
-        _liveHz.value = -1f
         val triad = EarRingCore.introChord(state.rootMidi, state.scaleId).toList()
         audioPlayback.playChord(
             midiNotes = triad,
@@ -176,7 +184,12 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
                                 onEach = {},
                                 onDone = {
                                     if (_state.value.sessionRunning) {
-                                        startListening()
+                                        viewModelScope.launch {
+                                            delay(POST_SEQUENCE_GAP_MS)
+                                            if (_state.value.sessionRunning) {
+                                                startListening()
+                                            }
+                                        }
                                     }
                                 }
                             )
@@ -188,51 +201,10 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     }
 
     private fun startListening() {
-        resetStability()
-        _liveHz.value = -1f
         _state.value = _state.value.copy(status = ExerciseStatus.LISTENING, currentNoteIndex = 0)
-        audioCapture.start(onAudio = { samples -> processSamples(samples) })
     }
 
-    private fun processSamples(samples: FloatArray) {
-        val rms = sqrt(samples.map { it * it }.average().toFloat())
-        if (rms < 0.003f) {
-            resetStability()
-            _liveHz.value = -1f
-            return
-        }
-
-        val hz = EarRingCore.detectPitch(samples, 44100)
-        if (hz <= 0f) {
-            resetStability()
-            _liveHz.value = -1f
-            return
-        }
-        _liveHz.value = hz
-
-        val midi = EarRingCore.freqToMidi(hz)
-        if (midi < 0) {
-            resetStability()
-            return
-        }
-        val cents = EarRingCore.freqToCents(hz)
-        val pitchClass = midi % 12
-
-        if (pitchClass == stablePitchClass) {
-            stableCount++
-        } else {
-            stablePitchClass = pitchClass
-            stableCount = 1
-            pitchConsumed = false
-        }
-
-        if (!pitchConsumed && stableCount >= 3) {
-            pitchConsumed = true
-            confirmNote(midi, cents)
-        }
-    }
-
-    private fun confirmNote(midi: Int, cents: Int) {
+    fun confirmNote(midi: Int, cents: Int) {
         val state = _state.value
         if (state.status != ExerciseStatus.LISTENING) return
         val index = state.currentNoteIndex
@@ -245,8 +217,6 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         if (correct) {
             val nextIndex = index + 1
             if (nextIndex >= state.sequence.size) {
-                audioCapture.stop()
-                _liveHz.value = -1f
                 completeTest(
                     passed = true,
                     attemptNotes = detected,
@@ -257,11 +227,8 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
                     detected = detected,
                     currentNoteIndex = nextIndex
                 )
-                resetStability()
             }
         } else {
-            audioCapture.stop()
-            _liveHz.value = -1f
             _state.value = state.copy(
                 detected = detected,
                 currentNoteIndex = detected.size,
@@ -317,7 +284,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         val context = getApplication<Application>()
         val record = TestRecord(
             scaleName = MusicTheory.SCALE_NAMES[state.scaleId],
-            rootLabel = "${MusicTheory.NOTE_NAMES[state.rootNote]}${state.octave}",
+            rootLabel = "${MusicTheory.NOTE_NAMES[state.rootNote]} ${state.rangeLabel}",
             scorePercent = scorePercent,
             attemptsUsed = attemptsUsed,
             maxAttempts = state.maxAttempts,
@@ -338,24 +305,13 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             context,
             SessionRecord(
                 scaleName = MusicTheory.SCALE_NAMES[state.scaleId],
-                rootLabel = "${MusicTheory.NOTE_NAMES[state.rootNote]}${state.octave}",
+                rootLabel = "${MusicTheory.NOTE_NAMES[state.rootNote]} ${state.rangeLabel}",
                 score = state.averageScorePercent / 100f,
                 sequenceLength = state.sequenceLength,
                 testsCompleted = state.testsCompleted
             )
         )
         sessionPersisted = true
-    }
-
-    private fun stopAllAudio() {
-        audioCapture.stop()
-        audioPlayback.cancelPlayback()
-    }
-
-    private fun resetStability() {
-        stableCount = 0
-        stablePitchClass = -1
-        pitchConsumed = false
     }
 
     private fun vibrate(success: Boolean) {
@@ -377,6 +333,6 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
 
     override fun onCleared() {
         super.onCleared()
-        stopAllAudio()
+        audioPlayback.cancelPlayback()
     }
 }

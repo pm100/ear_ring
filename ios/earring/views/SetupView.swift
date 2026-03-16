@@ -62,16 +62,8 @@ struct SetupView: View {
         }
         .padding(.horizontal, 16)
         .background(Color(.systemBackground))
-        .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button("← Back") {
-                    model.stopLivePitchDetection()
-                    dismiss()
-                }
-                .foregroundColor(.erPrimary)
-            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Text("Mic Setup")
                     .font(.subheadline.weight(.semibold))
@@ -97,9 +89,8 @@ struct SetupView: View {
         if pc == stabilityPitchClass {
             stabilityCount += 1
             if stabilityCount >= 3 {
-                let octave = model.rootMidi / 12 - 1
-                let midiMin = (octave + 1) * 12
-                let midiMax = midiMin + 23
+                let midiMin = model.rangeStart
+                let midiMax = model.rangeEnd
                 guard midi >= midiMin && midi <= midiMax else { return }
                 let isNewNote = midi != displayedMidi
                 displayedMidi = midi

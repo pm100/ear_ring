@@ -17,7 +17,7 @@ object EarRingCore {
     @JvmStatic external fun nativeFreqToMidi(hz: Float): Int
     @JvmStatic external fun nativeFreqToCents(hz: Float): Int
     @JvmStatic external fun nativeStaffPosition(midi: Int): Int
-    @JvmStatic external fun nativeGenerateSequence(rootMidi: Int, scaleId: Int, length: Int, seed: Long): IntArray
+    @JvmStatic external fun nativeGenerateSequence(rootChroma: Int, scaleId: Int, length: Int, rangeStart: Int, rangeEnd: Int, seed: Long): IntArray
     @JvmStatic external fun nativeIntroChord(rootMidi: Int, scaleId: Int): IntArray
     @JvmStatic external fun nativeIsCorrectNote(detectedMidi: Int, cents: Int, expectedMidi: Int): Int
     @JvmStatic external fun nativeTestScore(maxAttempts: Int, attemptsUsed: Int, passed: Int): Int
@@ -34,8 +34,9 @@ object EarRingCore {
     fun staffPosition(midi: Int): Int =
         if (loaded) nativeStaffPosition(midi) else 0
 
-    fun generateSequence(rootMidi: Int, scaleId: Int, length: Int, seed: Long): IntArray =
-        if (loaded) nativeGenerateSequence(rootMidi, scaleId, length, seed) else IntArray(length) { rootMidi }
+    fun generateSequence(rootChroma: Int, scaleId: Int, length: Int, rangeStart: Int, rangeEnd: Int, seed: Long): IntArray =
+        if (loaded) nativeGenerateSequence(rootChroma, scaleId, length, rangeStart, rangeEnd, seed)
+        else IntArray(length) { rangeStart }
 
     fun introChord(rootMidi: Int, scaleId: Int): IntArray =
         if (loaded) nativeIntroChord(rootMidi, scaleId) else intArrayOf(rootMidi, rootMidi + 4, rootMidi + 7)

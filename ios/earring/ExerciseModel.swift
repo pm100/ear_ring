@@ -16,7 +16,9 @@ enum ExerciseStatus {
 
 @MainActor
 class ExerciseModel: ObservableObject {
-    @Published var rootMidi: Int = 60
+    @Published var rootNote: Int = 0        // pitch class 0-11 (C=0)
+    @Published var rangeStart: Int = 60     // MIDI low bound (default C4)
+    @Published var rangeEnd: Int = 71       // MIDI high bound (default B4)
     @Published var scaleId: Int = 0
     @Published var sequenceLength: Int = 4
     @Published var tempoBpm: Int = 100
@@ -32,6 +34,24 @@ class ExerciseModel: ObservableObject {
     @Published var currentAttempt: Int = 1
     @Published var maxAttempts: Int = 5
     @Published var testsCompleted: Int = 0
+
+    /// MIDI of the root note at or just below rangeStart (used for intro chord).
+    var rootMidi: Int { rangeStart - ((rangeStart - rootNote + 12) % 12) }
+
+    var rangeLabel: String { "\(MusicTheory.midiToLabel(rangeStart))–\(MusicTheory.midiToLabel(rangeEnd))" }
+
+    /// Set rootNote and reset the range to one octave closest to middle C.
+    func updateRangeForKey() {
+        let (s, e) = ExerciseModel.defaultRange(rootNote: rootNote)
+        rangeStart = s
+        rangeEnd = e
+    }
+
+    static func defaultRange(rootNote: Int) -> (Int, Int) {
+        let best = (2...6).map { oct in (oct + 1) * 12 + rootNote }
+            .min(by: { abs($0 - 60) < abs($1 - 60) }) ?? 60
+        return (best, best + 11)
+    }
 
     let audioCapture = AudioCapture()
     private let audioPlayback = AudioPlayback()
@@ -112,9 +132,11 @@ class ExerciseModel: ObservableObject {
     private func startFreshTest() async {
         let seed = UInt64(Date().timeIntervalSince1970 * 1000)
         sequence = EarRingCore.generateSequence(
-            rootMidi: rootMidi,
+            rootChroma: rootNote,
             scaleId: scaleId,
             length: sequenceLength,
+            rangeStart: rangeStart,
+            rangeEnd: rangeEnd,
             seed: seed
         )
         detectedNotes = []
@@ -271,7 +293,7 @@ class ExerciseModel: ObservableObject {
                 id: UUID(),
                 date: Date(),
                 scaleName: MusicTheory.SCALE_NAMES[scaleId],
-                rootLabel: MusicTheory.midiToLabel(rootMidi),
+                rootLabel: rangeLabel,
                 score: score,
                 attemptsUsed: attemptsUsed,
                 maxAttempts: maxAttempts,
@@ -290,7 +312,7 @@ class ExerciseModel: ObservableObject {
                 id: UUID(),
                 date: Date(),
                 scaleName: MusicTheory.SCALE_NAMES[scaleId],
-                rootLabel: MusicTheory.midiToLabel(rootMidi),
+                rootLabel: rangeLabel,
                 score: score,
                 length: sequenceLength,
                 testsCompleted: testsCompleted

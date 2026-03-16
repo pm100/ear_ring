@@ -33,26 +33,23 @@ pub fn wasm_staff_position(midi: u8) -> i32 {
 
 /// Generate a note sequence; returns a Uint8Array of MIDI note numbers.
 ///
-/// * `root_midi` – root note MIDI number
-/// * `scale_id`  – 0=Major, 1=NatMinor, 2=HarmMinor, 3=PentMaj, 4=PentMin,
-///                 5=Dorian, 6=Mixolydian, 7=Blues
-/// * `length`    – number of notes
-/// * `seed`      – random seed
+/// * `root_chroma` – pitch class of the root (0=C … 11=B)
+/// * `scale_id`    – 0=Major … 4=Mixolydian
+/// * `length`      – number of notes
+/// * `range_start` – lowest accepted MIDI note
+/// * `range_end`   – highest accepted MIDI note
+/// * `seed`        – random seed
 #[wasm_bindgen]
-pub fn wasm_generate_sequence(root_midi: u8, scale_id: u8, length: u8, seed: u64) -> Vec<u8> {
+pub fn wasm_generate_sequence(root_chroma: u8, scale_id: u8, length: u8, range_start: u8, range_end: u8, seed: u64) -> Vec<u8> {
     let scale = match scale_id {
         0 => ScaleType::Major,
         1 => ScaleType::NaturalMinor,
         2 => ScaleType::HarmonicMinor,
-        3 => ScaleType::PentatonicMajor,
-        4 => ScaleType::PentatonicMinor,
-        5 => ScaleType::Dorian,
-        6 => ScaleType::Mixolydian,
-        7 => ScaleType::Blues,
+        3 => ScaleType::Dorian,
+        4 => ScaleType::Mixolydian,
         _ => ScaleType::Major,
     };
-    let root = Note::from_midi(root_midi);
-    generate_sequence(root, scale, length, seed)
+    generate_sequence(root_chroma, scale, range_start, range_end, length, seed)
         .iter()
         .map(|n| n.midi())
         .collect()
@@ -64,11 +61,8 @@ pub fn wasm_intro_chord(root_midi: u8, scale_id: u8) -> Vec<u8> {
         0 => ScaleType::Major,
         1 => ScaleType::NaturalMinor,
         2 => ScaleType::HarmonicMinor,
-        3 => ScaleType::PentatonicMajor,
-        4 => ScaleType::PentatonicMinor,
-        5 => ScaleType::Dorian,
-        6 => ScaleType::Mixolydian,
-        7 => ScaleType::Blues,
+        3 => ScaleType::Dorian,
+        4 => ScaleType::Mixolydian,
         _ => ScaleType::Major,
     };
     intro_chord(Note::from_midi(root_midi), scale)

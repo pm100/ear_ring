@@ -144,11 +144,8 @@ pub enum ScaleType {
     Major,
     NaturalMinor,
     HarmonicMinor,
-    PentatonicMajor,
-    PentatonicMinor,
     Dorian,
     Mixolydian,
-    Blues,
 }
 
 impl ScaleType {
@@ -158,11 +155,8 @@ impl ScaleType {
             ScaleType::Major => &[0, 2, 4, 5, 7, 9, 11],
             ScaleType::NaturalMinor => &[0, 2, 3, 5, 7, 8, 10],
             ScaleType::HarmonicMinor => &[0, 2, 3, 5, 7, 8, 11],
-            ScaleType::PentatonicMajor => &[0, 2, 4, 7, 9],
-            ScaleType::PentatonicMinor => &[0, 3, 5, 7, 10],
             ScaleType::Dorian => &[0, 2, 3, 5, 7, 9, 10],
             ScaleType::Mixolydian => &[0, 2, 4, 5, 7, 9, 10],
-            ScaleType::Blues => &[0, 3, 5, 6, 7, 10],
         }
     }
 
@@ -171,11 +165,8 @@ impl ScaleType {
             ScaleType::Major => "Major",
             ScaleType::NaturalMinor => "Natural Minor",
             ScaleType::HarmonicMinor => "Harmonic Minor",
-            ScaleType::PentatonicMajor => "Pentatonic Major",
-            ScaleType::PentatonicMinor => "Pentatonic Minor",
             ScaleType::Dorian => "Dorian",
             ScaleType::Mixolydian => "Mixolydian",
-            ScaleType::Blues => "Blues",
         }
     }
 }
@@ -193,18 +184,35 @@ pub fn scale_notes(root: Note, scale: ScaleType) -> Vec<Note> {
         .collect()
 }
 
-/// Generate a random sequence of `length` notes drawn from the given scale.
+/// Generate a random sequence of `length` notes drawn from the given scale,
+/// restricted to MIDI notes within [range_start, range_end].
 /// Uses a simple LCG seeded by the provided `seed` for reproducibility.
-pub fn generate_sequence(root: Note, scale: ScaleType, length: u8, seed: u64) -> Vec<Note> {
-    let notes = scale_notes(root, scale);
+pub fn generate_sequence(
+    root_chroma: u8,
+    scale: ScaleType,
+    range_start: u8,
+    range_end: u8,
+    length: u8,
+    seed: u64,
+) -> Vec<Note> {
+    use std::collections::HashSet;
+    let intervals: HashSet<u8> = scale.intervals().iter().copied().collect();
+    let notes: Vec<Note> = (range_start..=range_end)
+        .filter(|&m| {
+            let interval = (m + 12 - root_chroma % 12) % 12;
+            intervals.contains(&interval)
+        })
+        .map(Note::from_midi)
+        .collect();
+    if notes.is_empty() {
+        return Vec::new();
+    }
     let n = notes.len() as u64;
     let mut rng = seed;
     (0..length)
         .map(|_| {
-            // LCG parameters (Knuth)
             rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-            let idx = ((rng >> 33) % n) as usize;
-            notes[idx]
+            notes[((rng >> 33) % n) as usize]
         })
         .collect()
 }
@@ -316,9 +324,20 @@ mod tests {
 
     #[test]
     fn test_generate_sequence_length() {
-        let root = Note::new(NoteName::C, 4);
-        let seq = generate_sequence(root, ScaleType::Major, 5, 42);
+        // C major, one octave C4-B4 (MIDI 60-71)
+        let seq = generate_sequence(0, ScaleType::Major, 60, 71, 5, 42);
         assert_eq!(seq.len(), 5);
+    }
+
+    #[test]
+    fn test_generate_sequence_in_scale() {
+        // All generated notes must be in C major (intervals 0,2,4,5,7,9,11)
+        let seq = generate_sequence(0, ScaleType::Major, 60, 84, 20, 99);
+        let major_intervals: std::collections::HashSet<u8> = [0,2,4,5,7,9,11].iter().copied().collect();
+        for note in &seq {
+            assert!(major_intervals.contains(&(note.midi() % 12)), "Note {:?} not in C major", note);
+            assert!(note.midi() >= 60 && note.midi() <= 84, "Note {:?} out of range", note);
+        }
     }
 
     #[test]

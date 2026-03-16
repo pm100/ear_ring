@@ -49,7 +49,8 @@ fun EarRingApp() {
             val state by exerciseViewModel.state.collectAsState()
             SetupScreen(
                 onBack = { navController.popBackStack() },
-                octave = state.octave
+                rangeStart = state.rangeStart,
+                rangeEnd = state.rangeEnd
             )
         }
         composable(Routes.RESULTS) {

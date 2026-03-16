@@ -31,7 +31,7 @@ fun ResultsScreen(
         if (!saved) {
             saved = true
             val scaleName = MusicTheory.SCALE_NAMES[state.scaleId]
-            val rootLabel = MusicTheory.NOTE_NAMES[state.rootNote] + state.octave.toString()
+            val rootLabel = MusicTheory.NOTE_NAMES[state.rootNote] + " " + state.rangeLabel
             progressViewModel.addSession(scaleName, rootLabel, state.score, state.sequenceLength)
         }
     }
@@ -58,7 +58,7 @@ fun ResultsScreen(
         Text("Score", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "${MusicTheory.NOTE_NAMES[state.rootNote]}${state.octave}  ${MusicTheory.SCALE_NAMES[state.scaleId]}",
+            text = "${MusicTheory.NOTE_NAMES[state.rootNote]} ${state.rangeLabel}  ${MusicTheory.SCALE_NAMES[state.scaleId]}",
             style = MaterialTheme.typography.bodyLarge
         )
 

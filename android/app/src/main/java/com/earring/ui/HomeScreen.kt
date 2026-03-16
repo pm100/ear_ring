@@ -64,8 +64,8 @@ fun HomeScreen(
         )
         Spacer(Modifier.height(28.dp))
 
-        // Root note selection
-        SectionLabel("Root Note")
+        // Key selection
+        SectionLabel("Key")
         WrappingChipRow(
             items = MusicTheory.NOTE_NAMES,
             selected = state.rootNote,
@@ -73,12 +73,13 @@ fun HomeScreen(
         )
         Spacer(Modifier.height(16.dp))
 
-        // Octave selection
-        SectionLabel("Octave")
-        ChipRow(
-            items = listOf("3", "4", "5"),
-            selected = state.octave - 3,
-            onSelect = { viewModel.setOctave(it + 3) }
+        // Range selection — piano keyboard
+        SectionLabel("Range  (${MusicTheory.midiToLabel(state.rangeStart)} – ${MusicTheory.midiToLabel(state.rangeEnd)})")
+        PianoRangePicker(
+            rangeStart = state.rangeStart,
+            rangeEnd = state.rangeEnd,
+            onRangeChange = { s, e -> viewModel.setRange(s, e) },
+            modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(16.dp))
 

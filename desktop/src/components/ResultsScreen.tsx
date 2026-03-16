@@ -35,7 +35,7 @@ export default function ResultsScreen({ exercise, onTryAgain, onNewExercise, onP
   const total = sequence.length;
   const score = total > 0 ? Math.round((correct / total) * 100) : 0;
 
-  const rootLabel = `${NOTE_NAMES[exercise.rootNote]}${exercise.octave}`;
+  const rootLabel = `${NOTE_NAMES[exercise.rootNote]} ${midiToLabel(exercise.rangeStart)}–${midiToLabel(exercise.rangeEnd)}`;
   const scaleLabel = SCALE_NAMES[exercise.scaleId];
 
   return (

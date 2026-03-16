@@ -81,22 +81,23 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   }, []);
 
   const fetchIntroTriad = useCallback(() => {
-    const rootMidi = (exercise.octave + 1) * 12 + exercise.rootNote;
+    const rootMidi = exercise.rangeStart - ((exercise.rangeStart - exercise.rootNote + 12) % 12);
     return invoke<number[]>('cmd_intro_chord', {
       rootMidi,
       scaleId: exercise.scaleId,
     });
-  }, [exercise.octave, exercise.rootNote, exercise.scaleId]);
+  }, [exercise.rangeStart, exercise.rootNote, exercise.scaleId]);
 
   const generateFreshSequence = useCallback(async () => {
-    const rootMidi = (exercise.octave + 1) * 12 + exercise.rootNote;
     return invoke<number[]>('cmd_generate_sequence', {
-      rootMidi,
+      rootChroma: exercise.rootNote,
       scaleId: exercise.scaleId,
       length: exercise.sequenceLength,
+      rangeStart: exercise.rangeStart,
+      rangeEnd: exercise.rangeEnd,
       seed: Date.now(),
     });
-  }, [exercise.octave, exercise.rootNote, exercise.scaleId, exercise.sequenceLength]);
+  }, [exercise.rangeStart, exercise.rangeEnd, exercise.rootNote, exercise.scaleId, exercise.sequenceLength]);
 
   const playPromptForSequence = useCallback(async (nextSequence: number[]) => {
     setStatus('playing');
@@ -278,7 +279,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     }
   };
 
-  const rootLabel = `${NOTE_NAMES[exercise.rootNote]}${exercise.octave}`;
+  const rootLabel = `${NOTE_NAMES[exercise.rootNote]}  ${midiToLabel(exercise.rangeStart)}–${midiToLabel(exercise.rangeEnd)}`;
   const scaleLabel = SCALE_NAMES[exercise.scaleId];
   const score = averageScore(cumulativeScorePercent, testsCompleted);
   const staffNotes: StaffDisplayNote[] = exercise.showTestNotes

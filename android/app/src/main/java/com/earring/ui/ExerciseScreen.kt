@@ -14,9 +14,16 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import android.app.Activity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -25,8 +32,8 @@ import com.earring.EarRingCore
 import com.earring.ExerciseStatus
 import com.earring.ExerciseViewModel
 import com.earring.MusicTheory
-import com.earring.ui.components.MusicStaff
 import com.earring.ui.components.NoteState
+import com.earring.ui.components.MusicStaff
 import com.earring.ui.components.PitchMeter
 import com.earring.ui.components.StaffNote
 
@@ -36,7 +43,34 @@ fun ExerciseScreen(
     onBack: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
-    val liveHz by viewModel.liveHz.collectAsState()
+
+    // Keep screen on for the duration of the exercise session.
+    val context = LocalContext.current
+    DisposableEffect(Unit) {
+        val window = (context as? Activity)?.window
+        window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
+    val midiMin = state.rangeStart
+    val midiMax = state.rangeEnd
+
+    // Shared pitch detection — same pipeline as SetupScreen.
+    // warmupFrames absorbs mic-settling transients when auto-starting.
+    // onConfirmed judges the detected note against the expected sequence.
+    val liveHz = rememberPitchDetector(
+        active = state.status == ExerciseStatus.LISTENING,
+        midiMin = midiMin,
+        midiMax = midiMax,
+        warmupFrames = 10,
+        onConfirmed = { midi, hz ->
+            val cents = EarRingCore.freqToCents(hz)
+            viewModel.confirmNote(midi, cents)
+        }
+    )
+
     val liveMidi = if (liveHz > 0f) EarRingCore.freqToMidi(liveHz) else -1
     val noteStepDp = 44.dp
     val staffNotes = if (state.showTestNotes) {
@@ -52,12 +86,16 @@ fun ExerciseScreen(
         state.detected.map { StaffNote(it.midi, if (it.correct) NoteState.CORRECT else NoteState.INCORRECT) }
     }
 
+    // Guard against double back-navigation (predictive back + BackHandler race).
+    var exited by remember { mutableStateOf(false) }
     fun exitSession() {
+        if (exited) return
+        exited = true
         viewModel.stopExercise()
         onBack()
     }
 
-    BackHandler { exitSession() }
+    BackHandler(enabled = !exited) { exitSession() }
 
     Column(
         modifier = Modifier
@@ -65,17 +103,10 @@ fun ExerciseScreen(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButtonLike(text = "← Back", onClick = { exitSession() })
-            Spacer(Modifier.weight(1f))
-            Text(
-                text = "${MusicTheory.NOTE_NAMES[state.rootNote]}${state.octave} ${MusicTheory.SCALE_NAMES[state.scaleId]}",
-                style = MaterialTheme.typography.titleMedium
-            )
-        }
+        Text(
+            text = "${MusicTheory.NOTE_NAMES[state.rootNote]} ${state.rangeLabel}  ${MusicTheory.SCALE_NAMES[state.scaleId]}",
+            style = MaterialTheme.typography.titleMedium
+        )
 
         Spacer(Modifier.height(8.dp))
 
@@ -143,13 +174,6 @@ fun ExerciseScreen(
     }
 }
 
-@Composable
-private fun TextButtonLike(text: String, onClick: () -> Unit) {
-    androidx.compose.material3.TextButton(onClick = onClick) {
-        Text(text)
-    }
-}
-
 private fun statusText(state: com.earring.ExerciseState): String =
     when (state.status) {
         ExerciseStatus.PLAYING -> "Listen carefully…"
@@ -162,3 +186,4 @@ private fun statusText(state: com.earring.ExerciseState): String =
             }
         ExerciseStatus.STOPPED -> "Testing stopped"
     }
+

@@ -35,7 +35,7 @@ fn cmd_staff_position(midi: u8) -> i32 {
 }
 
 #[tauri::command]
-fn cmd_generate_sequence(root_midi: u8, scale_id: u8, length: u8, seed: u64) -> Vec<u8> {
+fn cmd_generate_sequence(root_chroma: u8, scale_id: u8, length: u8, range_start: u8, range_end: u8, seed: u64) -> Vec<u8> {
     let scale = match scale_id {
         0 => ScaleType::Major,
         1 => ScaleType::NaturalMinor,
@@ -47,8 +47,7 @@ fn cmd_generate_sequence(root_midi: u8, scale_id: u8, length: u8, seed: u64) -> 
         7 => ScaleType::Blues,
         _ => ScaleType::Major,
     };
-    let root = Note::from_midi(root_midi);
-    generate_sequence(root, scale, length, seed)
+    generate_sequence(root_chroma, scale, range_start, range_end, length, seed)
         .iter()
         .map(|n| n.midi())
         .collect()
