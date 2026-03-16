@@ -12,7 +12,7 @@ interface Props {
   onStop: () => void;
 }
 
-const SCALE_NAMES = ['Major','Natural Minor','Harmonic Minor','Pentatonic Major','Pentatonic Minor','Dorian','Mixolydian','Blues'];
+const SCALE_NAMES = ['Major','Natural Minor','Harmonic Minor','Dorian','Mixolydian'];
 const MAX_ATTEMPTS = 5;
 
 function averageScore(cumulativeScorePercent: number, testsCompleted: number): number {

@@ -40,11 +40,8 @@ fn cmd_generate_sequence(root_chroma: u8, scale_id: u8, length: u8, range_start:
         0 => ScaleType::Major,
         1 => ScaleType::NaturalMinor,
         2 => ScaleType::HarmonicMinor,
-        3 => ScaleType::PentatonicMajor,
-        4 => ScaleType::PentatonicMinor,
-        5 => ScaleType::Dorian,
-        6 => ScaleType::Mixolydian,
-        7 => ScaleType::Blues,
+        3 => ScaleType::Dorian,
+        4 => ScaleType::Mixolydian,
         _ => ScaleType::Major,
     };
     generate_sequence(root_chroma, scale, range_start, range_end, length, seed)
@@ -59,11 +56,8 @@ fn cmd_intro_chord(root_midi: u8, scale_id: u8) -> Vec<u8> {
         0 => ScaleType::Major,
         1 => ScaleType::NaturalMinor,
         2 => ScaleType::HarmonicMinor,
-        3 => ScaleType::PentatonicMajor,
-        4 => ScaleType::PentatonicMinor,
-        5 => ScaleType::Dorian,
-        6 => ScaleType::Mixolydian,
-        7 => ScaleType::Blues,
+        3 => ScaleType::Dorian,
+        4 => ScaleType::Mixolydian,
         _ => ScaleType::Major,
     };
     intro_chord(Note::from_midi(root_midi), scale)
