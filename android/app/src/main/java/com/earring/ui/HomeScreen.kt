@@ -8,6 +8,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,6 +25,7 @@ import com.earring.R
 
 private val BPM_OPTIONS = listOf("60", "80", "100", "120", "140")
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: ExerciseViewModel,
@@ -66,11 +70,66 @@ fun HomeScreen(
 
         // Key selection
         SectionLabel("Key")
-        WrappingChipRow(
-            items = MusicTheory.NOTE_NAMES,
-            selected = state.rootNote,
-            onSelect = { viewModel.setRootNote(it) }
-        )
+        var keyExpanded by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(
+            expanded = keyExpanded,
+            onExpandedChange = { keyExpanded = it },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            OutlinedTextField(
+                value = MusicTheory.NOTE_NAMES[state.rootNote],
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = keyExpanded) },
+                modifier = Modifier.menuAnchor().fillMaxWidth()
+            )
+            ExposedDropdownMenu(
+                expanded = keyExpanded,
+                onDismissRequest = { keyExpanded = false }
+            ) {
+                MusicTheory.NOTE_NAMES.forEachIndexed { index, name ->
+                    DropdownMenuItem(
+                        text = { Text(name) },
+                        onClick = {
+                            viewModel.setRootNote(index)
+                            keyExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+
+        // Scale selection
+        SectionLabel("Scale")
+        var scaleExpanded by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(
+            expanded = scaleExpanded,
+            onExpandedChange = { scaleExpanded = it },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            OutlinedTextField(
+                value = MusicTheory.SCALE_NAMES[state.scaleId],
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = scaleExpanded) },
+                modifier = Modifier.menuAnchor().fillMaxWidth()
+            )
+            ExposedDropdownMenu(
+                expanded = scaleExpanded,
+                onDismissRequest = { scaleExpanded = false }
+            ) {
+                MusicTheory.SCALE_NAMES.forEachIndexed { index, name ->
+                    DropdownMenuItem(
+                        text = { Text(name) },
+                        onClick = {
+                            viewModel.setScaleId(index)
+                            scaleExpanded = false
+                        }
+                    )
+                }
+            }
+        }
         Spacer(Modifier.height(16.dp))
 
         // Range selection — piano keyboard
@@ -80,15 +139,6 @@ fun HomeScreen(
             rangeEnd = state.rangeEnd,
             onRangeChange = { s, e -> viewModel.setRange(s, e) },
             modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(Modifier.height(16.dp))
-
-        // Scale selection
-        SectionLabel("Scale")
-        WrappingChipRow(
-            items = MusicTheory.SCALE_NAMES,
-            selected = state.scaleId,
-            onSelect = { viewModel.setScaleId(it) }
         )
         Spacer(Modifier.height(16.dp))
 
@@ -109,12 +159,16 @@ fun HomeScreen(
         )
         Spacer(Modifier.height(16.dp))
 
-        SectionLabel("Display Test Notes")
-        ChipRow(
-            items = listOf("Hide", "Show"),
-            selected = if (state.showTestNotes) 1 else 0,
-            onSelect = { viewModel.setShowTestNotes(it == 1) }
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Checkbox(
+                checked = state.showTestNotes,
+                onCheckedChange = { viewModel.setShowTestNotes(it) }
+            )
+            Text("Display Test Notes", style = MaterialTheme.typography.bodyLarge)
+        }
         Spacer(Modifier.height(32.dp))
 
         Button(

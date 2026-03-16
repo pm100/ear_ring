@@ -118,7 +118,6 @@ struct HomeView: View {
     @EnvironmentObject var model: ExerciseModel
     @Binding var path: NavigationPath
     private let bpmOptions = [60, 80, 100, 120, 140]
-    private let noteDisplayOptions = [false, true]
 
     var body: some View {
         ScrollView {
@@ -138,15 +137,29 @@ struct HomeView: View {
 
                 // ── Key ───────────────────────────────────────────────────
                 sectionLabel("Key").padding(.top, 28)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 50))], spacing: 6) {
+                Picker("Key", selection: Binding(
+                    get: { model.rootNote },
+                    set: { model.rootNote = $0; model.updateRangeForKey() }
+                )) {
                     ForEach(0..<12, id: \.self) { i in
-                        Button(MusicTheory.NOTE_NAMES[i]) {
-                            model.rootNote = i
-                            model.updateRangeForKey()
-                        }
-                        .buttonStyle(ChipButtonStyle(selected: model.rootNote == i))
+                        Text(MusicTheory.NOTE_NAMES[i]).tag(i)
                     }
                 }
+                .pickerStyle(.menu)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                // ── Scale ─────────────────────────────────────────────────
+                sectionLabel("Scale").padding(.top, 16)
+                Picker("Scale", selection: Binding(
+                    get: { model.scaleId },
+                    set: { model.scaleId = $0 }
+                )) {
+                    ForEach(0..<MusicTheory.SCALE_NAMES.count, id: \.self) { i in
+                        Text(MusicTheory.SCALE_NAMES[i]).tag(i)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 // ── Range (piano keyboard) ────────────────────────────────
                 sectionLabel("Range  (\(model.rangeLabel))").padding(.top, 16)
@@ -156,17 +169,6 @@ struct HomeView: View {
                     onRangeChange: { s, e in model.rangeStart = s; model.rangeEnd = e }
                 )
                 .frame(height: 102)
-
-                // ── Scale ─────────────────────────────────────────────────
-                sectionLabel("Scale").padding(.top, 16)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 6) {
-                    ForEach(0..<MusicTheory.SCALE_NAMES.count, id: \.self) { i in
-                        Button(MusicTheory.SCALE_NAMES[i]) {
-                            model.scaleId = i
-                        }
-                        .buttonStyle(ChipButtonStyle(selected: model.scaleId == i))
-                    }
-                }
 
                 // ── Sequence Length ───────────────────────────────────────
                 sectionLabel("Sequence Length").padding(.top, 16)
@@ -195,18 +197,13 @@ struct HomeView: View {
                     }
                 }
 
-                sectionLabel("Display Test Notes").padding(.top, 16)
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible()), count: noteDisplayOptions.count),
-                    spacing: 6
-                ) {
-                    ForEach(noteDisplayOptions, id: \.self) { show in
-                        Button(show ? "Show" : "Hide") {
-                            model.showTestNotes = show
-                        }
-                        .buttonStyle(ChipButtonStyle(selected: model.showTestNotes == show))
-                    }
-                }
+                Toggle(isOn: Binding(
+                    get: { model.showTestNotes },
+                    set: { model.showTestNotes = $0 }
+                )) {
+                    Text("Display Test Notes")
+                        .font(.body)
+                }.padding(.top, 16)
 
                 // ── Action buttons ────────────────────────────────────────
                 VStack(spacing: 10) {

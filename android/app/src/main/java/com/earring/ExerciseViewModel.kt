@@ -65,9 +65,46 @@ private const val INTRO_GAP_MS = 800L
 // the mic doesn't immediately pick up speaker resonance as a "sung" note.
 private const val POST_SEQUENCE_GAP_MS = 700L
 
+private const val PREFS_NAME = "ear_ring_settings"
+private const val PREF_ROOT_NOTE = "rootNote"
+private const val PREF_RANGE_START = "rangeStart"
+private const val PREF_RANGE_END = "rangeEnd"
+private const val PREF_SCALE_ID = "scaleId"
+private const val PREF_SEQUENCE_LENGTH = "sequenceLength"
+private const val PREF_TEMPO_BPM = "tempoBpm"
+private const val PREF_SHOW_TEST_NOTES = "showTestNotes"
+
 class ExerciseViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val _state = MutableStateFlow(ExerciseState())
+    private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    private fun loadInitialState(): ExerciseState {
+        val rootNote = prefs.getInt(PREF_ROOT_NOTE, 0)
+        val defaultRange = ExerciseState.defaultRange(rootNote)
+        return ExerciseState(
+            rootNote = rootNote,
+            rangeStart = prefs.getInt(PREF_RANGE_START, defaultRange.first),
+            rangeEnd = prefs.getInt(PREF_RANGE_END, defaultRange.second),
+            scaleId = prefs.getInt(PREF_SCALE_ID, 0),
+            sequenceLength = prefs.getInt(PREF_SEQUENCE_LENGTH, 4),
+            tempoBpm = prefs.getInt(PREF_TEMPO_BPM, 100),
+            showTestNotes = prefs.getBoolean(PREF_SHOW_TEST_NOTES, false),
+        )
+    }
+
+    private fun saveSettings(state: ExerciseState) {
+        prefs.edit()
+            .putInt(PREF_ROOT_NOTE, state.rootNote)
+            .putInt(PREF_RANGE_START, state.rangeStart)
+            .putInt(PREF_RANGE_END, state.rangeEnd)
+            .putInt(PREF_SCALE_ID, state.scaleId)
+            .putInt(PREF_SEQUENCE_LENGTH, state.sequenceLength)
+            .putInt(PREF_TEMPO_BPM, state.tempoBpm)
+            .putBoolean(PREF_SHOW_TEST_NOTES, state.showTestNotes)
+            .apply()
+    }
+
+    private val _state = MutableStateFlow(loadInitialState())
     val state: StateFlow<ExerciseState> = _state.asStateFlow()
 
     val audioPlayback = AudioPlayback(application)
@@ -85,12 +122,13 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     fun setRootNote(note: Int) {
         val (start, end) = ExerciseState.defaultRange(note)
         _state.value = _state.value.copy(rootNote = note, rangeStart = start, rangeEnd = end)
+        saveSettings(_state.value)
     }
-    fun setRange(start: Int, end: Int) { _state.value = _state.value.copy(rangeStart = start, rangeEnd = end) }
-    fun setScaleId(id: Int) { _state.value = _state.value.copy(scaleId = id) }
-    fun setSequenceLength(len: Int) { _state.value = _state.value.copy(sequenceLength = len) }
-    fun setTempoBpm(bpm: Int) { _state.value = _state.value.copy(tempoBpm = bpm) }
-    fun setShowTestNotes(show: Boolean) { _state.value = _state.value.copy(showTestNotes = show) }
+    fun setRange(start: Int, end: Int) { _state.value = _state.value.copy(rangeStart = start, rangeEnd = end); saveSettings(_state.value) }
+    fun setScaleId(id: Int) { _state.value = _state.value.copy(scaleId = id); saveSettings(_state.value) }
+    fun setSequenceLength(len: Int) { _state.value = _state.value.copy(sequenceLength = len); saveSettings(_state.value) }
+    fun setTempoBpm(bpm: Int) { _state.value = _state.value.copy(tempoBpm = bpm); saveSettings(_state.value) }
+    fun setShowTestNotes(show: Boolean) { _state.value = _state.value.copy(showTestNotes = show); saveSettings(_state.value) }
 
     fun startExercise() {
         audioPlayback.cancelPlayback()

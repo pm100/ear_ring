@@ -198,21 +198,30 @@ function HomeScreen({ settings, onUpdateSettings, onStart, onSetup, onProgress }
       <p className="app-subtitle">Ear Training</p>
 
       <span className="section-label">Key</span>
-      <div className="chip-row">
+      <select
+        value={settings.rootNote}
+        onChange={e => {
+          const i = Number(e.target.value);
+          const [rs, re] = defaultRangeForKey(i);
+          onUpdateSettings(prev => ({ ...prev, rootNote: i, rangeStart: rs, rangeEnd: re }));
+        }}
+        style={{ width: '100%', padding: '8px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #ccc', marginBottom: 4 }}
+      >
         {NOTE_NAMES.map((name, i) => (
-          <button
-            key={i}
-            type="button"
-            className={`chip ${settings.rootNote === i ? 'chip-selected' : ''}`}
-            onClick={() => {
-              const [rs, re] = defaultRangeForKey(i);
-              onUpdateSettings(prev => ({ ...prev, rootNote: i, rangeStart: rs, rangeEnd: re }));
-            }}
-          >
-            {name}
-          </button>
+          <option key={i} value={i}>{name}</option>
         ))}
-      </div>
+      </select>
+
+      <span className="section-label">Scale</span>
+      <select
+        value={settings.scaleId}
+        onChange={e => onUpdateSettings(prev => ({ ...prev, scaleId: Number(e.target.value) }))}
+        style={{ width: '100%', padding: '8px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #ccc', marginBottom: 4 }}
+      >
+        {SCALE_NAMES.map((name, i) => (
+          <option key={i} value={i}>{name}</option>
+        ))}
+      </select>
 
       <span className="section-label">Range ({midiLabel(safeRange(settings.rangeStart, settings.rangeEnd)[0])} – {midiLabel(safeRange(settings.rangeStart, settings.rangeEnd)[1])})</span>
       <PianoRangePicker
@@ -220,20 +229,6 @@ function HomeScreen({ settings, onUpdateSettings, onStart, onSetup, onProgress }
         rangeEnd={settings.rangeEnd}
         onChange={(s, e) => onUpdateSettings(prev => ({ ...prev, rangeStart: s, rangeEnd: e }))}
       />
-
-      <span className="section-label">Scale</span>
-      <div className="chip-row">
-        {SCALE_NAMES.map((name, i) => (
-          <button
-            key={i}
-            type="button"
-            className={`chip ${settings.scaleId === i ? 'chip-selected' : ''}`}
-            onClick={() => onUpdateSettings(prev => ({ ...prev, scaleId: i }))}
-          >
-            {name}
-          </button>
-        ))}
-      </div>
 
       <span className="section-label">Sequence Length</span>
       <div className="chip-row">
@@ -263,19 +258,15 @@ function HomeScreen({ settings, onUpdateSettings, onStart, onSetup, onProgress }
         ))}
       </div>
 
-      <span className="section-label">Display Test Notes</span>
-      <div className="chip-row">
-        {[false, true].map(show => (
-          <button
-            key={show ? 'show' : 'hide'}
-            type="button"
-            className={`chip ${settings.showTestNotes === show ? 'chip-selected' : ''}`}
-            onClick={() => onUpdateSettings(prev => ({ ...prev, showTestNotes: show }))}
-          >
-            {show ? 'Show' : 'Hide'}
-          </button>
-        ))}
-      </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 16, cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={settings.showTestNotes}
+          onChange={e => onUpdateSettings(prev => ({ ...prev, showTestNotes: e.target.checked }))}
+          style={{ width: 18, height: 18, cursor: 'pointer' }}
+        />
+        <span className="section-label" style={{ margin: 0 }}>Display Test Notes</span>
+      </label>
 
       <div style={{ marginTop: 32 }}>
         <button className="btn-primary" onClick={handleStart}>▶ Start Exercise</button>

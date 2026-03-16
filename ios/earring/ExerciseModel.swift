@@ -16,13 +16,29 @@ enum ExerciseStatus {
 
 @MainActor
 class ExerciseModel: ObservableObject {
-    @Published var rootNote: Int = 0        // pitch class 0-11 (C=0)
-    @Published var rangeStart: Int = 60     // MIDI low bound (default C4)
-    @Published var rangeEnd: Int = 71       // MIDI high bound (default B4)
-    @Published var scaleId: Int = 0
-    @Published var sequenceLength: Int = 4
-    @Published var tempoBpm: Int = 100
-    @Published var showTestNotes: Bool = false
+    private static let ud = UserDefaults.standard
+
+    @Published var rootNote: Int = ud.object(forKey: "rootNote") != nil ? ud.integer(forKey: "rootNote") : 0 {
+        didSet { UserDefaults.standard.set(rootNote, forKey: "rootNote") }
+    }
+    @Published var rangeStart: Int = ud.object(forKey: "rangeStart") != nil ? ud.integer(forKey: "rangeStart") : 60 {
+        didSet { UserDefaults.standard.set(rangeStart, forKey: "rangeStart") }
+    }
+    @Published var rangeEnd: Int = ud.object(forKey: "rangeEnd") != nil ? ud.integer(forKey: "rangeEnd") : 71 {
+        didSet { UserDefaults.standard.set(rangeEnd, forKey: "rangeEnd") }
+    }
+    @Published var scaleId: Int = ud.object(forKey: "scaleId") != nil ? ud.integer(forKey: "scaleId") : 0 {
+        didSet { UserDefaults.standard.set(scaleId, forKey: "scaleId") }
+    }
+    @Published var sequenceLength: Int = ud.object(forKey: "sequenceLength") != nil ? ud.integer(forKey: "sequenceLength") : 4 {
+        didSet { UserDefaults.standard.set(sequenceLength, forKey: "sequenceLength") }
+    }
+    @Published var tempoBpm: Int = ud.object(forKey: "tempoBpm") != nil ? ud.integer(forKey: "tempoBpm") : 100 {
+        didSet { UserDefaults.standard.set(tempoBpm, forKey: "tempoBpm") }
+    }
+    @Published var showTestNotes: Bool = ud.object(forKey: "showTestNotes") != nil ? ud.bool(forKey: "showTestNotes") : false {
+        didSet { UserDefaults.standard.set(showTestNotes, forKey: "showTestNotes") }
+    }
     @Published var sequence: [Int] = []
     @Published var detectedNotes: [DetectedNote] = []
     @Published var status: ExerciseStatus = .stopped

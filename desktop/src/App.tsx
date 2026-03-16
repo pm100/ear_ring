@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { Screen, ExerciseSettings, ExerciseState } from './types';
 import HomeScreen from './components/HomeScreen';
@@ -50,10 +50,24 @@ const defaultExercise: ExerciseState = {
   sessionRunning: false,
 };
 
+const SETTINGS_KEY = 'ear_ring_settings';
+
+function loadSettings(): ExerciseSettings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) return { ...defaultSettings, ...JSON.parse(raw) };
+  } catch {}
+  return defaultSettings;
+}
+
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
-  const [settings, setSettings] = useState<ExerciseSettings>(defaultSettings);
-  const [exercise, setExercise] = useState<ExerciseState>(defaultExercise);
+  const [settings, setSettings] = useState<ExerciseSettings>(loadSettings);
+  const [exercise, setExercise] = useState<ExerciseState>({ ...defaultExercise, ...loadSettings() });
+
+  useEffect(() => {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
+  }, [settings]);
 
   const startExercise = useCallback(async (rootNote: number, rangeStart: number, rangeEnd: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean) => {
     const seed = Date.now();

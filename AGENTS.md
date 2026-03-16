@@ -108,9 +108,8 @@ Chip row: 60  80  100  120  140   (single row, equal width)
   — Default selection: 100 BPM
 
 [16dp space]
-Section label: "Display Test Notes"
-Chip row: Hide  Show   (single row, equal width)
-  — Default selection: Hide
+Checkbox: "Display Test Notes"
+  — Default: unchecked (hidden)
 
 [32dp space]
 [▶ Start Exercise]    — full-width filled primary button, 52dp tall, 18sp
