@@ -54,10 +54,11 @@ struct MusicStaffView: View {
             let keySigStartX: CGFloat = 4 + clefWidth + 6
             let keySigStep: CGFloat = lineSpacing * 0.95
             let keySigFlatSize: CGFloat = lineSpacing * 3.5
-            let keySigSharpSize: CGFloat = lineSpacing * 2.0
+            let keySigSharpSize: CGFloat = lineSpacing * 3.0
 
             // Draw key signature symbols when in key-signature mode
-            // ♭ belly centering: shift target up by textSize*0.15 so belly lands on line.
+            // ♭ belly centering: iOS system font ♭ belly sits AT the bounding-box centre,
+            // so centre the glyph directly on the target line (no offset needed).
             // ♯ bar centering: bars are centred in glyph, use target directly.
             if keySignatureMode == 1 {
                 let keySig = EarRingCore.keySigPositions(rootChroma: rootChroma)
@@ -67,7 +68,7 @@ struct MusicStaffView: View {
                 for (i, staffPos) in keySig.positions.enumerated() {
                     let targetY = noteY(staffPos)
                     let keySigX = keySigStartX + CGFloat(i) * keySigStep
-                    let drawY = isSharp ? targetY : targetY - keySigTextSize * 0.15
+                    let drawY = targetY
                     ctx.draw(
                         Text(symbol)
                             .font(.system(size: keySigTextSize))
@@ -157,8 +158,8 @@ struct MusicStaffView: View {
 
                 if let accidental {
                     let isAccSharp = accidental == "♯"
-                    let accTextSize = isAccSharp ? lineSpacing * 2.0 : lineSpacing * 3.5
-                    let accDrawY = isAccSharp ? y : y - accTextSize * 0.15
+                    let accTextSize = isAccSharp ? lineSpacing * 3.0 : lineSpacing * 3.5
+                    let accDrawY = y  // iOS system font: both ♯ bars and ♭ belly sit at bounding-box centre
                     ctx.draw(
                         Text(accidental)
                             .font(.system(size: accTextSize))

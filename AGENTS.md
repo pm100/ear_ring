@@ -450,15 +450,16 @@ keySigStartX = clefRightEdge + 6   (clefRightEdge = 4 + measuredClefWidth on And
                                      2 + clefW on Tauri where clefW = lineSpacing*8*(149/307))
 keySigStep   = lineSpacing * 0.95
 keySigFontSize (♭) = lineSpacing * 3.5   (tall ascender needs full height)
-keySigFontSize (♯) = lineSpacing * 2.0   (Android/iOS physical px; bars span ~2 staff spaces)
-                   = lineSpacing * 3.0   (Tauri SVG CSS px; SVG units are smaller so needs larger multiplier)
+keySigFontSize (♯) = lineSpacing * 2.0   (Android physical px; bars span ~2 staff spaces)
+                   = lineSpacing * 3.0   (iOS logical pt and Tauri SVG CSS px)
 
-NOTE: Android lineSpacing ≈ 31.5 physical px; Tauri lineSpacing = 12 CSS px.
+NOTE: Android lineSpacing ≈ 31.5 physical px; iOS lineSpacing = 12 logical pt; Tauri lineSpacing = 12 CSS px.
 The ♯ glyph needs to appear ~2 staff spaces tall on screen — tune multiplier per platform accordingly.
+iOS system font ♭ belly sits ~30% below the glyph bounding-box centre; Android/Tauri fonts sit ~15% below.
 
 ♭ belly-centering: draw the glyph so its belly loop sits ON the target staff line:
   Android  : LEFT-aligned text, baseline = targetY + textSize * 0.15
-  iOS      : .center anchor at CGPoint(x, targetY - textSize * 0.15)
+  iOS      : .center anchor at CGPoint(x, targetY)  [iOS system font belly sits at bounding-box centre]
   Tauri    : textAnchor="start", dominantBaseline="auto", y = targetY + fontSize * 0.15
 
 ♯ bar-centering: draw so the two horizontal bars straddle the target staff line:
@@ -470,14 +471,13 @@ The ♯ glyph needs to appear ~2 staff spaces tall on screen — tune multiplier
 **Inline accidental symbol rendering** (before noteheads):
 ```
 accidentalFontSize (♭) = lineSpacing * 3.5
-accidentalFontSize (♯) = lineSpacing * 2.0  (Android/iOS) / lineSpacing * 3.0 (Tauri SVG)
+accidentalFontSize (♯) = lineSpacing * 2.0  (Android) / lineSpacing * 3.0 (iOS and Tauri SVG)
 accidentalX = noteX - noteHeadWidth * 1.25 (centered there)
 
 Same belly/bar centering rules as key sig (target = noteY):
   Android  : CENTER-aligned text, baseline = noteY + textSize * 0.15  (for ♭)
              CENTER-aligned text, getTextBounds baseline                (for ♯)
-  iOS      : .center anchor at CGPoint(x, noteY - textSize * 0.15)     (for ♭)
-             .center anchor at CGPoint(x, noteY)                        (for ♯)
+  iOS      : .center anchor at CGPoint(x, noteY)  [belly sits at bounding-box centre; same for ♭ and ♯]
   Tauri    : dominantBaseline="auto",    y = noteY + fontSize*0.15     (for ♭)
              dominantBaseline="central", y = noteY                      (for ♯)
 ```
