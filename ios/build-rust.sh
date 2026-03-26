@@ -2,6 +2,8 @@
 
 set -eu
 
+# Xcode doesn't inherit the user's shell PATH, so add Rust/Cargo explicitly
+export PATH="$HOME/.cargo/bin:$PATH"
 REPO_ROOT="${PROJECT_DIR}/.."
 GENERATED_DIR="${PROJECT_DIR}/build/generated/rust/${CONFIGURATION}${EFFECTIVE_PLATFORM_NAME}"
 

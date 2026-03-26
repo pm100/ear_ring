@@ -5,7 +5,9 @@ class AudioCapture: @unchecked Sendable {
     private(set) var isRunning: Bool = false
 
     /// Start capturing microphone audio.
-    /// The `onAudio` closure is called on the AVAudioEngine's internal thread with each buffer of samples.
+    /// Switches the shared session to .playAndRecord + .measurement for clean
+    /// pitch detection (same as the Mic Setup screen). Keeps .playAndRecord
+    /// throughout so playback can resume without a full category switch.
     func start(onAudio: @escaping (_ samples: [Float], _ sampleRate: UInt32) -> Void) async {
         guard !isRunning else { return }
 
@@ -56,7 +58,9 @@ class AudioCapture: @unchecked Sendable {
         }
     }
 
-    /// Stop capturing and release all audio resources.
+    /// Stop capturing. Switches mode back to .default so AVAudioPlayer pitch
+    /// shifting works correctly, while keeping the category as .playAndRecord
+    /// to avoid full session teardown/re-setup between playback and recording.
     func stop() {
         guard let engine = engine else { return }
         engine.inputNode.removeTap(onBus: 0)
@@ -65,10 +69,13 @@ class AudioCapture: @unchecked Sendable {
         isRunning = false
 
         do {
-            try AVAudioSession.sharedInstance().setActive(false,
-                                                          options: .notifyOthersOnDeactivation)
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playAndRecord,
+                                    mode: .default,
+                                    options: [.defaultToSpeaker, .allowBluetooth])
+            try session.setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
-            print("[AudioCapture] Session deactivation error: \(error)")
+            print("[AudioCapture] Session stop error: \(error)")
         }
     }
 }

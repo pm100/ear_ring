@@ -276,18 +276,50 @@ body {
 .setup-instruction {
   color: var(--text-secondary);
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 0;
   margin-top: 24px;
 }
 
-.setup-note-name {
-  font-size: 72px;
-  font-weight: bold;
-  text-align: center;
-  min-height: 90px;
+.listening-indicator {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  margin: 14px 0 6px;
+}
+
+.listening-ear {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.listening-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.setup-note-display {
+  text-align: center;
+  margin: 8px 0 0;
+  min-height: 90px;
+}
+
+.setup-note-name {
+  font-weight: bold;
+  text-align: center;
+  color: var(--muted);
+  line-height: 1.1;
+}
+
+.setup-note-name.detected {
+  color: var(--primary);
+}
+
+.setup-note-hz {
+  font-size: 15px;
+  color: var(--muted);
+  margin-top: 2px;
 }
 
 .setup-hz {

@@ -127,7 +127,10 @@ class AudioPlayback(private val context: Context) {
         onEach: (Int) -> Unit = {},
         onDone: () -> Unit = {}
     ) {
-        cancelPlayback()
+        // Cancel any pending sequencing loop but let currently-ringing notes decay
+        // naturally — calling cancelPlayback() here would cut them off mid-sustain.
+        sequenceJob?.cancel()
+        sequenceJob = null
         sequenceJob = scope.launch {
             val stepMs = (60_000L / bpm.coerceAtLeast(1)).coerceAtLeast(150L)
             for ((index, midi) in midiNotes.withIndex()) {
@@ -152,7 +155,10 @@ class AudioPlayback(private val context: Context) {
         holdMs: Long = 600L,
         onDone: () -> Unit = {}
     ) {
-        cancelPlayback()
+        // Cancel any pending sequencing loop but let currently-ringing notes decay
+        // naturally — calling cancelPlayback() here would cut them off mid-sustain.
+        sequenceJob?.cancel()
+        sequenceJob = null
         sequenceJob = scope.launch {
             val playable = midiNotes.mapNotNull { midi ->
                 val nearestMidi = nearestSampleMidi(midi)

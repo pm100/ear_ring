@@ -121,8 +121,14 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       () => {},
       () => {
         if (!sessionRunningRef.current) return;
-        setStatus('listening');
-        startCapture(handleHzDetectedRef.current);
+        // Let notes ring through a short settling gap before opening the mic,
+        // matching the Android/iOS POST_SEQUENCE_GAP behaviour.
+        window.setTimeout(() => {
+          if (!sessionRunningRef.current) return;
+          cancelPlayback();
+          setStatus('listening');
+          startCapture(handleHzDetectedRef.current);
+        }, 700);
       },
       exercise.tempoBpm
     );

@@ -46,6 +46,26 @@ int32_t ear_ring_generate_sequence(uint8_t root_chroma,
                                     uint64_t seed,
                                     uint8_t *out_buf);
 
+/// Build a 3-note intro chord as MIDI note numbers.
+/// Returns the count of notes written into out_buf on success, -1 on failure.
+/// @param root_midi  Root note MIDI number
+/// @param scale_id   Scale identifier (0–7)
+/// @param out_buf    Output buffer (must be at least 3 bytes)
+int32_t ear_ring_intro_chord(uint8_t root_midi, uint8_t scale_id, uint8_t *out_buf);
+
+/// Check whether a detected note is correct for the expected note.
+/// Returns 1 if correct, 0 otherwise.
+/// @param detected_midi  Detected MIDI note number
+/// @param cents          Cents deviation from detected note
+/// @param expected_midi  Expected MIDI note number
+int32_t ear_ring_is_correct_note(uint8_t detected_midi, int32_t cents, uint8_t expected_midi);
+
+/// Compute the score for an exercise attempt.
+/// @param max_attempts    Total number of notes in the sequence
+/// @param attempts_used   Number of notes attempted
+/// @param passed          1 if the exercise was passed, 0 otherwise
+int32_t ear_ring_test_score(uint8_t max_attempts, uint8_t attempts_used, int32_t passed);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,6 +1,10 @@
 import AVFoundation
 import Foundation
 
+/// Handles piano sample playback with accurate pitch shifting via AVAudioEngine.
+/// Uses AVAudioUnitTimePitch (shifts pitch in cents) instead of AVAudioPlayer.rate,
+/// which is unreliable on iOS and silently ignored in many session configurations.
+@MainActor
 class AudioPlayback {
 
     private static let sampleMap: [(name: String, midi: Int)] = [
@@ -14,13 +18,27 @@ class AudioPlayback {
         ("A7", 105), ("C8", 108)
     ]
 
-    private var players: [AVAudioPlayer] = []
+    private let engine = AVAudioEngine()
+    // (playerNode, timePitchUnit) pairs for all currently sounding notes.
+    private var activeNodes: [(AVAudioPlayerNode, AVAudioUnitTimePitch)] = []
     private var isCancelled = false
+
+    // MARK: - Lifecycle
 
     func cancelPlayback() {
         isCancelled = true
-        players.forEach { $0.stop() }
-        players.removeAll()
+        stopAllPlayers()
+    }
+
+    /// Stop all sounding notes without cancelling future playback.
+    func stopAllPlayers() {
+        let toStop = activeNodes
+        activeNodes.removeAll()
+        for (player, pitch) in toStop {
+            player.stop()
+            engine.detach(player)   // also disconnects
+            engine.detach(pitch)
+        }
     }
 
     func resetCancellation() {
@@ -29,54 +47,93 @@ class AudioPlayback {
 
     // MARK: - Private helpers
 
-    private func nearestSample(for midi: Int) -> (name: String, midi: Int) {
+    nonisolated private func nearestSample(for midi: Int) -> (name: String, midi: Int) {
         return AudioPlayback.sampleMap.min(by: {
             abs($0.midi - midi) < abs($1.midi - midi)
         }) ?? ("A4", 69)
     }
 
-    private func downloadIfNeeded(name: String) async throws -> URL {
+    nonisolated private func downloadIfNeeded(name: String) async throws -> URL {
         let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         let fileName = "\(name).mp3"
         let cachedURL = cacheDir.appendingPathComponent(fileName)
-
         if FileManager.default.fileExists(atPath: cachedURL.path) {
             return cachedURL
         }
-
         guard let remoteURL = URL(string: "https://tonejs.github.io/audio/salamander/\(fileName)") else {
             throw URLError(.badURL)
         }
-
         let (data, _) = try await URLSession.shared.data(from: remoteURL)
         try data.write(to: cachedURL)
         return cachedURL
+    }
+
+    /// Ensure the audio session and engine are in a state ready for playback.
+    private func ensureEngineRunning() throws {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playAndRecord, mode: .default,
+                                options: [.defaultToSpeaker, .allowBluetooth])
+        try session.setActive(true)
+        if !engine.isRunning {
+            try engine.start()
+        }
+    }
+
+    /// Attach a player + time-pitch pair to the engine and start playback immediately.
+    /// pitchCents: shift in cents (100 = +1 semitone, -100 = -1 semitone, 0 = no shift).
+    /// The completion handler detaches the nodes automatically when the sample finishes
+    /// playing naturally, so callers don't need to tear down for normal note decay.
+    private func startNode(url: URL, pitchCents: Float) throws -> (AVAudioPlayerNode, AVAudioUnitTimePitch) {
+        let audioFile = try AVAudioFile(forReading: url)
+        let playerNode = AVAudioPlayerNode()
+        let timePitch = AVAudioUnitTimePitch()
+        timePitch.pitch = pitchCents   // pure pitch shift; rate stays 1.0 (no time stretch)
+
+        engine.attach(playerNode)
+        engine.attach(timePitch)
+        engine.connect(playerNode, to: timePitch, format: audioFile.processingFormat)
+        engine.connect(timePitch, to: engine.mainMixerNode, format: nil)
+
+        try ensureEngineRunning()
+
+        // When the sample plays to its natural end, clean up the nodes.
+        playerNode.scheduleFile(audioFile, at: nil) { [weak self, weak playerNode, weak timePitch] in
+            guard let self, let playerNode, let timePitch else { return }
+            Task { @MainActor [weak self, weak playerNode, weak timePitch] in
+                guard let self, let playerNode, let timePitch else { return }
+                // Only detach if not already stopped by stopAllPlayers/tearDown.
+                guard self.activeNodes.contains(where: { $0.0 === playerNode }) else { return }
+                self.engine.detach(playerNode)
+                self.engine.detach(timePitch)
+                self.activeNodes.removeAll { $0.0 === playerNode }
+            }
+        }
+        playerNode.play()
+        activeNodes.append((playerNode, timePitch))
+        return (playerNode, timePitch)
+    }
+
+    private func tearDown(_ playerNode: AVAudioPlayerNode, _ timePitch: AVAudioUnitTimePitch) {
+        playerNode.stop()
+        engine.detach(playerNode)
+        engine.detach(timePitch)
+        activeNodes.removeAll { $0.0 === playerNode }
     }
 
     // MARK: - Public API
 
     func playNote(midi: Int, holdNanoseconds: UInt64 = 600_000_000) async {
         guard !isCancelled else { return }
-
         let sample = nearestSample(for: midi)
-        let deltaSemitones = midi - sample.midi
-        let rate = Float(pow(2.0, Double(deltaSemitones) / 12.0))
-
+        let pitchCents = Float((midi - sample.midi) * 100)
         do {
             let url = try await downloadIfNeeded(name: sample.name)
             guard !isCancelled else { return }
-
-            let player = try AVAudioPlayer(contentsOf: url)
-            // enableRate must be set before prepareToPlay
-            player.enableRate = true
-            player.prepareToPlay()
-            player.rate = rate
-            player.play()
-            players.append(player)
-
+            _ = try startNode(url: url, pitchCents: pitchCents)
+            // Wait for the step duration (for sequencing pacing) but don't stop the note —
+            // let it ring with natural piano decay. stopAllPlayers() silences everything
+            // when the phase ends (before mic opens or on cancel).
             try await Task.sleep(nanoseconds: holdNanoseconds)
-
-            players.removeAll { $0 === player }
         } catch {
             print("[AudioPlayback] Error playing MIDI \(midi): \(error)")
         }
@@ -91,44 +148,36 @@ class AudioPlayback {
         }
     }
 
+    /// Play multiple notes simultaneously.
+    /// Downloads all samples first (usually cached), then fires all player nodes
+    /// in a tight synchronous loop for near-simultaneous onset.
     func playChord(notes: [Int], holdMs: UInt64 = 600) async {
         guard !isCancelled else { return }
-        do {
-            let samples = try await withThrowingTaskGroup(of: (URL, Float)?.self) { group in
-                for midi in notes {
-                    group.addTask { [weak self] in
-                        guard let self else { return nil }
-                        let sample = self.nearestSample(for: midi)
-                        let url = try await self.downloadIfNeeded(name: sample.name)
-                        let deltaSemitones = midi - sample.midi
-                        let rate = Float(pow(2.0, Double(deltaSemitones) / 12.0))
-                        return (url, rate)
-                    }
-                }
-
-                var results: [(URL, Float)] = []
-                for try await result in group {
-                    if let result {
-                        results.append(result)
-                    }
-                }
-                return results
+        // Pre-load all samples (fast if cached, network download if first run).
+        var pendingPlays: [(URL, Float)] = []
+        for midi in notes {
+            do {
+                let sample = nearestSample(for: midi)
+                let pitchCents = Float((midi - sample.midi) * 100)
+                let url = try await downloadIfNeeded(name: sample.name)
+                pendingPlays.append((url, pitchCents))
+            } catch {
+                print("[AudioPlayback] Failed to load sample for midi \(midi): \(error)")
             }
-
-            guard !isCancelled else { return }
-
-            for (url, rate) in samples {
-                let player = try AVAudioPlayer(contentsOf: url)
-                player.enableRate = true
-                player.prepareToPlay()
-                player.rate = rate
-                player.play()
-                players.append(player)
-            }
-
-            try await Task.sleep(nanoseconds: holdMs * 1_000_000)
-        } catch {
-            print("[AudioPlayback] Error playing chord: \(error)")
         }
+        guard !isCancelled else { return }
+        // Start all notes with no awaits between them → simultaneous onset.
+        for (url, pitchCents) in pendingPlays {
+            do {
+                _ = try startNode(url: url, pitchCents: pitchCents)
+            } catch {
+                print("[AudioPlayback] Chord note error: \(error)")
+            }
+        }
+        // Wait for the hold duration (so playChord returns at the right time for
+        // sequencing), but don't tear down — let chord ring with natural decay.
+        // Caller stops sound via stopAllPlayers() when ready.
+        try? await Task.sleep(nanoseconds: holdMs * 1_000_000)
     }
 }
+

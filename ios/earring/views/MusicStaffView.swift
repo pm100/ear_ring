@@ -21,7 +21,7 @@ struct MusicStaffView: View {
         Canvas { ctx, size in
             let lineSpacing: CGFloat = 12
             let staffTop: CGFloat = size.height / 2 - 2 * lineSpacing
-            let leftMargin: CGFloat = 60
+            let leftMargin: CGFloat = 22
             let noteRadius: CGFloat = lineSpacing * 0.45
             let staffBottomY: CGFloat = staffTop + 4 * lineSpacing
             let staffCenter: CGFloat = staffTop + 2 * lineSpacing
@@ -42,8 +42,8 @@ struct MusicStaffView: View {
             }
 
             ctx.draw(
-                Text("𝄞").font(.system(size: lineSpacing * 3.5)),
-                at: CGPoint(x: 4, y: staffTop - lineSpacing * 0.5),
+                Text("𝄞").font(.system(size: lineSpacing * 7)),
+                at: CGPoint(x: 4, y: staffTop - lineSpacing * 2.5),
                 anchor: .topLeading
             )
 
@@ -77,18 +77,20 @@ struct MusicStaffView: View {
 
                 var ledgerBelow = staffBottomY + lineSpacing
                 while y >= ledgerBelow - 0.5 {
+                    let hw = noteHeadWidth / 2 + noteRadius * 0.5
                     var lp = Path()
-                    lp.move(to: CGPoint(x: x - noteRadius * 2.8, y: ledgerBelow))
-                    lp.addLine(to: CGPoint(x: x + noteRadius * 2.8, y: ledgerBelow))
+                    lp.move(to: CGPoint(x: x - hw, y: ledgerBelow))
+                    lp.addLine(to: CGPoint(x: x + hw, y: ledgerBelow))
                     ctx.stroke(lp, with: .color(Color(red: 0.333, green: 0.333, blue: 0.333)), lineWidth: 1.5)
                     ledgerBelow += lineSpacing
                 }
 
                 var ledgerAbove = staffTop - lineSpacing
                 while y <= ledgerAbove + 0.5 {
+                    let hw = noteHeadWidth / 2 + noteRadius * 0.5
                     var lp = Path()
-                    lp.move(to: CGPoint(x: x - noteRadius * 2.8, y: ledgerAbove))
-                    lp.addLine(to: CGPoint(x: x + noteRadius * 2.8, y: ledgerAbove))
+                    lp.move(to: CGPoint(x: x - hw, y: ledgerAbove))
+                    lp.addLine(to: CGPoint(x: x + hw, y: ledgerAbove))
                     ctx.stroke(lp, with: .color(Color(red: 0.333, green: 0.333, blue: 0.333)), lineWidth: 1.5)
                     ledgerAbove -= lineSpacing
                 }
@@ -114,7 +116,7 @@ struct MusicStaffView: View {
                     ctx.draw(
                         Text(accidental)
                             .font(.system(size: lineSpacing * 1.8))
-                            .foregroundStyle(noteColor),
+                            .foregroundColor(noteColor),
                         at: CGPoint(x: x - noteHeadWidth * 1.25, y: y),
                         anchor: .center
                     )

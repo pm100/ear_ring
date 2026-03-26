@@ -70,6 +70,13 @@ export function useAudioPlayback() {
   }, [loadSample, getContext]);
 
   const playChord = useCallback(async (midis: number[], holdMs = 600) => {
+    // Clear any residual notes from a previous test (they've had time to decay)
+    // and cancel any pending sequence timeout before starting fresh.
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    activeSourcesRef.current.forEach(source => {
+      try { source.stop(); } catch { /* already stopped */ }
+    });
+    activeSourcesRef.current = [];
     cancelRef.current = false;
     const ctx = getContext();
     if (ctx.state === 'suspended') await ctx.resume();

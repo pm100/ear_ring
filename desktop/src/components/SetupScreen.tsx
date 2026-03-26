@@ -1,8 +1,8 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import PitchMeter from './PitchMeter';
 import MusicStaff from './MusicStaff';
 import { useAudioCapture } from '../hooks/useAudioCapture';
-import { freqToMidi } from '../music';
+import { freqToMidi, midiToLabel } from '../music';
 
 interface Props {
   onBack: () => void;
@@ -15,9 +15,8 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd }: Props) {
   const [hz, setHz] = useState(0);
   const [currentMidi, setCurrentMidi] = useState<number>(-1);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
-  const [listening, setListening] = useState(false);
-  const frameNotesRef = React.useRef<number[]>([]);
-  const lastAddedMidiRef = React.useRef<number>(-1);
+  const frameNotesRef = useRef<number[]>([]);
+  const lastConfirmedMidiRef = useRef<number>(-1);
   const { start, stop } = useAudioCapture();
 
   const NOTE_STEP = 44;
@@ -36,40 +35,35 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd }: Props) {
         if (last.length === 3 && last[0] === last[1] && last[1] === last[2]) {
           if (midi < midiMin || midi > midiMax) return;
           setCurrentMidi(midi);
-          if (midi !== lastAddedMidiRef.current) {
+          // Only suppress re-confirm for a *sustained* note (same midi, no silence).
+          // lastConfirmedMidiRef resets to -1 on silence so replaying the same
+          // note after a break always appends again.
+          if (midi !== lastConfirmedMidiRef.current) {
+            lastConfirmedMidiRef.current = midi;
             setNoteHistory(prev => {
               const next = [...prev, midi];
               if (next.length > 8) next.shift();
               return next;
             });
-            lastAddedMidiRef.current = midi;
           }
         }
       }
     } else {
+      // Silence — reset so same note can be detected again after a break
       frameNotesRef.current = [];
+      lastConfirmedMidiRef.current = -1;
       setCurrentMidi(-1);
     }
-  }, []);
+  }, [midiMin, midiMax]);
 
-  const startListening = useCallback(() => {
-    setListening(true);
-    start(handleHz);
-  }, [start, handleHz]);
-
-  const stopListening = useCallback(() => {
-    stop();
-    setListening(false);
-    setHz(0);
-    setCurrentMidi(-1);
-    setNoteHistory([]);
-    lastAddedMidiRef.current = -1;
-    frameNotesRef.current = [];
-  }, [stop]);
-
+  // Auto-start on entry, auto-stop on unmount
   useEffect(() => {
+    start(handleHz);
     return () => stop();
-  }, [stop]);
+  }, [start, stop, handleHz]);
+
+  const noteLabel = currentMidi >= 0 ? midiToLabel(currentMidi) : '—';
+  const noteHz = currentMidi >= 0 ? (440 * Math.pow(2, (currentMidi - 69) / 12)) : null;
 
   return (
     <div className="screen">
@@ -80,6 +74,11 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd }: Props) {
 
       <p className="setup-instruction">Sing or play a note to test your microphone.</p>
 
+      <div className="listening-indicator">
+        <span className="listening-ear">👂</span>
+        <span className="listening-label">Listening…</span>
+      </div>
+
       <MusicStaff
         notes={noteHistory.map((midi, index) => ({
           midi,
@@ -88,15 +87,20 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd }: Props) {
         fixedSpacing={NOTE_STEP}
       />
 
+      <div className="setup-note-display">
+        <div className={`setup-note-name${currentMidi >= 0 ? ' detected' : ''}`}
+             style={{ fontSize: noteLabel.length >= 3 ? '56px' : '72px' }}>
+          {noteLabel}
+        </div>
+        {noteHz !== null && (
+          <div className="setup-note-hz">{noteHz.toFixed(1)} Hz</div>
+        )}
+      </div>
+
       <div className="pitch-meter-circle">
         <PitchMeter hz={hz} />
       </div>
-
-      {listening ? (
-        <button className="btn-danger" onClick={stopListening}>{'\u23f9'} Stop</button>
-      ) : (
-        <button className="btn-primary" onClick={startListening}>{'\uD83C\uDF99'} Start Listening</button>
-      )}
     </div>
   );
 }
+

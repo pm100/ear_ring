@@ -8,8 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-
-		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 		AA2000000000001A /* EarRingApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000001A /* EarRingApp.swift */; };
 		AA2000000000002A /* EarRingCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000002A /* EarRingCore.swift */; };
 		AA2000000000003A /* AudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000003A /* AudioCapture.swift */; };
@@ -25,15 +23,15 @@
 		AA200000000000DA /* ProgressScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100000000000DA /* ProgressScreen.swift */; };
 		AA200000000000EA /* MusicStaffView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100000000000EA /* MusicStaffView.swift */; };
 		AA200000000000FA /* PitchMeterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100000000000FA /* PitchMeterView.swift */; };
+		B5EF2949546CBF9135D51680 /* PianoRangePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 928562E53D2D807A5FEED52B /* PianoRangePickerView.swift */; };
+		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* earring.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = earring.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = earring/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = earring/Info.plist; sourceTree = "<group>"; };
-
-		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = earring/AppDelegate.swift; sourceTree = "<group>"; };
-		F11748442D0722820044C1D9 /* earring-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "earring-Bridging-Header.h"; path = "earring/earring-Bridging-Header.h"; sourceTree = "<group>"; };
+		928562E53D2D807A5FEED52B /* PianoRangePickerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PianoRangePickerView.swift; sourceTree = "<group>"; };
 		AA1000000000001A /* EarRingApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EarRingApp.swift; path = earring/EarRingApp.swift; sourceTree = "<group>"; };
 		AA1000000000002A /* EarRingCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EarRingCore.swift; path = earring/EarRingCore.swift; sourceTree = "<group>"; };
 		AA1000000000003A /* AudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AudioCapture.swift; path = earring/AudioCapture.swift; sourceTree = "<group>"; };
@@ -42,13 +40,15 @@
 		AA1000000000006A /* ExerciseModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ExerciseModel.swift; path = earring/ExerciseModel.swift; sourceTree = "<group>"; };
 		AA1000000000007A /* ProgressModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ProgressModel.swift; path = earring/ProgressModel.swift; sourceTree = "<group>"; };
 		AA1000000000008A /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContentView.swift; path = earring/ContentView.swift; sourceTree = "<group>"; };
-		AA1000000000009A /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HomeView.swift; path = HomeView.swift; sourceTree = "<group>"; };
-		AA100000000000AA /* ExerciseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ExerciseView.swift; path = ExerciseView.swift; sourceTree = "<group>"; };
-		AA100000000000BA /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SetupView.swift; path = SetupView.swift; sourceTree = "<group>"; };
-		AA100000000000CA /* ResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ResultsView.swift; path = ResultsView.swift; sourceTree = "<group>"; };
-		AA100000000000DA /* ProgressScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ProgressScreen.swift; path = ProgressScreen.swift; sourceTree = "<group>"; };
-		AA100000000000EA /* MusicStaffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MusicStaffView.swift; path = MusicStaffView.swift; sourceTree = "<group>"; };
-		AA100000000000FA /* PitchMeterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PitchMeterView.swift; path = PitchMeterView.swift; sourceTree = "<group>"; };
+		AA1000000000009A /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		AA100000000000AA /* ExerciseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseView.swift; sourceTree = "<group>"; };
+		AA100000000000BA /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
+		AA100000000000CA /* ResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsView.swift; sourceTree = "<group>"; };
+		AA100000000000DA /* ProgressScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressScreen.swift; sourceTree = "<group>"; };
+		AA100000000000EA /* MusicStaffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicStaffView.swift; sourceTree = "<group>"; };
+		AA100000000000FA /* PitchMeterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PitchMeterView.swift; sourceTree = "<group>"; };
+		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = earring/AppDelegate.swift; sourceTree = "<group>"; };
+		F11748442D0722820044C1D9 /* earring-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "earring-Bridging-Header.h"; path = "earring/earring-Bridging-Header.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -75,11 +75,9 @@
 				AA1000000000007A /* ProgressModel.swift */,
 				AA1000000000008A /* ContentView.swift */,
 				AA3000000000001A /* views */,
-
 				F11748442D0722820044C1D9 /* earring-Bridging-Header.h */,
-					13B07FB51A68108700A75B9A /* Images.xcassets */,
+				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
-	
 			);
 			name = earring;
 			sourceTree = "<group>";
@@ -97,7 +95,7 @@
 				13B07FAE1A68108700A75B9A /* earring */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
-				);
+			);
 			indentWidth = 2;
 			sourceTree = "<group>";
 			tabWidth = 2;
@@ -121,6 +119,7 @@
 				AA100000000000DA /* ProgressScreen.swift */,
 				AA100000000000EA /* MusicStaffView.swift */,
 				AA100000000000FA /* PitchMeterView.swift */,
+				928562E53D2D807A5FEED52B /* PianoRangePickerView.swift */,
 			);
 			name = views;
 			path = earring/views;
@@ -133,8 +132,8 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "earring" */;
 			buildPhases = (
-				13B07F871A680F5B00A75B9A /* Sources */,
 				AA4000000000001A /* Build Rust Core */,
+				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 			);
@@ -184,7 +183,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
-	
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -236,7 +234,7 @@
 				AA200000000000DA /* ProgressScreen.swift in Sources */,
 				AA200000000000EA /* MusicStaffView.swift in Sources */,
 				AA200000000000FA /* PitchMeterView.swift in Sources */,
-
+				B5EF2949546CBF9135D51680 /* PianoRangePickerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -249,6 +247,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9A4PVL859F;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -260,16 +259,16 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/build/generated/rust/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)",
+				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
 					"-lc++",
 					"-lear_ring_core",
-				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/build/generated/rust/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.name.earring;
 				PRODUCT_NAME = earring;
@@ -287,11 +286,16 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9A4PVL859F;
 				INFOPLIST_FILE = earring/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/build/generated/rust/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)",
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
@@ -299,10 +303,6 @@
 					"-ObjC",
 					"-lc++",
 					"-lear_ring_core",
-				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/build/generated/rust/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.name.earring;
 				PRODUCT_NAME = earring;

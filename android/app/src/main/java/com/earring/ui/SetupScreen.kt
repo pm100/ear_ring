@@ -24,23 +24,23 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71) {
 
     var displayMidi by remember { mutableIntStateOf(-1) }
     val noteHistory = remember { mutableStateListOf<Int>() }
-    var lastAddedMidi by remember { mutableIntStateOf(-1) }
 
     // Shared pitch detection — identical pipeline to ExerciseScreen.
-    // auto-starts on entry; onConfirmed decides what to do with each stable note.
+    // Auto-starts on entry; onConfirmed appends every stable note (same-note
+    // repetition is handled by PitchStabilityTracker resetting on silence).
     val liveHz = rememberPitchDetector(
         active = true,
         midiMin = midiMin,
         midiMax = midiMax,
         onConfirmed = { midi, _ ->
             displayMidi = midi
-            if (midi != lastAddedMidi) {
-                noteHistory.add(midi)
-                if (noteHistory.size > maxHistory) noteHistory.removeAt(0)
-                lastAddedMidi = midi
-            }
+            noteHistory.add(midi)
+            if (noteHistory.size > maxHistory) noteHistory.removeAt(0)
         }
     )
+
+    // Clear display when silence detected
+    if (liveHz <= 0f) displayMidi = -1
 
     BackHandler { onBack() }
 
@@ -63,6 +63,23 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71) {
         Text("Sing or play a note to test your microphone.", style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(16.dp))
 
+        // Listening indicator
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("👂", fontSize = 28.sp)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "Listening…",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+
         MusicStaff(
             notes = noteHistory.mapIndexed { i, m ->
                 StaffNote(m, if (i == noteHistory.size - 1) NoteState.ACTIVE else NoteState.EXPECTED)
@@ -70,16 +87,29 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71) {
             modifier = Modifier.fillMaxWidth(),
             fixedSpacingDp = noteStepDp
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
+
+        // Large note name + Hz
+        val noteLabel = if (displayMidi >= 0) MusicTheory.midiToLabel(displayMidi) else "—"
+        val noteHz = if (displayMidi >= 0) 440.0 * Math.pow(2.0, (displayMidi - 69) / 12.0) else 0.0
+        Text(
+            noteLabel,
+            fontSize = if (noteLabel.length >= 3) 56.sp else 72.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (displayMidi >= 0) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (displayMidi >= 0) {
+            Text(
+                String.format("%.1f Hz", noteHz),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.height(24.dp))
 
         PitchMeter(detectedMidi = displayMidi, detectedHz = liveHz)
         Spacer(Modifier.height(32.dp))
-
-        Button(
-            onClick = { onBack() },
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-            modifier = Modifier.fillMaxWidth().height(52.dp)
-        ) { Text("⏹ Stop", fontSize = 17.sp) }
     }
 }
 

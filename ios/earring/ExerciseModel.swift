@@ -46,7 +46,19 @@ class ExerciseModel: ObservableObject {
     @Published var score: Int = 0
     @Published var liveMidi: Int? = nil
     @Published var liveCents: Int = 0
-    @Published var liveFrameCount: Int = 0
+    /// Set each time a new stable note is confirmed by the shared detection pipeline.
+    /// SetupView observes confirmedNoteSeq (which always increments) so it fires even
+    /// when the same MIDI value is confirmed twice in a row.
+    @Published var confirmedLiveMidi: Int? = nil {
+        didSet {
+            guard status == .listening, let midi = confirmedLiveMidi else { return }
+            commitNote(midi: midi, cents: liveCents)
+        }
+    }
+    /// Monotonically increasing counter — incremented every time a note is confirmed.
+    /// Use this (not confirmedLiveMidi) in onChange() handlers so same-note re-fires
+    /// are always detected by SwiftUI.
+    @Published private(set) var confirmedNoteSeq: Int = 0
     @Published var currentAttempt: Int = 1
     @Published var maxAttempts: Int = 5
     @Published var testsCompleted: Int = 0
@@ -64,8 +76,8 @@ class ExerciseModel: ObservableObject {
     }
 
     static func defaultRange(rootNote: Int) -> (Int, Int) {
-        let best = (2...6).map { oct in (oct + 1) * 12 + rootNote }
-            .min(by: { abs($0 - 60) < abs($1 - 60) }) ?? 60
+        let candidates = (2...6).map { oct -> Int in (oct + 1) * 12 + rootNote }
+        let best = candidates.min(by: { abs($0 - 60) < abs($1 - 60) }) ?? 60
         return (best, best + 11)
     }
 
@@ -76,10 +88,19 @@ class ExerciseModel: ObservableObject {
     private var stabilityPitchClass: Int = -1
     private var stabilityCount: Int = 0
     private var pitchConsumed: Bool = false
+    private var warmupFramesRemaining: Int = 0
     private var sessionPersisted = false
     private let silenceRMSThreshold: Float = 0.003
     private let retryDelayNanoseconds: UInt64 = 3_000_000_000
     private let introGapNanoseconds: UInt64 = 800_000_000
+    // Gap between the last note of the sequence ending and mic start.
+    // Piano sustain continues after playSequence returns; this silence lets it fade so
+    // the mic doesn't immediately pick up speaker resonance as a "sung" note.
+    private let postSequenceGapNanoseconds: UInt64 = 700_000_000
+    // Frames to discard when the mic first opens to absorb mic-settling transients.
+    // 4 frames × ~93ms = ~370ms — enough to swallow hardware noise, not long enough
+    // to be noticeable. Mic Setup uses the same value via startLivePitchDetection.
+    private let micWarmupFrames: Int = 4
 
     var isCapturing: Bool { audioCapture.isRunning }
     var isSessionRunning: Bool { status != .stopped }
@@ -108,6 +129,7 @@ class ExerciseModel: ObservableObject {
         audioPlayback.cancelPlayback()
         liveMidi = nil
         liveCents = 0
+        warmupFramesRemaining = 0
         resetStability()
     }
 
@@ -127,6 +149,7 @@ class ExerciseModel: ObservableObject {
     func startLivePitchDetection() async {
         liveMidi = nil
         liveCents = 0
+        confirmedLiveMidi = nil
         resetStability()
 
         let capture = audioCapture
@@ -143,6 +166,7 @@ class ExerciseModel: ObservableObject {
         audioCapture.stop()
         liveMidi = nil
         liveCents = 0
+        confirmedLiveMidi = nil
     }
 
     private func startFreshTest() async {
@@ -155,6 +179,10 @@ class ExerciseModel: ObservableObject {
             rangeEnd: rangeEnd,
             seed: seed
         )
+        let chord = EarRingCore.introChord(rootMidi: rootMidi, scaleId: scaleId)
+        print("[EAR] rootNote=\(rootNote) scaleId=\(scaleId) rangeStart=\(rangeStart) rangeEnd=\(rangeEnd) rootMidi=\(rootMidi)")
+        print("[EAR] sequence=\(sequence.map { MusicTheory.midiToLabel($0) })")
+        print("[EAR] introChord=\(chord.map { MusicTheory.midiToLabel($0) })")
         detectedNotes = []
         currentNoteIndex = 0
         currentAttempt = 1
@@ -174,11 +202,19 @@ class ExerciseModel: ObservableObject {
         guard !sequence.isEmpty else { return }
         status = .playing
         audioPlayback.resetCancellation()
-        await audioPlayback.playChord(notes: EarRingCore.introChord(rootMidi: rootMidi, scaleId: scaleId))
+        let chord = EarRingCore.introChord(rootMidi: rootMidi, scaleId: scaleId)
+        await audioPlayback.playChord(notes: chord)
+        // Let the chord ring freely through the intro gap and into the sequence —
+        // stopping it early creates an unnatural cutoff.
         guard status == .playing else { return }
         try? await Task.sleep(nanoseconds: introGapNanoseconds)
         guard status == .playing else { return }
         await audioPlayback.playSequence(notes: sequence, bpm: tempoBpm) { _ in }
+        guard status == .playing else { return }
+        // Let all notes ring through the settling gap, then stop just before the mic
+        // opens so the pitch detector doesn't pick up residual piano sound.
+        try? await Task.sleep(nanoseconds: postSequenceGapNanoseconds)
+        audioPlayback.stopAllPlayers()
         if status == .playing {
             await startListening()
         }
@@ -188,71 +224,65 @@ class ExerciseModel: ObservableObject {
         detectedNotes = []
         currentNoteIndex = 0
         resetStability()
+        warmupFramesRemaining = micWarmupFrames
         status = .listening
-        liveMidi = nil
-        liveCents = 0
-
-        let capture = audioCapture
-        await Task.detached(priority: .userInitiated) {
-            await capture.start { [weak self] samples, sampleRate in
-                Task { @MainActor [weak self] in
-                    self?.processAudio(samples: samples, sampleRate: sampleRate)
-                }
-            }
-        }.value
+        // Use the same detection path as Mic Setup — confirmed notes arrive via
+        // confirmedLiveMidi.didSet which calls commitNote when status == .listening.
+        await startLivePitchDetection()
     }
 
-    private func processAudio(samples: [Float], sampleRate: UInt32) {
-        guard status == .listening else { return }
+    // MARK: - Shared audio detection pipeline (used by both Exercise and Mic Setup)
 
+    /// Runs RMS threshold check, Rust pitch detection, and MIDI conversion.
+    /// Updates liveMidi/liveCents. Resets stability on silence.
+    /// Returns (midi, cents) when a valid pitch is detected, nil otherwise.
+    private func detectRawNote(samples: [Float], sampleRate: UInt32) -> (midi: Int, cents: Int)? {
         let rms = computeRMS(samples)
-        if rms < silenceRMSThreshold {
-            resetStability()
+        guard rms >= silenceRMSThreshold else {
             liveMidi = nil
             liveCents = 0
-            return
+            resetStability()
+            return nil
         }
-
         guard let hz = EarRingCore.detectPitch(samples: samples, sampleRate: sampleRate),
               let (midi, cents) = EarRingCore.freqToNote(hz: hz) else {
-            return
+            return nil
         }
-
         liveMidi = midi
         liveCents = cents
-        let pitchClass = midi % 12
+        return (midi, cents)
+    }
 
+    /// 3-frame stability check shared by both Exercise and Mic Setup.
+    private func checkStability(pitchClass: Int) -> Bool {
         if pitchClass == stabilityPitchClass {
             stabilityCount += 1
             if !pitchConsumed && stabilityCount >= 3 {
                 pitchConsumed = true
-                commitNote(midi: midi, cents: cents)
+                return true
             }
         } else {
             stabilityPitchClass = pitchClass
             stabilityCount = 1
             pitchConsumed = false
         }
+        return false
     }
 
+    /// Single audio callback used by BOTH Exercise and Mic Setup.
+    /// Warmup frames are consumed first (set to micWarmupFrames at exercise listen
+    /// start, and to 5 after each committed note). Confirmed notes are published
+    /// via confirmedLiveMidi; the didSet handles exercise commit when appropriate.
     private func processAudioLive(samples: [Float], sampleRate: UInt32) {
-        let rms = computeRMS(samples)
-
-        if rms < silenceRMSThreshold {
-            liveMidi = nil
-            liveCents = 0
-            liveFrameCount &+= 1
+        if warmupFramesRemaining > 0 {
+            warmupFramesRemaining -= 1
             return
         }
-
-        guard let hz = EarRingCore.detectPitch(samples: samples, sampleRate: sampleRate),
-              let (midi, cents) = EarRingCore.freqToNote(hz: hz) else {
-            return
-        }
-
-        liveMidi = midi
-        liveCents = cents
-        liveFrameCount &+= 1
+        guard let (midi, _) = detectRawNote(samples: samples, sampleRate: sampleRate) else { return }
+        guard checkStability(pitchClass: midi % 12) else { return }
+        print("[EAR] confirmed midi=\(midi) (\(MusicTheory.midiToLabel(midi))) status=\(status)")
+        confirmedNoteSeq += 1
+        confirmedLiveMidi = midi
     }
 
     private func commitNote(midi: Int, cents: Int) {
@@ -266,7 +296,11 @@ class ExerciseModel: ObservableObject {
 
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(correct ? .success : .error)
+        // Reset stability for the next note, with a post-commit debounce so a
+        // sustained note can't immediately re-confirm.
+        // (5 frames ≈ 465ms at 44100Hz / 4096 samples)
         resetStability()
+        warmupFramesRemaining = 5
 
         if correct {
             if currentNoteIndex >= sequence.count {

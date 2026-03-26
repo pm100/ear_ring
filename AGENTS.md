@@ -241,36 +241,38 @@ Exercise control flow (canonical state machine):
 Layout: vertical column, 16dp padding.
 
 ```
-                        [Mic Setup]        (centred title; system back gesture)
+                        [Mic Setup]        (centred title; system back gesture on iOS/Android;
+                                            ← Back button on Desktop)
 
 [24dp space]
 "Sing or play a note to test your microphone."   — bodyMedium, centred
+
+[16dp space]
+👂 Listening…           — ear emoji (28sp) + "Listening…" label (subheadline semibold, primary colour)
+                          always visible while on screen (listening is always active)
 
 [16dp space]
 MusicStaff            — 160dp tall, shows rolling note history left to right
                         Notes are placed at fixed 44dp spacing from the LEFT end of the staff
                         Each newly stable note is appended on the right
                         When staff is full (8 notes), oldest scrolls off left, new note appears right
-                        Only notes within the valid MIDI range are added:
-                          midiMin = (octave + 1) * 12  (C at selected octave, e.g. C4 when octave=4)
-                          midiMax = midiMin + 23        (two octaves, e.g. B5 when octave=4)
+                        Only notes within the selected range are added
                         Max 8 notes visible; history capped at 8
                         Most recent note: ACTIVE colour (blue)
                         Previous notes: EXPECTED colour (filled dark)
                         Empty staff when nothing detected yet
+                        Same note repeated after silence is always appended again
 
 [8dp space]
-Large note name       — 72sp bold, primary colour when detected, muted when "—"
+Large note name       — 72sp bold, primary colour when detected, muted "—" when silent
+                        (use 56sp if label is 3+ chars, e.g. "C#4")
 Hz display            — bodyMedium, muted, shown only when pitch detected
 
 [24dp space]
 PitchMeter            — 90dp circle
 
-[32dp space]
-[⏹ Stop]             — full-width filled ERROR colour, 52dp, 17sp
-  Stops listening and returns to Home.
-
-Mic Setup **starts listening automatically on entry** — there is no Start Listening button.
+Mic Setup **starts listening automatically on entry** — there is NO Start Listening button
+and NO Stop button. The user exits via system back gesture (iOS/Android) or ← Back (Desktop).
 
 NO test note buttons.
 ```
