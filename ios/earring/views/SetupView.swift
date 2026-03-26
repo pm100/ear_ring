@@ -38,7 +38,9 @@ struct SetupView: View {
                         state: index == noteHistory.count - 1 ? .active : .expected
                     )
                 },
-                fixedSpacing: 44
+                fixedSpacing: 44,
+                rootChroma: model.rootNote,
+                keySignatureMode: model.keySignatureMode
             )
             .frame(height: 160)
 

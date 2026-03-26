@@ -1,13 +1,15 @@
 import React from 'react';
 import { StaffDisplayNote } from '../types';
-import { midiToLabel, staffPositionForMidi } from '../music';
+import { preferredMidiLabel, accidentalInKey, keySigPositions, staffPositionForMidi, keyAccidentalCount } from '../music';
 
 interface Props {
   notes: StaffDisplayNote[];
   fixedSpacing?: number;
+  rootChroma?: number;
+  keySignatureMode?: number;
 }
 
-export default function MusicStaff({ notes, fixedSpacing }: Props) {
+export default function MusicStaff({ notes, fixedSpacing, rootChroma = 0, keySignatureMode = 0 }: Props) {
   const svgWidth = 500;
   const svgHeight = 160;
   const lineSpacing = 12;
@@ -23,18 +25,29 @@ export default function MusicStaff({ notes, fixedSpacing }: Props) {
   const clefW = clefH * (149 / 307);
   const clefImgY = staffTop - lineSpacing * 2;
 
-  const noteAreaStart = leftMargin + 20;
-  const noteAreaWidth = svgWidth - noteAreaStart - 20;
+  const keySigStartX = 2 + clefW + 6;
+  const keySigStep = lineSpacing * 0.95;
+  const keySigCount = keySignatureMode === 1 ? Math.abs(keyAccidentalCount(rootChroma)) : 0;
+  const keySigEndX = keySigStartX + keySigCount * keySigStep + 8;
+  const dynamicNoteAreaStart = Math.max(keySigStartX + 20, keySigEndX);
+  const noteAreaWidth = svgWidth - dynamicNoteAreaStart - 20;
   const noteStep = fixedSpacing ?? noteAreaWidth / Math.max(notes.length, 1);
-  const calcNoteX = (i: number) => noteAreaStart + i * noteStep + noteStep / 2;
+  const calcNoteX = (i: number) => dynamicNoteAreaStart + i * noteStep + noteStep / 2;
 
-  const ledgerLineHalfWidth = noteRadius * 2.8;
+  const ledgerLineHalfWidth = noteRadius * 1.65;
   const noteHeadRx = noteRadius * 1.15;
   const noteHeadRy = noteRadius * 0.85;
   const stemLength = lineSpacing * 3.2;
 
-  const accidentalForMidi = (midi: number): string | null => {
-    const label = midiToLabel(midi);
+  const accidentalForNote = (midi: number): string | null => {
+    if (keySignatureMode === 1) {
+      const acc = accidentalInKey(midi, rootChroma);
+      if (acc === 1) return '\u266f';
+      if (acc === 2) return '\u266d';
+      if (acc === 3) return '\u266e';
+      return null;
+    }
+    const label = preferredMidiLabel(midi, rootChroma);
     if (label.includes('#')) return '\u266f';
     if (label.includes('b') || label.includes('\u266d')) return '\u266d';
     return null;
@@ -96,14 +109,45 @@ export default function MusicStaff({ notes, fixedSpacing }: Props) {
 
       <image href="/treble_clef.png" x={2} y={clefImgY} width={clefW} height={clefH} />
 
+      {keySignatureMode === 1 && (() => {
+        const keySig = keySigPositions(rootChroma);
+        const symbol = keySig.isSharp ? '\u266f' : '\u266d';
+        // Start just after clef PNG right edge (x=2+clefW), step lineSpacing*0.95
+        const keySigStartX = 2 + clefW + 6;
+        const keySigStep = lineSpacing * 0.95;
+        return keySig.positions.map((staffPos, i) => {
+          const cy = calcNoteY(staffPos);
+          const cx = keySigStartX + i * keySigStep;
+          const keySigFontSize = keySig.isSharp ? lineSpacing * 3.0 : lineSpacing * 3.5;
+          // ♭: use alphabetic baseline; belly sits just above baseline → y = cy + fontSize*0.15
+          // ♯: use central baseline; bars centred on cy
+          const drawY = keySig.isSharp ? cy : cy + keySigFontSize * 0.15;
+          const baseline = keySig.isSharp ? 'central' : 'auto';
+          return (
+            <text
+              key={`ks-${i}`}
+              x={cx}
+              y={drawY}
+              textAnchor="start"
+              dominantBaseline={baseline}
+              fontSize={keySigFontSize}
+              fill="#333333"
+              style={{ userSelect: 'none' }}
+            >
+              {symbol}
+            </text>
+          );
+        });
+      })()}
+
       {notes.map((note, i) => {
-        const sp = staffPositionForMidi(note.midi);
+        const sp = staffPositionForMidi(note.midi, rootChroma);
         const cx = calcNoteX(i);
         const cy = calcNoteY(sp);
         const color = colorForState(note.state);
         const ledgers = getLedgerLines(sp, cx);
         const stemUp = sp < 6;
-        const accidental = accidentalForMidi(note.midi);
+        const accidental = accidentalForNote(note.midi);
         const stemX = stemUp ? cx + noteHeadRx * 0.9 : cx - noteHeadRx * 0.9;
         const stemY2 = stemUp ? cy - stemLength : cy + stemLength;
 
@@ -113,9 +157,10 @@ export default function MusicStaff({ notes, fixedSpacing }: Props) {
             {accidental && (
               <text
                 x={cx - noteHeadRx * 2.4}
-                y={cy + 4}
+                y={accidental === '♭' ? cy + lineSpacing * 3.5 * 0.15 : cy}
                 textAnchor="middle"
-                fontSize={lineSpacing * 1.8}
+                dominantBaseline={accidental === '♭' ? 'auto' : 'central'}
+                fontSize={accidental === '♭' ? lineSpacing * 3.5 : lineSpacing * 3.0}
                 fill={color}
                 style={{ userSelect: 'none' }}
               >

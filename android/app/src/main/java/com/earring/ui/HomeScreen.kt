@@ -169,6 +169,14 @@ fun HomeScreen(
             )
             Text("Display Test Notes", style = MaterialTheme.typography.bodyLarge)
         }
+        Spacer(Modifier.height(16.dp))
+
+        SectionLabel("Key Display")
+        ChipRow(
+            items = listOf("Inline Accidentals", "Key Signature"),
+            selected = state.keySignatureMode,
+            onSelect = { viewModel.setKeySignatureMode(it) }
+        )
         Spacer(Modifier.height(32.dp))
 
         Button(

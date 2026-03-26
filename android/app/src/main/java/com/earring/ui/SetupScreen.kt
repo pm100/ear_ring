@@ -16,7 +16,7 @@ import com.earring.ui.components.PitchMeter
 import com.earring.ui.components.StaffNote
 
 @Composable
-fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71) {
+fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71, rootChroma: Int = 0, keySignatureMode: Int = 0) {
     val noteStepDp = 44.dp
     val midiMin = rangeStart
     val midiMax = rangeEnd
@@ -85,7 +85,9 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71) {
                 StaffNote(m, if (i == noteHistory.size - 1) NoteState.ACTIVE else NoteState.EXPECTED)
             },
             modifier = Modifier.fillMaxWidth(),
-            fixedSpacingDp = noteStepDp
+            fixedSpacingDp = noteStepDp,
+            rootChroma = rootChroma,
+            keySignatureMode = keySignatureMode
         )
         Spacer(Modifier.height(8.dp))
 

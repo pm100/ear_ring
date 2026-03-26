@@ -113,7 +113,9 @@ fun ExerciseScreen(
         MusicStaff(
             notes = staffNotes,
             modifier = Modifier.fillMaxWidth(),
-            fixedSpacingDp = noteStepDp
+            fixedSpacingDp = noteStepDp,
+            rootChroma = state.rootNote,
+            keySignatureMode = state.keySignatureMode
         )
 
         Spacer(Modifier.height(12.dp))
@@ -139,17 +141,6 @@ fun ExerciseScreen(
             detectedHz = liveHz
         )
 
-        Spacer(Modifier.height(24.dp))
-
-        Button(
-            onClick = { exitSession() },
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-        ) {
-            Text("⏹ Stop Testing", fontSize = 17.sp)
-        }
 
         if (state.detected.isNotEmpty()) {
             Spacer(Modifier.height(20.dp))
@@ -177,7 +168,7 @@ fun ExerciseScreen(
 private fun statusText(state: com.earring.ExerciseState): String =
     when (state.status) {
         ExerciseStatus.PLAYING -> "Listen carefully…"
-        ExerciseStatus.LISTENING -> "Sing note ${state.currentNoteIndex + 1} of ${state.sequence.size}"
+        ExerciseStatus.LISTENING -> "👂 Sing note ${state.currentNoteIndex + 1} of ${state.sequence.size}"
         ExerciseStatus.RETRY_DELAY ->
             if (state.detected.lastOrNull()?.correct == false && state.currentAttempt < state.maxAttempts) {
                 "Wrong note. Replaying the same test…"

@@ -29,7 +29,9 @@ struct ExerciseView: View {
             Spacer().frame(height: 8)
             MusicStaffView(
                 notes: staffNotes,
-                fixedSpacing: 44
+                fixedSpacing: 44,
+                rootChroma: model.rootNote,
+                keySignatureMode: model.keySignatureMode
             )
             .frame(height: 160)
 

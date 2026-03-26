@@ -5,7 +5,7 @@ import MusicStaff from './MusicStaff';
 import PitchMeter from './PitchMeter';
 import { useAudioCapture } from '../hooks/useAudioCapture';
 import { useAudioPlayback } from '../hooks/useAudioPlayback';
-import { freqToCents, freqToMidi, midiToLabel, NOTE_NAMES } from '../music';
+import { freqToCents, freqToMidi, midiToLabel, preferredMidiLabel, NOTE_NAMES } from '../music';
 
 interface Props {
   exercise: ExerciseState;
@@ -285,7 +285,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     }
   };
 
-  const rootLabel = `${NOTE_NAMES[exercise.rootNote]}  ${midiToLabel(exercise.rangeStart)}–${midiToLabel(exercise.rangeEnd)}`;
+  const rootLabel = `${NOTE_NAMES[exercise.rootNote]}  ${preferredMidiLabel(exercise.rangeStart, exercise.rootNote)}–${preferredMidiLabel(exercise.rangeEnd, exercise.rootNote)}`;
   const scaleLabel = SCALE_NAMES[exercise.scaleId];
   const score = averageScore(cumulativeScorePercent, testsCompleted);
   const staffNotes: StaffDisplayNote[] = exercise.showTestNotes
@@ -313,6 +313,8 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       <MusicStaff
         notes={staffNotes}
         fixedSpacing={noteStep}
+        rootChroma={exercise.rootNote}
+        keySignatureMode={exercise.keySignatureMode}
       />
 
       <div className="status-text">{statusText()}</div>
@@ -330,7 +332,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
           <div className="note-tracker">
             {detected.map((note, i) => (
               <div key={i} className={`note-tracker-item ${note.correct ? 'tracker-correct' : 'tracker-incorrect'}`}>
-                <div className="tracker-note">{midiToLabel(note.midi)}</div>
+                <div className="tracker-note">{preferredMidiLabel(note.midi, exercise.rootNote)}</div>
               </div>
             ))}
           </div>

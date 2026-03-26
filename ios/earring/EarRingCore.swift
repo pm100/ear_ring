@@ -51,4 +51,62 @@ struct EarRingCore {
     static func testScore(maxAttempts: Int, attemptsUsed: Int, passed: Bool) -> Int {
         Int(ear_ring_test_score(UInt8(maxAttempts), UInt8(attemptsUsed), passed ? 1 : 0))
     }
+
+    /// Convert a MIDI number to a note label (e.g. "C#4").
+    static func midiToLabel(_ midi: Int) -> String {
+        var buf = [CChar](repeating: 0, count: 16)
+        ear_ring_midi_to_label(UInt8(midi), &buf, 16)
+        return String(cString: buf)
+    }
+
+    /// Display name for a pitch class (chroma 0–11), e.g. 0 → "C", 1 → "C#".
+    static func noteName(chroma: Int) -> String {
+        var buf = [CChar](repeating: 0, count: 8)
+        ear_ring_note_name(UInt8(chroma), &buf, 8)
+        return String(cString: buf)
+    }
+
+    /// Display name for a scale ID (0–4).
+    static func scaleName(scaleId: Int) -> String {
+        var buf = [CChar](repeating: 0, count: 32)
+        ear_ring_scale_name(UInt8(scaleId), &buf, 32)
+        return String(cString: buf)
+    }
+
+    static func isSharpKey(rootChroma: Int) -> Bool {
+        ear_ring_is_sharp_key(UInt8(rootChroma)) == 1
+    }
+
+    static func keyAccidentalCount(rootChroma: Int) -> Int {
+        Int(ear_ring_key_accidental_count(UInt8(rootChroma)))
+    }
+
+    static func preferredNoteLabel(midi: Int, rootChroma: Int) -> String {
+        var buf = [CChar](repeating: 0, count: 8)
+        ear_ring_preferred_note_label(UInt8(midi), UInt8(rootChroma), &buf, 8)
+        return String(cString: buf)
+    }
+
+    static func preferredMidiLabel(midi: Int, rootChroma: Int) -> String {
+        var buf = [CChar](repeating: 0, count: 16)
+        ear_ring_preferred_midi_label(UInt8(midi), UInt8(rootChroma), &buf, 16)
+        return String(cString: buf)
+    }
+
+    /// Returns: 0=none, 1=sharp(♯), 2=flat(♭), 3=natural(♮)
+    static func accidentalInKey(midi: Int, rootChroma: Int) -> Int {
+        Int(ear_ring_accidental_in_key(UInt8(midi), UInt8(rootChroma)))
+    }
+
+    static func keySigPositions(rootChroma: Int) -> (positions: [Int], isSharp: Bool) {
+        var buf = [Int32](repeating: 0, count: 7)
+        var isSharpOut: Int32 = 1
+        let count = ear_ring_key_sig_positions(UInt8(rootChroma), &buf, 7, &isSharpOut)
+        guard count > 0 else { return ([], isSharpOut == 1) }
+        return (buf.prefix(Int(count)).map { Int($0) }, isSharpOut == 1)
+    }
+
+    static func staffPositionInKey(midi: Int, rootChroma: Int) -> Int {
+        Int(ear_ring_staff_position_in_key(UInt8(midi), UInt8(rootChroma)))
+    }
 }

@@ -16,12 +16,13 @@ struct StaffDisplayNote: Identifiable {
 struct MusicStaffView: View {
     var notes: [StaffDisplayNote]
     var fixedSpacing: CGFloat? = nil
+    var rootChroma: Int = 0
+    var keySignatureMode: Int = 0
 
     var body: some View {
         Canvas { ctx, size in
             let lineSpacing: CGFloat = 12
             let staffTop: CGFloat = size.height / 2 - 2 * lineSpacing
-            let leftMargin: CGFloat = 22
             let noteRadius: CGFloat = lineSpacing * 0.45
             let staffBottomY: CGFloat = staffTop + 4 * lineSpacing
             let staffCenter: CGFloat = staffTop + 2 * lineSpacing
@@ -47,14 +48,46 @@ struct MusicStaffView: View {
                 anchor: .topLeading
             )
 
+            // Measure actual clef advance width to position key sig correctly
+            let clefFont = UIFont.systemFont(ofSize: lineSpacing * 7)
+            let clefWidth = NSAttributedString(string: "𝄞", attributes: [.font: clefFont]).size().width
+            let keySigStartX: CGFloat = 4 + clefWidth + 6
+            let keySigStep: CGFloat = lineSpacing * 0.95
+            let keySigFlatSize: CGFloat = lineSpacing * 3.5
+            let keySigSharpSize: CGFloat = lineSpacing * 2.0
+
+            // Draw key signature symbols when in key-signature mode
+            // ♭ belly centering: shift target up by textSize*0.15 so belly lands on line.
+            // ♯ bar centering: bars are centred in glyph, use target directly.
+            if keySignatureMode == 1 {
+                let keySig = EarRingCore.keySigPositions(rootChroma: rootChroma)
+                let isSharp = keySig.isSharp
+                let symbol = isSharp ? "♯" : "♭"
+                let keySigTextSize = isSharp ? keySigSharpSize : keySigFlatSize
+                for (i, staffPos) in keySig.positions.enumerated() {
+                    let targetY = noteY(staffPos)
+                    let keySigX = keySigStartX + CGFloat(i) * keySigStep
+                    let drawY = isSharp ? targetY : targetY - keySigTextSize * 0.15
+                    ctx.draw(
+                        Text(symbol)
+                            .font(.system(size: keySigTextSize))
+                            .foregroundColor(Color(white: 0.2)),
+                        at: CGPoint(x: keySigX, y: drawY),
+                        anchor: .center
+                    )
+                }
+            }
+
             guard !notes.isEmpty else { return }
 
-            let noteAreaStart: CGFloat = leftMargin + 20
+            let keySigCount = keySignatureMode == 1 ? abs(EarRingCore.keyAccidentalCount(rootChroma: rootChroma)) : 0
+            let keySigEndX = keySigStartX + CGFloat(keySigCount) * keySigStep + 8
+            let noteAreaStart = max(keySigStartX + 20, keySigEndX)
             let noteAreaWidth: CGFloat = size.width - noteAreaStart - 20
             let noteStep = fixedSpacing ?? noteAreaWidth / CGFloat(max(notes.count, 1))
 
             for (index, displayNote) in notes.enumerated() {
-                let staffPos = EarRingCore.staffPosition(midi: displayNote.midi)
+                let staffPos = EarRingCore.staffPositionInKey(midi: displayNote.midi, rootChroma: rootChroma)
                 let x = noteAreaStart + CGFloat(index) * noteStep + noteStep / 2
                 let y = noteY(staffPos)
                 let noteColor: Color = {
@@ -65,11 +98,21 @@ struct MusicStaffView: View {
                     case .active: return .erPrimary
                     }
                 }()
-                let noteLabel = MusicTheory.midiToLabel(displayNote.midi)
                 let accidental: String? = {
-                    if noteLabel.contains("#") { return "♯" }
-                    if noteLabel.contains("b") || noteLabel.contains("♭") { return "♭" }
-                    return nil
+                    if keySignatureMode == 1 {
+                        let acc = EarRingCore.accidentalInKey(midi: displayNote.midi, rootChroma: rootChroma)
+                        switch acc {
+                        case 1: return "♯"
+                        case 2: return "♭"
+                        case 3: return "♮"
+                        default: return nil
+                        }
+                    } else {
+                        let label = EarRingCore.preferredNoteLabel(midi: displayNote.midi, rootChroma: rootChroma)
+                        if label.contains("#") { return "♯" }
+                        if label.contains("b") { return "♭" }
+                        return nil
+                    }
                 }()
                 let stemUp = staffPos < 6
                 let stemX = stemUp ? x + noteHeadWidth * 0.35 : x - noteHeadWidth * 0.35
@@ -113,11 +156,14 @@ struct MusicStaffView: View {
                 ctx.fill(noteHead, with: .color(noteColor))
 
                 if let accidental {
+                    let isAccSharp = accidental == "♯"
+                    let accTextSize = isAccSharp ? lineSpacing * 2.0 : lineSpacing * 3.5
+                    let accDrawY = isAccSharp ? y : y - accTextSize * 0.15
                     ctx.draw(
                         Text(accidental)
-                            .font(.system(size: lineSpacing * 1.8))
+                            .font(.system(size: accTextSize))
                             .foregroundColor(noteColor),
-                        at: CGPoint(x: x - noteHeadWidth * 1.25, y: y),
+                        at: CGPoint(x: x - noteHeadWidth * 1.25, y: accDrawY),
                         anchor: .center
                     )
                 }

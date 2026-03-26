@@ -50,7 +50,9 @@ fun EarRingApp() {
             SetupScreen(
                 onBack = { navController.popBackStack() },
                 rangeStart = state.rangeStart,
-                rangeEnd = state.rangeEnd
+                rangeEnd = state.rangeEnd,
+                rootChroma = state.rootNote,
+                keySignatureMode = state.keySignatureMode
             )
         }
         composable(Routes.RESULTS) {

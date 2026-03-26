@@ -1,8 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use ear_ring_core::{
-    detect_pitch, freq_to_note, generate_sequence, intro_chord, is_correct_note, staff_position,
-    test_score, Note, ScaleType,
+    accidental_in_key, detect_pitch, freq_to_note, generate_sequence, intro_chord, is_correct_note,
+    is_sharp_key, key_accidental_count, key_sig_staff_positions, preferred_midi_label,
+    staff_position, test_score, Note, ScaleType,
 };
 
 #[tauri::command]
@@ -76,6 +77,38 @@ fn cmd_test_score(max_attempts: u8, attempts_used: u8, passed: bool) -> u8 {
     test_score(max_attempts, attempts_used, passed)
 }
 
+#[tauri::command]
+fn cmd_is_sharp_key(root_chroma: u8) -> bool {
+    is_sharp_key(root_chroma)
+}
+
+#[tauri::command]
+fn cmd_key_accidental_count(root_chroma: u8) -> i32 {
+    key_accidental_count(root_chroma) as i32
+}
+
+#[tauri::command]
+fn cmd_preferred_midi_label(midi: u8, root_chroma: u8) -> String {
+    preferred_midi_label(midi, root_chroma).to_string()
+}
+
+#[tauri::command]
+fn cmd_accidental_in_key(midi: u8, root_chroma: u8) -> i32 {
+    match accidental_in_key(midi, root_chroma) {
+        None => 0,
+        Some("♯") => 1,
+        Some("♭") => 2,
+        Some("♮") => 3,
+        _ => 0,
+    }
+}
+
+#[tauri::command]
+fn cmd_key_sig_positions(root_chroma: u8) -> (Vec<i32>, bool) {
+    let (positions, is_sharp) = key_sig_staff_positions(root_chroma);
+    (positions.to_vec(), is_sharp)
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -87,6 +120,11 @@ fn main() {
             cmd_intro_chord,
             cmd_is_correct_note,
             cmd_test_score,
+            cmd_is_sharp_key,
+            cmd_key_accidental_count,
+            cmd_preferred_midi_label,
+            cmd_accidental_in_key,
+            cmd_key_sig_positions,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

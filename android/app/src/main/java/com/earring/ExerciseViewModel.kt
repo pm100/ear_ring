@@ -27,6 +27,7 @@ data class ExerciseState(
     val sequenceLength: Int = 4,
     val tempoBpm: Int = 100,
     val showTestNotes: Boolean = false,
+    val keySignatureMode: Int = 0,  // 0=inline accidentals, 1=key signature
     val sequence: List<Int> = emptyList(),
     val detected: List<DetectedNote> = emptyList(),
     val status: ExerciseStatus = ExerciseStatus.STOPPED,
@@ -73,6 +74,7 @@ private const val PREF_SCALE_ID = "scaleId"
 private const val PREF_SEQUENCE_LENGTH = "sequenceLength"
 private const val PREF_TEMPO_BPM = "tempoBpm"
 private const val PREF_SHOW_TEST_NOTES = "showTestNotes"
+private const val PREF_KEY_SIG_MODE = "keySignatureMode"
 
 class ExerciseViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -89,6 +91,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             sequenceLength = prefs.getInt(PREF_SEQUENCE_LENGTH, 4),
             tempoBpm = prefs.getInt(PREF_TEMPO_BPM, 100),
             showTestNotes = prefs.getBoolean(PREF_SHOW_TEST_NOTES, false),
+            keySignatureMode = prefs.getInt(PREF_KEY_SIG_MODE, 0),
         )
     }
 
@@ -101,6 +104,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putInt(PREF_SEQUENCE_LENGTH, state.sequenceLength)
             .putInt(PREF_TEMPO_BPM, state.tempoBpm)
             .putBoolean(PREF_SHOW_TEST_NOTES, state.showTestNotes)
+            .putInt(PREF_KEY_SIG_MODE, state.keySignatureMode)
             .apply()
     }
 
@@ -129,6 +133,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     fun setSequenceLength(len: Int) { _state.value = _state.value.copy(sequenceLength = len); saveSettings(_state.value) }
     fun setTempoBpm(bpm: Int) { _state.value = _state.value.copy(tempoBpm = bpm); saveSettings(_state.value) }
     fun setShowTestNotes(show: Boolean) { _state.value = _state.value.copy(showTestNotes = show); saveSettings(_state.value) }
+    fun setKeySignatureMode(mode: Int) { _state.value = _state.value.copy(keySignatureMode = mode); saveSettings(_state.value) }
 
     fun startExercise() {
         audioPlayback.cancelPlayback()

@@ -205,6 +205,23 @@ struct HomeView: View {
                         .font(.body)
                 }.padding(.top, 16)
 
+                sectionLabel("Key Display").padding(.top, 16)
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible()), count: 2),
+                    spacing: 6
+                ) {
+                    Button("Inline Accidentals") {
+                        model.keySignatureMode = 0
+                    }
+                    .buttonStyle(ChipButtonStyle(selected: model.keySignatureMode == 0))
+
+                    Button("Key Signature") {
+                        model.keySignatureMode = 1
+                    }
+                    .buttonStyle(ChipButtonStyle(selected: model.keySignatureMode == 1))
+                }
+                .padding(.top, 6)
+
                 // ── Action buttons ────────────────────────────────────────
                 VStack(spacing: 10) {
                     Button("▶ Start Exercise") {

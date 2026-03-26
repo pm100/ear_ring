@@ -39,6 +39,9 @@ class ExerciseModel: ObservableObject {
     @Published var showTestNotes: Bool = ud.object(forKey: "showTestNotes") != nil ? ud.bool(forKey: "showTestNotes") : false {
         didSet { UserDefaults.standard.set(showTestNotes, forKey: "showTestNotes") }
     }
+    @Published var keySignatureMode: Int = ud.object(forKey: "keySignatureMode") != nil ? ud.integer(forKey: "keySignatureMode") : 0 {
+        didSet { UserDefaults.standard.set(keySignatureMode, forKey: "keySignatureMode") }
+    }
     @Published var sequence: [Int] = []
     @Published var detectedNotes: [DetectedNote] = []
     @Published var status: ExerciseStatus = .stopped

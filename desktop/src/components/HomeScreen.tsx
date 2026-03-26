@@ -4,7 +4,7 @@ import { ExerciseSettings } from '../types';
 interface Props {
   settings: ExerciseSettings;
   onUpdateSettings: React.Dispatch<React.SetStateAction<ExerciseSettings>>;
-  onStart: (rootNote: number, rangeStart: number, rangeEnd: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean) => void;
+  onStart: (rootNote: number, rangeStart: number, rangeEnd: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean, keySignatureMode: number) => void;
   onSetup: () => void;
   onProgress: () => void;
 }
@@ -186,7 +186,7 @@ function PianoRangePicker({ rangeStart: rangeStartProp, rangeEnd: rangeEndProp, 
 
 function HomeScreen({ settings, onUpdateSettings, onStart, onSetup, onProgress }: Props) {
   const handleStart = () => {
-    onStart(settings.rootNote, settings.rangeStart, settings.rangeEnd, settings.scaleId, settings.sequenceLength, settings.tempoBpm, settings.showTestNotes);
+    onStart(settings.rootNote, settings.rangeStart, settings.rangeEnd, settings.scaleId, settings.sequenceLength, settings.tempoBpm, settings.showTestNotes, settings.keySignatureMode);
   };
 
   return (
@@ -267,6 +267,24 @@ function HomeScreen({ settings, onUpdateSettings, onStart, onSetup, onProgress }
         />
         <span className="section-label" style={{ margin: 0 }}>Display Test Notes</span>
       </label>
+
+      <span className="section-label" style={{ marginTop: 16, display: 'block' }}>Key Display</span>
+      <div className="chip-row" style={{ marginTop: 6 }}>
+        <button
+          type="button"
+          className={`chip ${settings.keySignatureMode === 0 ? 'chip-selected' : ''}`}
+          onClick={() => onUpdateSettings(prev => ({ ...prev, keySignatureMode: 0 }))}
+        >
+          Inline Accidentals
+        </button>
+        <button
+          type="button"
+          className={`chip ${settings.keySignatureMode === 1 ? 'chip-selected' : ''}`}
+          onClick={() => onUpdateSettings(prev => ({ ...prev, keySignatureMode: 1 }))}
+        >
+          Key Signature
+        </button>
+      </div>
 
       <div style={{ marginTop: 32 }}>
         <button className="btn-primary" onClick={handleStart}>▶ Start Exercise</button>

@@ -66,6 +66,49 @@ int32_t ear_ring_is_correct_note(uint8_t detected_midi, int32_t cents, uint8_t e
 /// @param passed          1 if the exercise was passed, 0 otherwise
 int32_t ear_ring_test_score(uint8_t max_attempts, uint8_t attempts_used, int32_t passed);
 
+/// Convert a MIDI note number to a label string like "C#4".
+/// Writes a null-terminated string into out_buf (max buf_len bytes including null).
+/// Returns bytes written (excluding null), or -1 on error.
+int32_t ear_ring_midi_to_label(uint8_t midi, char *out_buf, uint32_t buf_len);
+
+/// Display name for a pitch class (chroma 0–11), e.g. 0 → "C", 1 → "C#".
+/// Writes a null-terminated string into out_buf.
+/// Returns bytes written (excluding null), or -1 on error.
+int32_t ear_ring_note_name(uint8_t chroma, char *out_buf, uint32_t buf_len);
+
+/// Display name for a scale ID (0–4).
+/// Writes a null-terminated string into out_buf.
+/// Returns bytes written (excluding null), or -1 on error.
+int32_t ear_ring_scale_name(uint8_t scale_id, char *out_buf, uint32_t buf_len);
+
+/// Returns 1 if the major key for this root chroma uses sharps, 0 for flats.
+int32_t ear_ring_is_sharp_key(uint8_t root_chroma);
+
+/// Returns the count of accidentals in the key signature (positive=sharps, negative=flats).
+int32_t ear_ring_key_accidental_count(uint8_t root_chroma);
+
+/// Writes the key-context note label (without octave) for the given MIDI note.
+/// Uses sharp spelling for sharp keys, flat spelling for flat keys.
+int32_t ear_ring_preferred_note_label(uint8_t midi, uint8_t root_chroma, char *out_buf, uint32_t buf_len);
+
+/// Writes the full key-context note label with octave (e.g. "C#4", "Bb3").
+int32_t ear_ring_preferred_midi_label(uint8_t midi, uint8_t root_chroma, char *out_buf, uint32_t buf_len);
+
+/// Returns the accidental to draw in key-signature mode:
+/// 0=none, 1=sharp(♯), 2=flat(♭), 3=natural(♮).
+int32_t ear_ring_accidental_in_key(uint8_t midi, uint8_t root_chroma);
+
+/// Fills out_buf with staff positions for key signature symbols (up to 7).
+/// Sets *out_is_sharp to 1 for a sharp key, 0 for flat.
+/// Returns count of positions written, or -1 on error.
+int32_t ear_ring_key_sig_positions(uint8_t root_chroma, int32_t *out_buf, uint32_t buf_len, int32_t *out_is_sharp);
+
+/// Key-aware treble-clef staff position for a MIDI note.
+/// Flat keys place flattened pitch classes at their upper diatonic neighbour
+/// (e.g. Bb at B's position = 6). Sharp keys use the standard sharp-based mapping.
+/// Returns diatonic steps above C4 (C4=0, D4=1, …, B4=6, C5=7).
+int32_t ear_ring_staff_position_in_key(uint8_t midi, uint8_t root_chroma);
+
 #ifdef __cplusplus
 }
 #endif

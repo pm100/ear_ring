@@ -2,16 +2,18 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import PitchMeter from './PitchMeter';
 import MusicStaff from './MusicStaff';
 import { useAudioCapture } from '../hooks/useAudioCapture';
-import { freqToMidi, midiToLabel } from '../music';
+import { freqToMidi, preferredMidiLabel } from '../music';
 
 interface Props {
   onBack: () => void;
   rangeStart: number;
   rangeEnd: number;
+  rootChroma?: number;
+  keySignatureMode?: number;
 }
 
 
-export default function SetupScreen({ onBack, rangeStart, rangeEnd }: Props) {
+export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma = 0, keySignatureMode = 0 }: Props) {
   const [hz, setHz] = useState(0);
   const [currentMidi, setCurrentMidi] = useState<number>(-1);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
@@ -62,7 +64,7 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd }: Props) {
     return () => stop();
   }, [start, stop, handleHz]);
 
-  const noteLabel = currentMidi >= 0 ? midiToLabel(currentMidi) : '—';
+  const noteLabel = currentMidi >= 0 ? preferredMidiLabel(currentMidi, rootChroma) : '—';
   const noteHz = currentMidi >= 0 ? (440 * Math.pow(2, (currentMidi - 69) / 12)) : null;
 
   return (
@@ -85,6 +87,8 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd }: Props) {
           state: index === noteHistory.length - 1 ? 'active' : 'expected',
         }))}
         fixedSpacing={NOTE_STEP}
+        rootChroma={rootChroma}
+        keySignatureMode={keySignatureMode}
       />
 
       <div className="setup-note-display">

@@ -21,6 +21,7 @@ export interface ExerciseSettings {
   sequenceLength: number;
   tempoBpm: number;
   showTestNotes: boolean;
+  keySignatureMode: number;  // 0=inline accidentals, 1=key signature
 }
 
 export interface ExerciseState {
@@ -31,6 +32,7 @@ export interface ExerciseState {
   sequenceLength: number;
   tempoBpm: number;
   showTestNotes: boolean;
+  keySignatureMode: number;
   sequence: number[]; // MIDI values
   detected: DetectedNote[];
   status: ExerciseStatus;

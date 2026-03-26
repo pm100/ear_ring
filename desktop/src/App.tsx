@@ -23,6 +23,7 @@ const defaultSettings: ExerciseSettings = (() => {
     sequenceLength: 4,
     tempoBpm: 100,
     showTestNotes: false,
+    keySignatureMode: 0,
   };
 })();
 
@@ -69,7 +70,7 @@ export default function App() {
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
   }, [settings]);
 
-  const startExercise = useCallback(async (rootNote: number, rangeStart: number, rangeEnd: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean) => {
+  const startExercise = useCallback(async (rootNote: number, rangeStart: number, rangeEnd: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean, keySignatureMode: number) => {
     const seed = Date.now();
     try {
       const sequence = await invoke<number[]>('cmd_generate_sequence', {
@@ -88,6 +89,7 @@ export default function App() {
         sequenceLength,
         tempoBpm,
         showTestNotes,
+        keySignatureMode,
         sequence,
         detected: [],
         status: 'playing',
@@ -138,7 +140,7 @@ export default function App() {
         />
       )}
       {screen === 'setup' && (
-        <SetupScreen onBack={() => setScreen('home')} rangeStart={settings.rangeStart} rangeEnd={settings.rangeEnd} />
+        <SetupScreen onBack={() => setScreen('home')} rangeStart={settings.rangeStart} rangeEnd={settings.rangeEnd} rootChroma={settings.rootNote} keySignatureMode={settings.keySignatureMode} />
       )}
       {screen === 'results' && (
         <ResultsScreen

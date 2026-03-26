@@ -1,5 +1,20 @@
 # Ear Ring — Agent Instructions
 
+## ⚠️ Read This First — Every Session
+
+**Before doing any work on this repository, read this entire file.**
+It contains the canonical UI spec, platform rules, build commands, and debugging
+procedures. Do not rely on memory alone — this file is the source of truth and is
+kept up to date as the project evolves.
+
+Key things you will find here:
+- All UI changes must be applied to **all three platforms** (Android, iOS, Tauri) simultaneously
+- Build and run commands for each platform (see **UI Debugging Guide** at the bottom)
+- Platform exceptions (e.g. iOS Home screen differs slightly)
+- Music staff, pitch meter, colour, and audio specs
+
+---
+
 ## Shared Logic Rule
 
 **Keep cross-platform app logic in the shared Rust core whenever practical.**
@@ -111,6 +126,13 @@ Chip row: 60  80  100  120  140   (single row, equal width)
 Checkbox: "Display Test Notes"
   — Default: unchecked (hidden)
 
+[16dp space]
+Section label: "Key Display"
+Two chips (equal width): "Inline Accidentals" | "Key Signature"
+  — Default: "Inline Accidentals" selected (keySignatureMode=0)
+  — "Inline Accidentals": no key signature drawn; every accidental shown on the note
+  — "Key Signature": conventional key sig after clef; only out-of-key notes get an accidental
+
 [32dp space]
 [▶ Start Exercise]    — full-width filled primary button, 52dp tall, 18sp
 [🎙 Mic Setup]        — full-width outlined button, 48dp tall, 16sp
@@ -160,7 +182,9 @@ Meta line             — bodyMedium, muted colour, centred
 PitchMeter            — 90dp circle (see Pitch Meter spec below)
 
 [24dp space]
-[⏹ Stop Testing]      — full-width filled ERROR colour, 52dp, 17sp
+[⏹ Stop Testing]      — full-width filled ERROR colour, 52dp, 17sp — **desktop only**
+  - On Android & iOS: use the system back gesture instead (no on-screen Stop button)
+  - On desktop: on-screen button required (no system back gesture)
   - Ends the continuous testing session immediately
   - Returns the user to Home
   - Saves the session summary if at least one test was completed
@@ -362,8 +386,8 @@ Canvas/SVG element, full width, **160dp/px tall**.
 ```
 lineSpacing = 12dp
 staffTop    = height/2 - 2*lineSpacing    (centres the 5-line staff vertically)
-leftMargin  = 60px (used for note placement only — NOT for staff line start)
 noteRadius  = lineSpacing * 0.45
+noteAreaStart = max(keySigStartX + 20, keySigEndX)   (dynamic: shifts right when key sig present)
 ```
 
 **5 horizontal staff lines** (colour #333333, 1.5px stroke):
@@ -381,7 +405,7 @@ Staff lines must start at x=5 (not leftMargin) so they visually pass through the
 ```
 Android / iOS  : Unicode U+1D11E (𝄞), x = 4px from left edge
                  Android: font size = lineSpacing * 3.5
-                          drawText baseline y = staffTop + lineSpacing * 3.0
+                          drawText baseline y = staffTop + lineSpacing * 4.0
                  iOS:     font size = lineSpacing * 7  (iOS system font fallback renders smaller)
                           topLeading anchor at CGPoint(x:4, y: staffTop - lineSpacing * 2.5)
 
@@ -413,7 +437,50 @@ noteX         = noteAreaStart + index*noteStep + noteStep/2
 - Draw a stem for every note:
   - notes below the B4 centre line (`staffPos < 6`) use an upward stem on the right side
   - notes on/above the B4 centre line use a downward stem on the left side
-- If the pitch label contains a sharp or flat, draw `♯` or `♭` immediately before the notehead
+- Accidental display depends on `keySignatureMode`:
+  - **Mode 0 (Inline Accidentals)**: use `preferredMidiLabel(midi, rootChroma)` for key-correct spelling;
+    draw `♯` or `♭` before the notehead when the label contains `#` or `b`
+  - **Mode 1 (Key Signature)**: after the clef draw the conventional key sig symbols (♯ or ♭) at the
+    standard treble-clef staff positions; for each note call
+    `accidentalInKey(midi, rootChroma)` → 0=none, 1=♯, 2=♭, 3=♮ and draw that symbol if non-zero
+
+**Key signature symbol rendering** (all platforms):
+```
+keySigStartX = clefRightEdge + 6   (clefRightEdge = 4 + measuredClefWidth on Android/iOS,
+                                     2 + clefW on Tauri where clefW = lineSpacing*8*(149/307))
+keySigStep   = lineSpacing * 0.95
+keySigFontSize (♭) = lineSpacing * 3.5   (tall ascender needs full height)
+keySigFontSize (♯) = lineSpacing * 2.0   (Android/iOS physical px; bars span ~2 staff spaces)
+                   = lineSpacing * 3.0   (Tauri SVG CSS px; SVG units are smaller so needs larger multiplier)
+
+NOTE: Android lineSpacing ≈ 31.5 physical px; Tauri lineSpacing = 12 CSS px.
+The ♯ glyph needs to appear ~2 staff spaces tall on screen — tune multiplier per platform accordingly.
+
+♭ belly-centering: draw the glyph so its belly loop sits ON the target staff line:
+  Android  : LEFT-aligned text, baseline = targetY + textSize * 0.15
+  iOS      : .center anchor at CGPoint(x, targetY - textSize * 0.15)
+  Tauri    : textAnchor="start", dominantBaseline="auto", y = targetY + fontSize * 0.15
+
+♯ bar-centering: draw so the two horizontal bars straddle the target staff line:
+  Android  : LEFT-aligned text, use getTextBounds; baseline = targetY + (-top) - glyphH * 0.5
+  iOS      : .center anchor at CGPoint(x, targetY)
+  Tauri    : textAnchor="start", dominantBaseline="central", y = targetY
+```
+
+**Inline accidental symbol rendering** (before noteheads):
+```
+accidentalFontSize (♭) = lineSpacing * 3.5
+accidentalFontSize (♯) = lineSpacing * 2.0  (Android/iOS) / lineSpacing * 3.0 (Tauri SVG)
+accidentalX = noteX - noteHeadWidth * 1.25 (centered there)
+
+Same belly/bar centering rules as key sig (target = noteY):
+  Android  : CENTER-aligned text, baseline = noteY + textSize * 0.15  (for ♭)
+             CENTER-aligned text, getTextBounds baseline                (for ♯)
+  iOS      : .center anchor at CGPoint(x, noteY - textSize * 0.15)     (for ♭)
+             .center anchor at CGPoint(x, noteY)                        (for ♯)
+  Tauri    : dominantBaseline="auto",    y = noteY + fontSize*0.15     (for ♭)
+             dominantBaseline="central", y = noteY                      (for ♯)
+```
 - Do not draw note-name text beneath the staff notes
 
 **Note colours**:
@@ -424,7 +491,7 @@ noteX         = noteAreaStart + index*noteStep + noteStep/2
 | CORRECT  | #4CAF50 |
 | INCORRECT| #F44336 |
 
-**Ledger lines** (colour #555555, 1.5px stroke, width = noteRadius*2.8 each side):
+**Ledger lines** (colour #555555, 1.5px stroke, width = noteRadius*1.65 each side):
 - Draw above staff: for each lineSpacing step above staffTop while noteY ≤ that line
 - Draw below staff: for each lineSpacing step below line 4 while noteY ≥ that line
 
@@ -643,4 +710,40 @@ node gen_desktop_clef.js
 The script uses PowerShell GDI+ internally, then sharp for trimming. The output PNG has a
 **transparent background** (RGBA, channels=4). Do NOT use sharp's SVG renderer for this —
 libvips/rsvg does not have access to Windows system fonts and renders a fallback glyph.
+
+---
+
+### Reading Android ADB Screenshots — Common Pitfalls
+
+The emulator screen is **1080×2400 physical pixels** but ADB screenshots are rendered
+at compressed display sizes when viewed in this tool, making precise vertical position
+hard to judge visually.
+
+**How to count staff lines correctly in a screenshot:**
+
+The music staff has **5 horizontal lines**. From top to bottom:
+```
+Line 1 (top)    = F5
+Line 2          = D5
+Line 3 (middle) = B4  ← ♭ belly for Bb MUST sit on this line (F major key sig)
+Line 4          = G4
+Line 5 (bottom) = E4
+```
+Spaces between lines (top to bottom): G5, E5, C5, A4.
+
+**CRITICAL pitfall:** At compressed display scales it is very easy to miscount which line
+a symbol sits on and wrongly conclude it needs moving. **Before declaring a symbol
+misplaced, carefully count lines from the TOP of the staff in the screenshot.**
+
+Rules:
+- **Trust the user's report over your own screenshot reading if they conflict.**
+  The user can see the actual screen; you are reading a compressed image.
+- If genuinely uncertain, add a temporary debug dot at the exact `targetY` pixel
+  and compare its position to the symbol — remove the dot before the next release build.
+- Do NOT iterate the offset blindly; each build/test cycle is slow. Reason from the
+  measured glyph bounds first.
+
+**Key reference values (lineSpacing=31.5px at ~420dpi emulator):**
+- `staffTop = 147px`, `staffCenter (B4) = 210px`, `staffBottom (E4) = 273px`
+- Canvas height = 420px, lineSpacing = 31.5px
 

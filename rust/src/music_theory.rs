@@ -253,6 +253,8 @@ pub fn test_score(max_attempts: u8, attempts_used: u8, passed: bool) -> u8 {
 /// Returns the number of staff steps above middle C (C4).
 /// Each step = one line or one space. Positive = higher, negative = lower.
 /// Used by the UI to place note heads on the staff.
+/// NOTE: Uses sharp-based diatonic (A#=A's position). For key-aware placement
+/// use `staff_position_in_key` instead.
 pub fn staff_position(note: Note) -> i32 {
     // Diatonic step offset within an octave for each pitch class (C=0, D=1, E=2, …)
     let diatonic = match note.name {
@@ -272,6 +274,177 @@ pub fn staff_position(note: Note) -> i32 {
     // Middle C (C4) is at staff position 0
     let octave_offset = (note.octave as i32 - 4) * 7;
     octave_offset + diatonic
+}
+
+/// Key-aware treble-clef staff position for a MIDI note number.
+/// In flat keys, flattened pitch classes are placed at their *upper* diatonic neighbour:
+///   Bb (chroma 10) → B's position (6), Ab (8) → A's (5), Eb (3) → E's (2), etc.
+/// In sharp keys (or C major), uses the standard sharp-based diatonic mapping.
+pub fn staff_position_in_key(midi: u8, root_chroma: u8) -> i32 {
+    let chroma = (midi % 12) as usize;
+    let octave = (midi as i32 / 12) - 1;
+    let diatonic: i32 = if is_sharp_key(root_chroma) {
+        [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6][chroma]
+    } else {
+        // Flat spelling: black keys placed at their upper diatonic neighbour
+        [0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6][chroma]
+    };
+    (octave - 4) * 7 + diatonic
+}
+
+// ── Public naming helpers ─────────────────────────────────────────────────────
+
+/// Convert a MIDI number to a human-readable label (e.g. "C#4", "A3").
+pub fn midi_to_label(midi: u8) -> String {
+    Note::from_midi(midi).to_string()
+}
+
+/// Display name for a pitch class (chroma 0–11), e.g. 0 → "C", 1 → "C#".
+pub fn note_name(chroma: u8) -> &'static str {
+    NoteName::from_chroma(chroma).display_name()
+}
+
+/// Display name for a scale ID (0–4).
+pub fn scale_name(scale_id: u8) -> &'static str {
+    match scale_id {
+        0 => "Major",
+        1 => "Natural Minor",
+        2 => "Harmonic Minor",
+        3 => "Dorian",
+        4 => "Mixolydian",
+        _ => "?",
+    }
+}
+
+// ── Key signature ─────────────────────────────────────────────────────────────
+
+/// Order of sharps by pitch class (circle of fifths): F# C# G# D# A# E# B#
+pub const SHARP_ORDER: [u8; 7] = [6, 1, 8, 3, 10, 5, 11];
+/// Order of flats by pitch class (circle of fifths): Bb Eb Ab Db Gb Cb Fb
+pub const FLAT_ORDER: [u8; 7] = [10, 3, 8, 1, 6, 11, 5];
+
+/// Treble-clef staff positions for sharp symbols, in order of sharps (F# C# G# D# A# E# B#).
+/// Staff position = diatonic steps from C4 (C4=0, D4=1, B4=6, C5=7, ...).
+pub const SHARP_STAFF_POSITIONS: [i32; 7] = [10, 7, 11, 8, 5, 9, 6];
+/// Treble-clef staff positions for flat symbols, in order of flats (Bb Eb Ab Db Gb Cb Fb).
+pub const FLAT_STAFF_POSITIONS: [i32; 7] = [6, 9, 5, 8, 4, 7, 3];
+
+/// Number of sharps (positive) or flats (negative) in the major key with this root chroma.
+/// Ties (enharmonic keys) are resolved to the simpler key: chroma 1 → C# (7#), chroma 6 → F# (6#).
+pub fn key_accidental_count(root_chroma: u8) -> i8 {
+    match root_chroma % 12 {
+        0 => 0,   // C  – no accidentals
+        7 => 1,   // G  – 1 sharp
+        2 => 2,   // D  – 2 sharps
+        9 => 3,   // A  – 3 sharps
+        4 => 4,   // E  – 4 sharps
+        11 => 5,  // B  – 5 sharps
+        6 => 6,   // F# – 6 sharps
+        1 => 7,   // C# – 7 sharps
+        5 => -1,  // F  – 1 flat
+        10 => -2, // Bb – 2 flats
+        3 => -3,  // Eb – 3 flats
+        8 => -4,  // Ab – 4 flats
+        _ => 0,
+    }
+}
+
+/// Returns true if the major key with this root chroma uses sharps (or is C major).
+pub fn is_sharp_key(root_chroma: u8) -> bool {
+    key_accidental_count(root_chroma) >= 0
+}
+
+/// Returns the set of pitch classes that are part of the key signature
+/// (the accidentalled notes) for the major key with this root chroma.
+pub fn key_signature_pitch_classes(root_chroma: u8) -> &'static [u8] {
+    let count = key_accidental_count(root_chroma);
+    if count > 0 {
+        &SHARP_ORDER[..count as usize]
+    } else if count < 0 {
+        &FLAT_ORDER[..(-count) as usize]
+    } else {
+        &[]
+    }
+}
+
+/// Returns the treble-clef staff positions where key signature symbols are drawn,
+/// along with whether they are sharps (`true`) or flats (`false`).
+pub fn key_sig_staff_positions(root_chroma: u8) -> (&'static [i32], bool) {
+    let count = key_accidental_count(root_chroma);
+    if count > 0 {
+        (&SHARP_STAFF_POSITIONS[..count as usize], true)
+    } else if count < 0 {
+        (&FLAT_STAFF_POSITIONS[..(-count) as usize], false)
+    } else {
+        (&[], true)
+    }
+}
+
+/// Returns the preferred note name (without octave) for a MIDI note in the context
+/// of a major key. Sharp keys use sharp spellings; flat keys use flat spellings.
+pub fn preferred_note_label(midi: u8, root_chroma: u8) -> &'static str {
+    let chroma = midi % 12;
+    if is_sharp_key(root_chroma) {
+        match chroma {
+            0 => "C", 1 => "C#", 2 => "D", 3 => "D#", 4 => "E",
+            5 => "F", 6 => "F#", 7 => "G", 8 => "G#", 9 => "A",
+            10 => "A#", 11 => "B", _ => "?",
+        }
+    } else {
+        match chroma {
+            0 => "C", 1 => "Db", 2 => "D", 3 => "Eb", 4 => "E",
+            5 => "F", 6 => "Gb", 7 => "G", 8 => "Ab", 9 => "A",
+            10 => "Bb", 11 => "B", _ => "?",
+        }
+    }
+}
+
+/// Full label including octave, e.g. "C#4" or "Bb3", using the key's preferred spelling.
+pub fn preferred_midi_label(midi: u8, root_chroma: u8) -> String {
+    let octave = (midi as i32 / 12) - 1;
+    format!("{}{}", preferred_note_label(midi, root_chroma), octave)
+}
+
+/// For key-signature display mode: returns the accidental symbol to draw on a note
+/// given the current major key. Returns:
+///   `None`       → note is diatonic in the key, no accidental needed
+///   `Some("♯")`  → draw a sharp
+///   `Some("♭")`  → draw a flat
+///   `Some("♮")`  → draw a natural (note is chromatically altered away from key)
+pub fn accidental_in_key(midi: u8, root_chroma: u8) -> Option<&'static str> {
+    let chroma = midi % 12;
+    let ks_chromas = key_signature_pitch_classes(root_chroma);
+    let count = key_accidental_count(root_chroma);
+
+    if count >= 0 {
+        // Sharp key: ks_chromas are the sharpened pitch classes (e.g. F# in G major)
+        if ks_chromas.contains(&chroma) {
+            return None;
+        }
+        // If chroma+1 is a key-sig sharp, this note is the natural of that sharp → ♮
+        if ks_chromas.contains(&((chroma + 1) % 12)) {
+            return Some("♮");
+        }
+        // Remaining black keys not in the key sig need a sharp accidental
+        if matches!(chroma, 1 | 3 | 6 | 8 | 10) {
+            return Some("♯");
+        }
+        None
+    } else {
+        // Flat key: ks_chromas are the flattened pitch classes (e.g. Bb in F major)
+        if ks_chromas.contains(&chroma) {
+            return None;
+        }
+        // If chroma-1 is a key-sig flat, this note is the natural of that flat → ♮
+        if ks_chromas.contains(&(chroma.wrapping_sub(1) % 12)) {
+            return Some("♮");
+        }
+        // Remaining black keys not in the key sig need a flat accidental
+        if matches!(chroma, 1 | 3 | 6 | 8 | 10) {
+            return Some("♭");
+        }
+        None
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
