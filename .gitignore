@@ -51,3 +51,12 @@ android/app/src/main/assets/index.android.bundle.map
 desktop/node_modules/
 desktop/dist/
 desktop/src-tauri/target/
+hs_err_pid*.log
+screen_debug.png
+tauri_cap.png
+ui.xml
+ui2.xml
+ui_dump.xml
+copilot-session-*.md
+screen_home.png
+screen_keydrop.png
