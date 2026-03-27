@@ -68,65 +68,71 @@ fun HomeScreen(
         )
         Spacer(Modifier.height(28.dp))
 
-        // Key selection
-        SectionLabel("Key")
-        var keyExpanded by remember { mutableStateOf(false) }
-        ExposedDropdownMenuBox(
-            expanded = keyExpanded,
-            onExpandedChange = { keyExpanded = it },
-            modifier = Modifier.fillMaxWidth()
+        // Key + Scale selections side by side
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            OutlinedTextField(
-                value = MusicTheory.NOTE_NAMES[state.rootNote],
-                onValueChange = {},
-                readOnly = true,
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = keyExpanded) },
-                modifier = Modifier.menuAnchor().fillMaxWidth()
-            )
-            ExposedDropdownMenu(
-                expanded = keyExpanded,
-                onDismissRequest = { keyExpanded = false }
-            ) {
-                MusicTheory.NOTE_NAMES.forEachIndexed { index, name ->
-                    DropdownMenuItem(
-                        text = { Text(name) },
-                        onClick = {
-                            viewModel.setRootNote(index)
-                            keyExpanded = false
-                        }
+            Column(modifier = Modifier.weight(1f)) {
+                SectionLabel("Key")
+                var keyExpanded by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(
+                    expanded = keyExpanded,
+                    onExpandedChange = { keyExpanded = it },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = MusicTheory.NOTE_NAMES[state.rootNote],
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = keyExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
                     )
+                    ExposedDropdownMenu(
+                        expanded = keyExpanded,
+                        onDismissRequest = { keyExpanded = false }
+                    ) {
+                        MusicTheory.NOTE_NAMES.forEachIndexed { index, name ->
+                            DropdownMenuItem(
+                                text = { Text(name) },
+                                onClick = {
+                                    viewModel.setRootNote(index)
+                                    keyExpanded = false
+                                }
+                            )
+                        }
+                    }
                 }
             }
-        }
-        Spacer(Modifier.height(16.dp))
-
-        // Scale selection
-        SectionLabel("Scale")
-        var scaleExpanded by remember { mutableStateOf(false) }
-        ExposedDropdownMenuBox(
-            expanded = scaleExpanded,
-            onExpandedChange = { scaleExpanded = it },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            OutlinedTextField(
-                value = MusicTheory.SCALE_NAMES[state.scaleId],
-                onValueChange = {},
-                readOnly = true,
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = scaleExpanded) },
-                modifier = Modifier.menuAnchor().fillMaxWidth()
-            )
-            ExposedDropdownMenu(
-                expanded = scaleExpanded,
-                onDismissRequest = { scaleExpanded = false }
-            ) {
-                MusicTheory.SCALE_NAMES.forEachIndexed { index, name ->
-                    DropdownMenuItem(
-                        text = { Text(name) },
-                        onClick = {
-                            viewModel.setScaleId(index)
-                            scaleExpanded = false
-                        }
+            Column(modifier = Modifier.weight(1f)) {
+                SectionLabel("Scale")
+                var scaleExpanded by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(
+                    expanded = scaleExpanded,
+                    onExpandedChange = { scaleExpanded = it },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = MusicTheory.SCALE_NAMES[state.scaleId],
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = scaleExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
                     )
+                    ExposedDropdownMenu(
+                        expanded = scaleExpanded,
+                        onDismissRequest = { scaleExpanded = false }
+                    ) {
+                        MusicTheory.SCALE_NAMES.forEachIndexed { index, name ->
+                            DropdownMenuItem(
+                                text = { Text(name) },
+                                onClick = {
+                                    viewModel.setScaleId(index)
+                                    scaleExpanded = false
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -168,15 +174,13 @@ fun HomeScreen(
                 onCheckedChange = { viewModel.setShowTestNotes(it) }
             )
             Text("Display Test Notes", style = MaterialTheme.typography.bodyLarge)
+            Spacer(Modifier.width(16.dp))
+            Checkbox(
+                checked = state.keySignatureMode == 1,
+                onCheckedChange = { viewModel.setKeySignatureMode(if (it) 1 else 0) }
+            )
+            Text("Use Key Signature", style = MaterialTheme.typography.bodyLarge)
         }
-        Spacer(Modifier.height(16.dp))
-
-        SectionLabel("Key Display")
-        ChipRow(
-            items = listOf("Inline Accidentals", "Key Signature"),
-            selected = state.keySignatureMode,
-            onSelect = { viewModel.setKeySignatureMode(it) }
-        )
         Spacer(Modifier.height(32.dp))
 
         Button(

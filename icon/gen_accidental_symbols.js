@@ -35,7 +35,7 @@ const ROOT = path.resolve(__dirname, '..');
 const FONT_SIZE = 400;
 
 // Fraction of the trimmed glyph where the visual anchor sits.
-const FLAT_ANCHOR_FRAC  = 0.63;   // belly ~63% from top of trimmed ♭
+const FLAT_ANCHOR_FRAC  = 0.731;  // belly ~73% from top of trimmed ♭ (Segoe UI Symbol)
 const SHARP_ANCHOR_FRAC = 0.50;   // bars centred in ♯
 
 const MARGIN = 12;
@@ -132,9 +132,9 @@ $bmp.Save('${tmpRaw.replace(/\\/g, '\\\\')}')
   let paddingTop    = 0;
   let paddingBottom = 0;
   if (anchorPx < trimH / 2) {
-    paddingBottom = Math.round(trimH - 2 * anchorPx);
+    paddingTop    = Math.round(trimH - 2 * anchorPx);  // anchor in top half → pad top
   } else {
-    paddingTop = Math.round(2 * anchorPx - trimH);
+    paddingBottom = Math.round(2 * anchorPx - trimH);  // anchor in bottom half → pad bottom
   }
 
   // Step 4: extend (adds anchor-centering pad + breathing margin) → base PNG

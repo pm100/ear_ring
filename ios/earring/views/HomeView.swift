@@ -135,31 +135,38 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 24)
 
-                // ── Key ───────────────────────────────────────────────────
-                sectionLabel("Key").padding(.top, 28)
-                Picker("Key", selection: Binding(
-                    get: { model.rootNote },
-                    set: { model.rootNote = $0; model.updateRangeForKey() }
-                )) {
-                    ForEach(0..<12, id: \.self) { i in
-                        Text(MusicTheory.NOTE_NAMES[i]).tag(i)
+                // ── Key + Scale (side by side) ────────────────────────────
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        sectionLabel("Key").padding(.top, 28)
+                        Picker("Key", selection: Binding(
+                            get: { model.rootNote },
+                            set: { model.rootNote = $0; model.updateRangeForKey() }
+                        )) {
+                            ForEach(0..<12, id: \.self) { i in
+                                Text(MusicTheory.NOTE_NAMES[i]).tag(i)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                }
-                .pickerStyle(.menu)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity)
 
-                // ── Scale ─────────────────────────────────────────────────
-                sectionLabel("Scale").padding(.top, 16)
-                Picker("Scale", selection: Binding(
-                    get: { model.scaleId },
-                    set: { model.scaleId = $0 }
-                )) {
-                    ForEach(0..<MusicTheory.SCALE_NAMES.count, id: \.self) { i in
-                        Text(MusicTheory.SCALE_NAMES[i]).tag(i)
+                    VStack(alignment: .leading, spacing: 0) {
+                        sectionLabel("Scale").padding(.top, 28)
+                        Picker("Scale", selection: Binding(
+                            get: { model.scaleId },
+                            set: { model.scaleId = $0 }
+                        )) {
+                            ForEach(0..<MusicTheory.SCALE_NAMES.count, id: \.self) { i in
+                                Text(MusicTheory.SCALE_NAMES[i]).tag(i)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .frame(maxWidth: .infinity)
                 }
-                .pickerStyle(.menu)
-                .frame(maxWidth: .infinity, alignment: .leading)
 
                 // ── Range (piano keyboard) ────────────────────────────────
                 sectionLabel("Range  (\(model.rangeLabel))").padding(.top, 16)
@@ -197,30 +204,22 @@ struct HomeView: View {
                     }
                 }
 
-                Toggle(isOn: Binding(
-                    get: { model.showTestNotes },
-                    set: { model.showTestNotes = $0 }
-                )) {
-                    Text("Display Test Notes")
-                        .font(.body)
+                HStack(spacing: 8) {
+                    Toggle(isOn: Binding(
+                        get: { model.showTestNotes },
+                        set: { model.showTestNotes = $0 }
+                    )) {
+                        Text("Display Test Notes")
+                            .font(.body)
+                    }
+                    Toggle(isOn: Binding(
+                        get: { model.keySignatureMode == 1 },
+                        set: { model.keySignatureMode = $0 ? 1 : 0 }
+                    )) {
+                        Text("Use Key Signature")
+                            .font(.body)
+                    }
                 }.padding(.top, 16)
-
-                sectionLabel("Key Display").padding(.top, 16)
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible()), count: 2),
-                    spacing: 6
-                ) {
-                    Button("Inline Accidentals") {
-                        model.keySignatureMode = 0
-                    }
-                    .buttonStyle(ChipButtonStyle(selected: model.keySignatureMode == 0))
-
-                    Button("Key Signature") {
-                        model.keySignatureMode = 1
-                    }
-                    .buttonStyle(ChipButtonStyle(selected: model.keySignatureMode == 1))
-                }
-                .padding(.top, 6)
 
                 // ── Action buttons ────────────────────────────────────────
                 VStack(spacing: 10) {

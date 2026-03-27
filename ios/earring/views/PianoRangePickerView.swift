@@ -27,19 +27,31 @@ struct PianoRangePickerView: View {
 
     var body: some View {
         let totalW = whiteKeyW * CGFloat(TOTAL_WHITE_KEYS)
-        ScrollView(.horizontal, showsIndicators: false) {
-            ZStack(alignment: .topLeading) {
-                Canvas { ctx, size in
-                    drawPiano(ctx: ctx, size: size)
+        let centerX = (keyX(rangeStart) + keyX(rangeEnd)) / 2
+        let midY = (handleArea + whiteKeyH) / 2
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                ZStack(alignment: .topLeading) {
+                    Canvas { ctx, size in
+                        drawPiano(ctx: ctx, size: size)
+                    }
+                    .frame(width: totalW, height: handleArea + whiteKeyH)
+                    .gesture(
+                        DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                            .onChanged { value in handleGesture(at: value.location, isDrag: true) }
+                            .onEnded { value in handleGesture(at: value.location, isDrag: false) }
+                    )
+                    // Invisible anchor used by ScrollViewReader to center the range.
+                    Color.clear
+                        .frame(width: 1, height: 1)
+                        .id("range-center")
+                        .position(x: centerX, y: midY)
                 }
                 .frame(width: totalW, height: handleArea + whiteKeyH)
-                .gesture(
-                    DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                        .onChanged { value in handleGesture(at: value.location, isDrag: true) }
-                        .onEnded { value in handleGesture(at: value.location, isDrag: false) }
-                )
             }
-            .frame(width: totalW, height: handleArea + whiteKeyH)
+            .onAppear {
+                proxy.scrollTo("range-center", anchor: .center)
+            }
         }
     }
 

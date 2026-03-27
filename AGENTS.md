@@ -88,15 +88,12 @@ Layout: vertically scrollable column, 16dp/px padding, centred.
 "Ear Training"         — 16sp, muted/secondary colour
 
 [28dp space]
-Section label: "Key"
-Dropdown (full-width outlined): C  C#  D  D#  E  F  F#  G  G#  A  A#  B
-  — ExposedDropdownMenu / select, full width
-  — Selecting a new key auto-resets the range to one octave from the new key closest to middle C
-
-[16dp space]
-Section label: "Scale"
-Dropdown (full-width outlined): Major | Natural Minor | Harmonic Minor | Dorian | Mixolydian
-  — ExposedDropdownMenu / select, full width
+Row (equal width, 8dp gap):
+  Left half — Section label: "Key"
+              Dropdown (outlined, full width of column): C  C#  D  D#  E  F  F#  G  G#  A  A#  B
+                — Selecting a new key auto-resets the range to one octave from the new key closest to middle C
+  Right half — Section label: "Scale"
+               Dropdown (outlined, full width of column): Major | Natural Minor | Harmonic Minor | Dorian | Mixolydian
 
 [16dp space]
 Section label: "Range  (RangeLow – RangeHigh)"   — label updates dynamically with current range
@@ -109,8 +106,7 @@ PianoRangePicker
   — Drag a handle to resize range (minimum span = 12 semitones); tap elsewhere to shift range
   — Default: one octave (12 semitones) from rootNote, using the octave closest to middle C
     e.g. root=C → (C4, B4) = MIDI 60–71; root=G → (G3, F#4) = MIDI 55–65
-
-
+  — On first display, scroll position centers the selected range in the viewport
 
 [16dp space]
 Section label: "Sequence Length"
@@ -122,15 +118,12 @@ Chip row: 60  80  100  120  140   (single row, equal width)
   — Default selection: 100 BPM
 
 [16dp space]
-Checkbox: "Display Test Notes"
-  — Default: unchecked (hidden)
-
-[16dp space]
-Section label: "Key Display"
-Two chips (equal width): "Inline Accidentals" | "Key Signature"
-  — Default: "Inline Accidentals" selected (keySignatureMode=0)
-  — "Inline Accidentals": no key signature drawn; every accidental shown on the note
-  — "Key Signature": conventional key sig after clef; only out-of-key notes get an accidental
+Row (same line): ☐ Display Test Notes    ☐ Use Key Signature
+  — Both checkboxes on one row with a gap between them
+  — "Display Test Notes" default: unchecked (hidden)
+  — "Use Key Signature" (keySignatureMode): default unchecked (= Inline Accidentals mode = 0)
+  — Checked: conventional key sig after clef; only out-of-key notes get an accidental
+  — Unchecked: no key signature drawn; every accidental shown on the note
 
 [32dp space]
 [▶ Start Exercise]    — full-width filled primary button, 52dp tall, 18sp

@@ -2,11 +2,11 @@ import React from 'react';
 import { StaffDisplayNote } from '../types';
 import { preferredMidiLabel, accidentalInKey, keySigPositions, staffPositionForMidi, keyAccidentalCount } from '../music';
 
-// Flat PNG: 141×378px, belly (anchor) at exactly 50% height.
+// Flat PNG: 141×435px, belly (anchor) at exactly 50% height.
 // Sharp PNG: 179×305px, bar-centre (anchor) at exactly 50% height.
 // Position formula on every platform: top = targetY - displayH / 2
 const FLAT_W  = 141;
-const FLAT_H  = 378;
+const FLAT_H  = 435;
 const SHARP_W = 179;
 const SHARP_H = 305;
 

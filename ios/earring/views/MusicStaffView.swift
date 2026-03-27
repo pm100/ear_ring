@@ -17,7 +17,7 @@ struct StaffDisplayNote: Identifiable {
 // Anchor (belly for ♭, bar-centre for ♯) is at exactly 50% of the image height.
 // Position formula: top = targetY - displayH / 2  (same on all platforms).
 private let FLAT_PNG_W:  CGFloat = 141
-private let FLAT_PNG_H:  CGFloat = 378
+private let FLAT_PNG_H:  CGFloat = 435
 private let SHARP_PNG_W: CGFloat = 179
 private let SHARP_PNG_H: CGFloat = 305
 private let FLAT_H_MULT:  CGFloat = 3.0
@@ -38,6 +38,16 @@ struct MusicStaffView: View {
     var fixedSpacing: CGFloat? = nil
     var rootChroma: Int = 0
     var keySignatureMode: Int = 0
+
+    // Preloaded UIImage cache so Canvas GraphicsContext can draw them reliably.
+    private static let accImages: [String: UIImage] = {
+        var d: [String: UIImage] = [:]
+        for name in ["flat", "flat_correct", "flat_wrong", "flat_active",
+                     "sharp", "sharp_correct", "sharp_wrong", "sharp_active"] {
+            if let img = UIImage(named: name) { d[name] = img }
+        }
+        return d
+    }()
 
     var body: some View {
         Canvas { ctx, size in
@@ -61,9 +71,9 @@ struct MusicStaffView: View {
 
             // Draw an accidental PNG centred vertically on targetY (anchor@50%).
             func drawAcc(_ name: String, leftX: CGFloat, targetY: CGFloat, displayH: CGFloat, displayW: CGFloat) {
-                let img = Image(name).resizable()
+                guard let ui = MusicStaffView.accImages[name] else { return }
                 let r = CGRect(x: leftX, y: targetY - displayH / 2, width: displayW, height: displayH)
-                ctx.draw(img, in: r)
+                ctx.draw(Image(uiImage: ui), in: r)
             }
 
             // ── Staff lines ──────────────────────────────────────────────────

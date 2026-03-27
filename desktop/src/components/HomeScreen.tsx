@@ -67,6 +67,7 @@ function PianoRangePicker({ rangeStart: rangeStartProp, rangeEnd: rangeEndProp, 
 }) {
   const [rangeStart, rangeEnd] = safeRange(rangeStartProp, rangeEndProp);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const totalW = totalWhiteKeys() * WHITE_KEY_W;
   const totalH = HANDLE_AREA + WHITE_KEY_H;
   const dragging = useRef<null | 0 | 1>(null);
@@ -168,8 +169,17 @@ function PianoRangePicker({ rangeStart: rangeStartProp, rangeEnd: rangeEndProp, 
   };
   const onMouseUp = () => { dragging.current = null; };
 
+  // Center scroll on initial render.
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const cx = (keyX(rangeStart) + keyX(rangeEnd)) / 2;
+    el.scrollLeft = Math.max(0, cx - el.clientWidth / 2);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <div style={{ overflowX: 'auto', width: '100%' }}>
+    <div ref={scrollContainerRef} style={{ overflowX: 'auto', width: '100%' }}>
       <canvas
         ref={canvasRef}
         width={totalW}
@@ -197,31 +207,36 @@ function HomeScreen({ settings, onUpdateSettings, onStart, onSetup, onProgress }
       </div>
       <p className="app-subtitle">Ear Training</p>
 
-      <span className="section-label">Key</span>
-      <select
-        value={settings.rootNote}
-        onChange={e => {
-          const i = Number(e.target.value);
-          const [rs, re] = defaultRangeForKey(i);
-          onUpdateSettings(prev => ({ ...prev, rootNote: i, rangeStart: rs, rangeEnd: re }));
-        }}
-        style={{ width: '100%', padding: '8px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #ccc', marginBottom: 4 }}
-      >
-        {NOTE_NAMES.map((name, i) => (
-          <option key={i} value={i}>{name}</option>
-        ))}
-      </select>
-
-      <span className="section-label">Scale</span>
-      <select
-        value={settings.scaleId}
-        onChange={e => onUpdateSettings(prev => ({ ...prev, scaleId: Number(e.target.value) }))}
-        style={{ width: '100%', padding: '8px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #ccc', marginBottom: 4 }}
-      >
-        {SCALE_NAMES.map((name, i) => (
-          <option key={i} value={i}>{name}</option>
-        ))}
-      </select>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ flex: 1 }}>
+          <span className="section-label">Key</span>
+          <select
+            value={settings.rootNote}
+            onChange={e => {
+              const i = Number(e.target.value);
+              const [rs, re] = defaultRangeForKey(i);
+              onUpdateSettings(prev => ({ ...prev, rootNote: i, rangeStart: rs, rangeEnd: re }));
+            }}
+            style={{ width: '100%', padding: '8px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #ccc', marginBottom: 4 }}
+          >
+            {NOTE_NAMES.map((name, i) => (
+              <option key={i} value={i}>{name}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ flex: 1 }}>
+          <span className="section-label">Scale</span>
+          <select
+            value={settings.scaleId}
+            onChange={e => onUpdateSettings(prev => ({ ...prev, scaleId: Number(e.target.value) }))}
+            style={{ width: '100%', padding: '8px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #ccc', marginBottom: 4 }}
+          >
+            {SCALE_NAMES.map((name, i) => (
+              <option key={i} value={i}>{name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       <span className="section-label">Range ({midiLabel(safeRange(settings.rangeStart, settings.rangeEnd)[0])} – {midiLabel(safeRange(settings.rangeStart, settings.rangeEnd)[1])})</span>
       <PianoRangePicker
@@ -258,32 +273,25 @@ function HomeScreen({ settings, onUpdateSettings, onStart, onSetup, onProgress }
         ))}
       </div>
 
-      <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 16, cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={settings.showTestNotes}
-          onChange={e => onUpdateSettings(prev => ({ ...prev, showTestNotes: e.target.checked }))}
-          style={{ width: 18, height: 18, cursor: 'pointer' }}
-        />
-        <span className="section-label" style={{ margin: 0 }}>Display Test Notes</span>
-      </label>
-
-      <span className="section-label" style={{ marginTop: 16, display: 'block' }}>Key Display</span>
-      <div className="chip-row" style={{ marginTop: 6 }}>
-        <button
-          type="button"
-          className={`chip ${settings.keySignatureMode === 0 ? 'chip-selected' : ''}`}
-          onClick={() => onUpdateSettings(prev => ({ ...prev, keySignatureMode: 0 }))}
-        >
-          Inline Accidentals
-        </button>
-        <button
-          type="button"
-          className={`chip ${settings.keySignatureMode === 1 ? 'chip-selected' : ''}`}
-          onClick={() => onUpdateSettings(prev => ({ ...prev, keySignatureMode: 1 }))}
-        >
-          Key Signature
-        </button>
+      <div style={{ display: 'flex', gap: 24, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={settings.showTestNotes}
+            onChange={e => onUpdateSettings(prev => ({ ...prev, showTestNotes: e.target.checked }))}
+            style={{ width: 18, height: 18, cursor: 'pointer' }}
+          />
+          <span className="section-label" style={{ margin: 0 }}>Display Test Notes</span>
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={settings.keySignatureMode === 1}
+            onChange={e => onUpdateSettings(prev => ({ ...prev, keySignatureMode: e.target.checked ? 1 : 0 }))}
+            style={{ width: 18, height: 18, cursor: 'pointer' }}
+          />
+          <span className="section-label" style={{ margin: 0 }}>Use Key Signature</span>
+        </label>
       </div>
 
       <div style={{ marginTop: 32 }}>

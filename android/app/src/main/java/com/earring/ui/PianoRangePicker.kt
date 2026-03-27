@@ -6,12 +6,16 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -53,8 +57,22 @@ fun PianoRangePicker(
     val handleArea: Dp = 22.dp  // vertical area above keys for handles
     val totalHeight: Dp = handleArea + whiteKeyHeight
     val totalWidth: Dp = whiteKeyWidth * TOTAL_WHITE_KEYS
+    val scrollbarHeight: Dp = 8.dp
 
-    Box(modifier = modifier.height(totalHeight).horizontalScroll(rememberScrollState())) {
+    val scrollState = rememberScrollState()
+    Column(modifier = modifier) {
+    BoxWithConstraints(modifier = Modifier.height(totalHeight)) {
+        val viewWidthPx = with(density) { maxWidth.toPx() }
+        LaunchedEffect(Unit) {
+            val wkw = with(density) { whiteKeyWidth.toPx() }
+            val bkw = with(density) { blackKeyWidth.toPx() }
+            fun localKeyX(midi: Int): Float =
+                if (isWhiteKey(midi)) whiteIndex(midi) * wkw + wkw / 2
+                else whiteIndex(midi - 1) * wkw + wkw - bkw / 2
+            val cx = (localKeyX(rangeStart) + localKeyX(rangeEnd)) / 2f
+            scrollState.scrollTo((cx - viewWidthPx / 2f).toInt().coerceAtLeast(0))
+        }
+        Box(modifier = Modifier.height(totalHeight).horizontalScroll(scrollState)) {
         Canvas(
             modifier = Modifier
                 .width(totalWidth)
@@ -87,7 +105,7 @@ fun PianoRangePicker(
                     }
 
                     awaitEachGesture {
-                        val down = awaitFirstDown()
+                        val down = awaitFirstDown(requireUnconsumed = false)
                         val x = down.position.x
                         val y = down.position.y
                         val handleY = hArea / 2
@@ -110,7 +128,10 @@ fun PianoRangePicker(
                             val newStart = tapped.coerceIn(PIANO_MIDI_MIN, PIANO_MIDI_MAX - span)
                             onRangeChange(newStart, newStart + span)
                         } else {
+                            // Consume the down event so the parent scroll doesn't intercept
+                            down.consume()
                             drag(down.id) { change ->
+                                change.consume()
                                 val nx = change.position.x
                                 val m = xToMidi(nx, bkh / 2f)
                                 if (which == 0) {
@@ -199,5 +220,25 @@ fun PianoRangePicker(
             drawCircle(color = primaryColor, radius = hRadius, center = Offset(sx, hy))
             drawCircle(color = primaryColor, radius = hRadius, center = Offset(ex, hy))
         }
+        }  // Box (horizontalScroll)
+    }  // BoxWithConstraints
+
+    // Horizontal scrollbar
+    val totalWidthPx = with(density) { totalWidth.toPx() }
+    val scrollVal = scrollState.value
+    val scrollMax = scrollState.maxValue
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(scrollbarHeight)
+    ) {
+        val viewW = size.width
+        val thumbFrac = (viewW / totalWidthPx).coerceIn(0f, 1f)
+        val thumbW = (viewW * thumbFrac).coerceAtLeast(20f)
+        val scrollFrac = if (scrollMax > 0) scrollVal.toFloat() / scrollMax.toFloat() else 0f
+        val thumbX = (viewW - thumbW) * scrollFrac
+        drawRoundRect(color = Color(0xFFDDDDDD), size = Size(viewW, size.height), cornerRadius = CornerRadius(4f))
+        drawRoundRect(color = primaryColor.copy(alpha = 0.6f), topLeft = Offset(thumbX, 0f), size = Size(thumbW, size.height), cornerRadius = CornerRadius(4f))
     }
-}
+    }  // Column
+}  // PianoRangePicker

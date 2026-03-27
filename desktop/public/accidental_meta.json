@@ -1,6 +1,10 @@
 {
-  "flatHeightMultiplier": 3.5,
-  "sharpHeightMultiplier": 2.5,
+  "flatWidth": 141,
+  "flatHeight": 435,
+  "sharpWidth": 179,
+  "sharpHeight": 305,
+  "flatHeightMultiplier": 3.0,
+  "sharpHeightMultiplier": 2.0,
   "anchorAtMidHeight": true,
   "positionFormula": "y = targetStaffLineY - displayHeight / 2"
 }
