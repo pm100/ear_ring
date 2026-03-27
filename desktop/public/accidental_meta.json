@@ -1,0 +1,6 @@
+{
+  "flatHeightMultiplier": 3.5,
+  "sharpHeightMultiplier": 2.5,
+  "anchorAtMidHeight": true,
+  "positionFormula": "y = targetStaffLineY - displayHeight / 2"
+}
