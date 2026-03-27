@@ -2,26 +2,31 @@ const { execSync } = require('child_process');
 const sharp = require('sharp');
 const path = require('path');
 
-// Render treble clef for Tauri desktop SVG.
+// Render treble clef for all platforms (Android, iOS, Tauri desktop).
 // WebView2 font fallback for U+1D11E is unreliable; we render once here
-// using Windows GDI+ (System.Drawing) which has full access to Segoe UI Symbol.
-// Uses StringFormat.GenericTypographic + TextRenderingHint.AntiAlias to get
-// tight, proportional bounds matching Android's Skia text rendering.
+// using Windows GDI+ (System.Drawing) with NotoMusic-Regular.ttf loaded as a
+// private font — this is the same font Android uses to render U+1D11E via Skia,
+// so the glyph shape matches the original Android unicode rendering exactly.
+// Uses StringFormat.GenericTypographic + TextRenderingHint.AntiAlias for tight bounds.
 
 const rawPng  = path.join(__dirname, 'treble_raw_tmp.png');
 const outFile = path.join(__dirname, '..', 'desktop', 'public', 'treble_clef.png');
+const fontFile = path.join(__dirname, 'NotoMusic-Regular.ttf');
 const PAD = 8;
 
-// Step 1: render via PowerShell GDI+ with GenericTypographic for tight bounds
+// Step 1: render via PowerShell GDI+ with NotoMusic (Android's font for U+1D11E)
 const ps = `
 Add-Type -AssemblyName System.Drawing
+$pfc = New-Object System.Drawing.Text.PrivateFontCollection
+$pfc.AddFontFile('${fontFile.replace(/\\/g, '\\\\')}')
+$family = $pfc.Families[0]
 $bmp = New-Object System.Drawing.Bitmap(800, 1600)
 $g = [System.Drawing.Graphics]::FromImage($bmp)
 $g.Clear([System.Drawing.Color]::Transparent)
 $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAlias
 $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
 $clef = [char]::ConvertFromUtf32(0x1D11E)
-$font = New-Object System.Drawing.Font('Segoe UI Symbol', 600, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
+$font = New-Object System.Drawing.Font($family, 600, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
 $brush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::Black)
 $fmt = [System.Drawing.StringFormat]::GenericTypographic
 $g.DrawString($clef, $font, $brush, [float]10, [float]10, $fmt)
