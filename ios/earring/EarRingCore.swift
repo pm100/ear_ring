@@ -109,4 +109,10 @@ struct EarRingCore {
     static func staffPositionInKey(midi: Int, rootChroma: Int) -> Int {
         Int(ear_ring_staff_position_in_key(UInt8(midi), UInt8(rootChroma)))
     }
+
+    /// Returns a JSON string: `[{"title":"...","body":"..."},...]`
+    static func helpContent() -> String {
+        guard let ptr = ear_ring_help_content() else { return "[]" }
+        return String(cString: ptr)
+    }
 }

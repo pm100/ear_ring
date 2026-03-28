@@ -138,12 +138,5 @@ struct ProgressScreen: View {
         }
         .background(Color(.systemBackground))
         .onAppear { progressModel.reload() }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Text("Progress")
-                    .font(.subheadline.weight(.semibold))
-            }
-        }
     }
 }

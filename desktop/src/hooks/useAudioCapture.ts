@@ -10,7 +10,7 @@ export function useAudioCapture() {
   const activeRef = useRef(false);
   const detectInFlightRef = useRef(false);
 
-  const start = useCallback(async (onHz: (hz: number) => void) => {
+  const start = useCallback(async (onHz: (hz: number) => void, silenceThreshold?: number) => {
     try {
       activeRef.current = true;
       callbackRef.current = onHz;
@@ -38,6 +38,7 @@ export function useAudioCapture() {
           const hz = await invoke<number>('cmd_detect_pitch', {
             samples,
             sampleRate: 44100,
+            silenceThreshold: silenceThreshold ?? 0.003,
           });
           if (activeRef.current && callbackRef.current) {
             callbackRef.current(hz);

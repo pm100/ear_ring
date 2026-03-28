@@ -6,10 +6,12 @@ import ExerciseScreen from './components/ExerciseScreen';
 import SetupScreen from './components/SetupScreen';
 import ResultsScreen from './components/ResultsScreen';
 import ProgressScreen from './components/ProgressScreen';
+import SettingsScreen from './components/SettingsScreen';
+import HelpScreen from './components/HelpScreen';
+import BottomNavBar from './components/BottomNavBar';
 
 const defaultSettings: ExerciseSettings = (() => {
-  const rootNote = 0;  // C
-  // One octave from rootNote closest to middle C (MIDI 60)
+  const rootNote = 0;
   let rangeStart = 60;
   for (let oct = 2; oct <= 6; oct++) {
     const c = (oct + 1) * 12 + rootNote;
@@ -24,10 +26,14 @@ const defaultSettings: ExerciseSettings = (() => {
     tempoBpm: 100,
     showTestNotes: false,
     keySignatureMode: 0,
+    maxRetries: 5,
+    silenceThreshold: 0.003,
+    framesToConfirm: 3,
+    postChordGapMs: 800,
+    wrongNotePauseMs: 3000,
   };
 })();
 
-/** Return the MIDI range (one octave) for a given pitch class closest to middle C. */
 function defaultRangeForKey(rootNote: number): [number, number] {
   let best = 60 + rootNote;
   for (let oct = 2; oct <= 6; oct++) {
@@ -45,7 +51,7 @@ const defaultExercise: ExerciseState = {
   currentNoteIndex: 0,
   highlightIndex: -1,
   currentAttempt: 1,
-  maxAttempts: 5,
+  maxAttempts: defaultSettings.maxRetries,
   testsCompleted: 0,
   cumulativeScorePercent: 0,
   sessionRunning: false,
@@ -60,6 +66,8 @@ function loadSettings(): ExerciseSettings {
   } catch {}
   return defaultSettings;
 }
+
+const TAB_SCREENS: Screen[] = ['home', 'setup', 'progress', 'settings', 'help'];
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
@@ -90,13 +98,18 @@ export default function App() {
         tempoBpm,
         showTestNotes,
         keySignatureMode,
+        maxRetries: settings.maxRetries,
+        silenceThreshold: settings.silenceThreshold,
+        framesToConfirm: settings.framesToConfirm,
+        postChordGapMs: settings.postChordGapMs,
+        wrongNotePauseMs: settings.wrongNotePauseMs,
         sequence,
         detected: [],
         status: 'playing',
         currentNoteIndex: 0,
         highlightIndex: -1,
         currentAttempt: 1,
-        maxAttempts: 5,
+        maxAttempts: settings.maxRetries,
         testsCompleted: 0,
         cumulativeScorePercent: 0,
         sessionRunning: true,
@@ -105,7 +118,7 @@ export default function App() {
     } catch (e) {
       console.error('generate_sequence failed', e);
     }
-  }, []);
+  }, [settings]);
 
   const stopExercise = useCallback(() => {
     setExercise(prev => ({
@@ -122,6 +135,8 @@ export default function App() {
     setScreen('home');
   }, []);
 
+  const showNav = TAB_SCREENS.includes(screen);
+
   return (
     <div className="app-container">
       {screen === 'home' && (
@@ -129,8 +144,6 @@ export default function App() {
           settings={settings}
           onUpdateSettings={setSettings}
           onStart={startExercise}
-          onSetup={() => setScreen('setup')}
-          onProgress={() => setScreen('progress')}
         />
       )}
       {screen === 'exercise' && (
@@ -140,7 +153,15 @@ export default function App() {
         />
       )}
       {screen === 'setup' && (
-        <SetupScreen onBack={() => setScreen('home')} rangeStart={settings.rangeStart} rangeEnd={settings.rangeEnd} rootChroma={settings.rootNote} keySignatureMode={settings.keySignatureMode} />
+        <SetupScreen
+          onBack={() => setScreen('home')}
+          rangeStart={settings.rangeStart}
+          rangeEnd={settings.rangeEnd}
+          rootChroma={settings.rootNote}
+          keySignatureMode={settings.keySignatureMode}
+          silenceThreshold={settings.silenceThreshold}
+          framesToConfirm={settings.framesToConfirm}
+        />
       )}
       {screen === 'results' && (
         <ResultsScreen
@@ -152,6 +173,19 @@ export default function App() {
       )}
       {screen === 'progress' && (
         <ProgressScreen onBack={() => setScreen('home')} />
+      )}
+      {screen === 'settings' && (
+        <SettingsScreen
+          settings={settings}
+          onUpdateSettings={setSettings}
+          onBack={() => setScreen('home')}
+        />
+      )}
+      {screen === 'help' && (
+        <HelpScreen onBack={() => setScreen('home')} />
+      )}
+      {showNav && (
+        <BottomNavBar currentScreen={screen} onNavigate={setScreen} />
       )}
     </div>
   );

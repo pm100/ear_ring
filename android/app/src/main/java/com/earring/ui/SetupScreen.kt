@@ -16,7 +16,7 @@ import com.earring.ui.components.PitchMeter
 import com.earring.ui.components.StaffNote
 
 @Composable
-fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71, rootChroma: Int = 0, keySignatureMode: Int = 0) {
+fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71, rootChroma: Int = 0, keySignatureMode: Int = 0, silenceThreshold: Float = 0.003f, framesToConfirm: Int = 3) {
     val noteStepDp = 44.dp
     val midiMin = rangeStart
     val midiMax = rangeEnd
@@ -32,6 +32,8 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71, ro
         active = true,
         midiMin = midiMin,
         midiMax = midiMax,
+        silenceThreshold = silenceThreshold,
+        framesToConfirm = framesToConfirm,
         onConfirmed = { midi, _ ->
             displayMidi = midi
             noteHistory.add(midi)
@@ -60,7 +62,7 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71, ro
         }
 
         Spacer(Modifier.height(24.dp))
-        Text("Sing or play a note to test your microphone.", style = MaterialTheme.typography.bodyMedium)
+        Text("Play a note to test your microphone.", style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(16.dp))
 
         // Listening indicator

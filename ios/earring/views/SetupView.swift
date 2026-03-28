@@ -12,7 +12,7 @@ struct SetupView: View {
 
             // ── Instruction text ──────────────────────────────────────────
             Spacer().frame(height: 24)
-            Text("Sing or play a note to test your microphone.")
+            Text("Play a note to test your microphone.")
                 .font(.body)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
@@ -79,13 +79,6 @@ struct SetupView: View {
         }
         .padding(.horizontal, 16)
         .background(Color(.systemBackground))
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Text("Mic Setup")
-                    .font(.subheadline.weight(.semibold))
-            }
-        }
         .onAppear {
             resetState()
             Task { await model.startLivePitchDetection() }

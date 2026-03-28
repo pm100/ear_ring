@@ -5,13 +5,10 @@ interface Props {
   settings: ExerciseSettings;
   onUpdateSettings: React.Dispatch<React.SetStateAction<ExerciseSettings>>;
   onStart: (rootNote: number, rangeStart: number, rangeEnd: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean, keySignatureMode: number) => void;
-  onSetup: () => void;
-  onProgress: () => void;
 }
 
 const NOTE_NAMES = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
 const SCALE_NAMES = ['Major','Natural Minor','Harmonic Minor','Dorian','Mixolydian'];
-const BPM_OPTIONS = [60, 80, 100, 120, 140];
 
 const PIANO_MIDI_MIN = 36;
 const PIANO_MIDI_MAX = 84;
@@ -194,7 +191,7 @@ function PianoRangePicker({ rangeStart: rangeStartProp, rangeEnd: rangeEndProp, 
   );
 }
 
-function HomeScreen({ settings, onUpdateSettings, onStart, onSetup, onProgress }: Props) {
+function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
   const handleStart = () => {
     onStart(settings.rootNote, settings.rangeStart, settings.rangeEnd, settings.scaleId, settings.sequenceLength, settings.tempoBpm, settings.showTestNotes, settings.keySignatureMode);
   };
@@ -259,19 +256,6 @@ function HomeScreen({ settings, onUpdateSettings, onStart, onSetup, onProgress }
         ))}
       </div>
 
-      <span className="section-label">Tempo (BPM)</span>
-      <div className="chip-row">
-        {BPM_OPTIONS.map(bpm => (
-          <button
-            key={bpm}
-            type="button"
-            className={`chip ${settings.tempoBpm === bpm ? 'chip-selected' : ''}`}
-            onClick={() => onUpdateSettings(prev => ({ ...prev, tempoBpm: bpm }))}
-          >
-            {bpm}
-          </button>
-        ))}
-      </div>
 
       <div style={{ display: 'flex', gap: 24, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
@@ -296,8 +280,6 @@ function HomeScreen({ settings, onUpdateSettings, onStart, onSetup, onProgress }
 
       <div style={{ marginTop: 32 }}>
         <button className="btn-primary" onClick={handleStart}>▶ Start Exercise</button>
-        <button className="btn-outlined" onClick={onSetup}>🎙 Mic Setup</button>
-        <button className="btn-outlined" onClick={onProgress}>📊 Progress</button>
       </div>
     </div>
   );

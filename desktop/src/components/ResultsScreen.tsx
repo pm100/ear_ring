@@ -65,7 +65,7 @@ export default function ResultsScreen({ exercise, onTryAgain, onNewExercise, onP
           <div key={i} className="result-row">
             <span className="result-index">{i + 1}.</span>
             <span className="result-expected">Expected: {expectedLabel}</span>
-            <span className="result-detected">Sung: {sungLabel}</span>
+            <span className="result-detected">Played: {sungLabel}</span>
             <span className={symbolClass}>{symbol}</span>
           </div>
         );

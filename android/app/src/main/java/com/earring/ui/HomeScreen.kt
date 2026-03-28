@@ -23,15 +23,11 @@ import com.earring.ExerciseViewModel
 import com.earring.MusicTheory
 import com.earring.R
 
-private val BPM_OPTIONS = listOf("60", "80", "100", "120", "140")
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: ExerciseViewModel,
-    onStartExercise: () -> Unit,
-    onMicSetup: () -> Unit,
-    onProgress: () -> Unit
+    onStartExercise: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -157,14 +153,6 @@ fun HomeScreen(
         )
         Spacer(Modifier.height(16.dp))
 
-        SectionLabel("Tempo (BPM)")
-        ChipRow(
-            items = BPM_OPTIONS,
-            selected = BPM_OPTIONS.indexOf(state.tempoBpm.toString()).coerceAtLeast(0),
-            onSelect = { viewModel.setTempoBpm(BPM_OPTIONS[it].toInt()) }
-        )
-        Spacer(Modifier.height(16.dp))
-
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
@@ -189,26 +177,12 @@ fun HomeScreen(
         ) {
             Text("▶ Start Exercise", fontSize = 18.sp)
         }
-        Spacer(Modifier.height(12.dp))
-        OutlinedButton(
-            onClick = onMicSetup,
-            modifier = Modifier.fillMaxWidth().height(48.dp)
-        ) {
-            Text("🎙 Mic Setup", fontSize = 16.sp)
-        }
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(
-            onClick = onProgress,
-            modifier = Modifier.fillMaxWidth().height(48.dp)
-        ) {
-            Text("📊 Progress", fontSize = 16.sp)
-        }
         Spacer(Modifier.height(16.dp))
     }
 }
 
 @Composable
-private fun SectionLabel(text: String) {
+internal fun SectionLabel(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelLarge,
@@ -220,7 +194,7 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
-private fun ChipRow(
+internal fun ChipRow(
     items: List<String>,
     selected: Int,
     onSelect: (Int) -> Unit

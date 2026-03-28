@@ -1,6 +1,6 @@
 # Ear Ring 🎵
 
-A music ear training app that helps you develop pitch recognition and interval hearing skills. Sing or play notes back after hearing a sequence — the app uses real-time pitch detection to score your performance.
+A music ear training app that helps you develop pitch recognition and interval hearing skills. Play notes back after hearing a sequence — the app uses real-time pitch detection to score your performance.
 
 ## Platforms
 

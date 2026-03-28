@@ -1,13 +1,17 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use ear_ring_core::{
-    accidental_in_key, detect_pitch, freq_to_note, generate_sequence, intro_chord, is_correct_note,
-    is_sharp_key, key_accidental_count, key_sig_staff_positions, preferred_midi_label,
-    staff_position, test_score, Note, ScaleType,
+    accidental_in_key, detect_pitch, freq_to_note, generate_sequence, help_sections_json,
+    intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
+    preferred_midi_label, staff_position, test_score, Note, ScaleType,
 };
 
 #[tauri::command]
-fn cmd_detect_pitch(samples: Vec<f32>, sample_rate: u32) -> f32 {
+fn cmd_detect_pitch(samples: Vec<f32>, sample_rate: u32, silence_threshold: f32) -> f32 {
+    let rms: f32 = (samples.iter().map(|&s| s * s).sum::<f32>() / samples.len() as f32).sqrt();
+    if rms < silence_threshold {
+        return -1.0;
+    }
     match detect_pitch(&samples, sample_rate) {
         Some(hz) => hz,
         None => -1.0,
@@ -109,6 +113,11 @@ fn cmd_key_sig_positions(root_chroma: u8) -> (Vec<i32>, bool) {
     (positions.to_vec(), is_sharp)
 }
 
+#[tauri::command]
+fn cmd_help_content() -> String {
+    help_sections_json()
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -125,6 +134,7 @@ fn main() {
             cmd_preferred_midi_label,
             cmd_accidental_in_key,
             cmd_key_sig_positions,
+            cmd_help_content,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

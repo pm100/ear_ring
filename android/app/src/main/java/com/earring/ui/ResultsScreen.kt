@@ -115,7 +115,7 @@ private fun NoteResultRow(
     ) {
         Text("$index.", modifier = Modifier.width(28.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("Expected: $expectedLabel", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        Text("Sung: $detectedLabel", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Text("Played: $detectedLabel", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
         Text(
             text = if (!wasAttempted) "—" else if (correct) "✓" else "✗",
             color = if (!wasAttempted) MaterialTheme.colorScheme.onSurfaceVariant else if (correct) Color(0xFF4CAF50) else Color(0xFFF44336),

@@ -37,11 +37,13 @@ fun rememberPitchDetector(
     active: Boolean,
     midiMin: Int,
     midiMax: Int,
+    silenceThreshold: Float = 0.003f,
+    framesToConfirm: Int = 3,
     warmupFrames: Int = 0,
     onConfirmed: (midi: Int, hz: Float) -> Unit
 ): Float {
     val audioCapture = remember { AudioCapture() }
-    val pitchTracker = remember { PitchStabilityTracker() }
+    val pitchTracker = remember(silenceThreshold, framesToConfirm) { PitchStabilityTracker(silenceThreshold = silenceThreshold, requiredFrames = framesToConfirm) }
     val liveHzState = remember { mutableFloatStateOf(-1f) }
 
     DisposableEffect(active) {

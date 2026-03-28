@@ -13,7 +13,6 @@ interface Props {
 }
 
 const SCALE_NAMES = ['Major','Natural Minor','Harmonic Minor','Dorian','Mixolydian'];
-const MAX_ATTEMPTS = 5;
 
 function averageScore(cumulativeScorePercent: number, testsCompleted: number): number {
   return testsCompleted === 0 ? 0 : Math.floor(cumulativeScorePercent / testsCompleted);
@@ -113,7 +112,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     await playChord(await fetchIntroTriad());
     if (!sessionRunningRef.current) return;
     await new Promise(resolve => {
-      window.setTimeout(resolve, 800);
+      window.setTimeout(resolve, exercise.postChordGapMs);
     });
     if (!sessionRunningRef.current) return;
     await playSequence(
@@ -127,7 +126,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
           if (!sessionRunningRef.current) return;
           cancelPlayback();
           setStatus('listening');
-          startCapture(handleHzDetectedRef.current);
+          startCapture(handleHzDetectedRef.current, exercise.silenceThreshold);
         }, 700);
       },
       exercise.tempoBpm
@@ -152,7 +151,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
 
   const completeTest = useCallback((passed: boolean, attemptNotes: DetectedNote[], attemptsUsed: number) => {
     void invoke<number>('cmd_test_score', {
-      maxAttempts: MAX_ATTEMPTS,
+      maxAttempts: exercise.maxRetries,
       attemptsUsed,
       passed,
     }).then(testScore => {
@@ -163,7 +162,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         score: testScore,
         length: exercise.sequenceLength,
         attemptsUsed,
-        maxAttempts: MAX_ATTEMPTS,
+        maxAttempts: exercise.maxRetries,
         passed,
         expectedNotes: sequenceRef.current.map(midiToLabel),
         detectedNotes: attemptNotes.map(note => midiToLabel(note.midi)),
@@ -175,9 +174,9 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         if (sessionRunningRef.current) {
           void startFreshTest();
         }
-      }, 3000);
+      }, exercise.wrongNotePauseMs);
     });
-  }, [exercise.scaleId, exercise.rootNote, exercise.sequenceLength, schedule, startFreshTest]);
+  }, [exercise.scaleId, exercise.rootNote, exercise.sequenceLength, exercise.maxRetries, exercise.wrongNotePauseMs, schedule, startFreshTest]);
 
   handleHzDetectedRef.current = async (hz: number) => {
     setLiveHz(hz);
@@ -208,7 +207,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
        pitchConsumedRef.current = false;
      }
 
-     if (!pitchConsumedRef.current && stableCountRef.current >= 3) {
+     if (!pitchConsumedRef.current && stableCountRef.current >= exercise.framesToConfirm) {
        pitchConsumedRef.current = true;
        const expected = sequenceRef.current[idx];
        const correct = await invoke<boolean>('cmd_is_correct_note', {
@@ -234,14 +233,14 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       } else {
         stopCapture();
         setStatus('retry_delay');
-        if (currentAttemptRef.current >= MAX_ATTEMPTS) {
+        if (currentAttemptRef.current >= exercise.maxRetries) {
           completeTest(false, newDetected, currentAttemptRef.current);
         } else {
           schedule(() => {
             if (sessionRunningRef.current) {
               void retryCurrentTest(currentAttemptRef.current + 1);
             }
-          }, 3000);
+          }, exercise.wrongNotePauseMs);
         }
       }
     }
@@ -276,9 +275,9 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   const statusText = () => {
     switch (status) {
       case 'playing': return 'Listen carefully…';
-      case 'listening': return `Sing note ${currentNoteIndex + 1} of ${sequence.length}`;
+      case 'listening': return `Play note ${currentNoteIndex + 1} of ${sequence.length}`;
       case 'retry_delay':
-        return detected[detected.length - 1]?.correct === false && currentAttempt < MAX_ATTEMPTS
+        return detected[detected.length - 1]?.correct === false && currentAttempt < exercise.maxRetries
           ? 'Wrong note. Replaying the same test…'
           : 'Starting the next test…';
       case 'stopped': return 'Testing stopped';
@@ -318,7 +317,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       />
 
       <div className="status-text">{statusText()}</div>
-      <div className="exercise-meta">Attempt {currentAttempt} of {MAX_ATTEMPTS} • Tests {testsCompleted} • Score {score}%</div>
+      <div className="exercise-meta">Attempt {currentAttempt} of {exercise.maxRetries} • Tests {testsCompleted} • Score {score}%</div>
 
       <div className="pitch-meter-circle">
         <PitchMeter hz={liveHz} />

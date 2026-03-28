@@ -1,4 +1,4 @@
-export type Screen = 'home' | 'exercise' | 'setup' | 'results' | 'progress';
+export type Screen = 'home' | 'exercise' | 'setup' | 'results' | 'progress' | 'settings' | 'help';
 export type ExerciseStatus = 'playing' | 'listening' | 'retry_delay' | 'stopped';
 export type StaffNoteState = 'expected' | 'correct' | 'incorrect' | 'active';
 
@@ -22,6 +22,11 @@ export interface ExerciseSettings {
   tempoBpm: number;
   showTestNotes: boolean;
   keySignatureMode: number;  // 0=inline accidentals, 1=key signature
+  maxRetries: number;         // default 5
+  silenceThreshold: number;   // default 0.003
+  framesToConfirm: number;    // default 3
+  postChordGapMs: number;     // default 800
+  wrongNotePauseMs: number;   // default 3000
 }
 
 export interface ExerciseState {
@@ -33,6 +38,11 @@ export interface ExerciseState {
   tempoBpm: number;
   showTestNotes: boolean;
   keySignatureMode: number;
+  maxRetries: number;
+  silenceThreshold: number;
+  framesToConfirm: number;
+  postChordGapMs: number;
+  wrongNotePauseMs: number;
   sequence: number[]; // MIDI values
   detected: DetectedNote[];
   status: ExerciseStatus;

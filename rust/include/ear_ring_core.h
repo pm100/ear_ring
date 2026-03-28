@@ -109,6 +109,11 @@ int32_t ear_ring_key_sig_positions(uint8_t root_chroma, int32_t *out_buf, uint32
 /// Returns diatonic steps above C4 (C4=0, D4=1, …, B4=6, C5=7).
 int32_t ear_ring_staff_position_in_key(uint8_t midi, uint8_t root_chroma);
 
+/// Returns a pointer to a static null-terminated UTF-8 JSON string containing
+/// help sections: `[{"title":"...","body":"..."},...]`.
+/// The pointer is valid for the lifetime of the process. Do not free it.
+const char *ear_ring_help_content(void);
+
 #ifdef __cplusplus
 }
 #endif

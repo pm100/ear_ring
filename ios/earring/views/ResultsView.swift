@@ -69,13 +69,13 @@ struct ResultsView: View {
 
                             if index < model.detectedNotes.count {
                                 let d = model.detectedNotes[index]
-                                Text("Sung: \(MusicTheory.midiToLabel(d.midi))")
+                                Text("Played: \(MusicTheory.midiToLabel(d.midi))")
                                     .font(.body)
                                 Text(d.isCorrect ? "✓" : "✗")
                                     .font(.body.weight(.bold))
                                     .foregroundColor(d.isCorrect ? .erSuccess : .erError)
                             } else {
-                                Text("Sung: —")
+                                Text("Played: —")
                                     .font(.body)
                                     .foregroundColor(.erMuted)
                                 Text("—")
@@ -102,11 +102,6 @@ struct ResultsView: View {
                     Button("🏠 New Exercise") {
                         model.newRound()
                         path = NavigationPath()
-                    }
-                    .buttonStyle(OutlinedButtonStyle(height: 48, fontSize: 16))
-
-                    Button("📊 View Progress") {
-                        path.append(AppRoute.progress)
                     }
                     .buttonStyle(OutlinedButtonStyle(height: 48, fontSize: 16))
                 }

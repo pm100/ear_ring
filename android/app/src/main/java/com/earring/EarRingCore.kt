@@ -31,6 +31,7 @@ object EarRingCore {
     @JvmStatic external fun nativeAccidentalInKey(midi: Int, rootChroma: Int): Int
     @JvmStatic external fun nativeKeySigPositions(rootChroma: Int): IntArray
     @JvmStatic external fun nativeStaffPositionInKey(midi: Int, rootChroma: Int): Int
+    @JvmStatic external fun nativeHelpContent(): String
 
     fun detectPitch(samples: FloatArray, sampleRate: Int): Float =
         if (loaded) nativeDetectPitch(samples, sampleRate) else -1f
@@ -99,4 +100,7 @@ object EarRingCore {
 
     fun staffPositionInKey(midi: Int, rootChroma: Int): Int =
         if (loaded) nativeStaffPositionInKey(midi, rootChroma) else staffPosition(midi)
+
+    fun helpContent(): String =
+        if (loaded) nativeHelpContent() else "[]"
 }

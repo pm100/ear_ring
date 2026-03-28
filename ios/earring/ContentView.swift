@@ -2,9 +2,7 @@ import SwiftUI
 
 enum AppRoute: Hashable {
     case exercise
-    case setup
     case results
-    case progress
 }
 
 extension View {
@@ -19,9 +17,66 @@ extension View {
 }
 
 struct ContentView: View {
-    @State private var path = NavigationPath()
     @EnvironmentObject var exerciseModel: ExerciseModel
     @EnvironmentObject var progressModel: ProgressModel
+    @State private var selectedTab: Int = 0
+
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            // Tab 1: Home (with exercise navigation nested inside)
+            HomeTabView()
+                .tabItem {
+                    Label("Home", systemImage: "house.fill")
+                }
+                .tag(0)
+
+            // Tab 2: Mic Setup
+            NavigationStack {
+                SetupView()
+                    .hideNavigationBar()
+            }
+            .tabItem {
+                Label("Mic", systemImage: "mic.fill")
+            }
+            .tag(1)
+
+            // Tab 3: Progress
+            NavigationStack {
+                ProgressScreen()
+                    .hideNavigationBar()
+            }
+            .tabItem {
+                Label("Progress", systemImage: "chart.bar.fill")
+            }
+            .tag(2)
+
+            // Tab 4: Settings
+            NavigationStack {
+                SettingsView()
+                    .hideNavigationBar()
+            }
+            .tabItem {
+                Label("Settings", systemImage: "gearshape.fill")
+            }
+            .tag(3)
+
+            // Tab 5: Help
+            NavigationStack {
+                HelpView()
+                    .hideNavigationBar()
+            }
+            .tabItem {
+                Label("Help", systemImage: "questionmark.circle.fill")
+            }
+            .tag(4)
+        }
+        .tint(.indigo)
+    }
+}
+
+// Home tab wraps HomeView in a NavigationStack so Exercise can be pushed on top.
+struct HomeTabView: View {
+    @State private var path = NavigationPath()
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -30,12 +85,8 @@ struct ContentView: View {
                     switch route {
                     case .exercise:
                         ExerciseView(path: $path)
-                    case .setup:
-                        SetupView()
                     case .results:
                         ResultsView(path: $path)
-                    case .progress:
-                        ProgressScreen()
                     }
                 }
         }

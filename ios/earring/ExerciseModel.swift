@@ -42,6 +42,21 @@ class ExerciseModel: ObservableObject {
     @Published var keySignatureMode: Int = ud.object(forKey: "keySignatureMode") != nil ? ud.integer(forKey: "keySignatureMode") : 0 {
         didSet { UserDefaults.standard.set(keySignatureMode, forKey: "keySignatureMode") }
     }
+    @Published var maxRetries: Int = ud.object(forKey: "maxRetries") != nil ? ud.integer(forKey: "maxRetries") : 5 {
+        didSet { UserDefaults.standard.set(maxRetries, forKey: "maxRetries") }
+    }
+    @Published var silenceThreshold: Float = ud.object(forKey: "silenceThreshold") != nil ? Float(ud.double(forKey: "silenceThreshold")) : 0.003 {
+        didSet { UserDefaults.standard.set(Double(silenceThreshold), forKey: "silenceThreshold") }
+    }
+    @Published var framesToConfirm: Int = ud.object(forKey: "framesToConfirm") != nil ? ud.integer(forKey: "framesToConfirm") : 3 {
+        didSet { UserDefaults.standard.set(framesToConfirm, forKey: "framesToConfirm") }
+    }
+    @Published var postChordGapNanoseconds: UInt64 = ud.object(forKey: "postChordGapNs") != nil ? UInt64(ud.integer(forKey: "postChordGapNs")) : 800_000_000 {
+        didSet { UserDefaults.standard.set(Int(postChordGapNanoseconds), forKey: "postChordGapNs") }
+    }
+    @Published var wrongNotePauseNanoseconds: UInt64 = ud.object(forKey: "wrongNotePauseNs") != nil ? UInt64(ud.integer(forKey: "wrongNotePauseNs")) : 3_000_000_000 {
+        didSet { UserDefaults.standard.set(Int(wrongNotePauseNanoseconds), forKey: "wrongNotePauseNs") }
+    }
     @Published var sequence: [Int] = []
     @Published var detectedNotes: [DetectedNote] = []
     @Published var status: ExerciseStatus = .stopped
@@ -93,12 +108,10 @@ class ExerciseModel: ObservableObject {
     private var pitchConsumed: Bool = false
     private var warmupFramesRemaining: Int = 0
     private var sessionPersisted = false
-    private let silenceRMSThreshold: Float = 0.003
-    private let retryDelayNanoseconds: UInt64 = 3_000_000_000
-    private let introGapNanoseconds: UInt64 = 800_000_000
+
     // Gap between the last note of the sequence ending and mic start.
     // Piano sustain continues after playSequence returns; this silence lets it fade so
-    // the mic doesn't immediately pick up speaker resonance as a "sung" note.
+    // the mic doesn't immediately pick up speaker resonance as a "played" note.
     private let postSequenceGapNanoseconds: UInt64 = 700_000_000
     // Frames to discard when the mic first opens to absorb mic-settling transients.
     // 4 frames × ~93ms = ~370ms — enough to swallow hardware noise, not long enough
@@ -115,7 +128,7 @@ class ExerciseModel: ObservableObject {
         testsCompleted = 0
         score = 0
         currentAttempt = 1
-        maxAttempts = 5
+        maxAttempts = maxRetries
         Task { await startFreshTest() }
     }
 
@@ -210,7 +223,7 @@ class ExerciseModel: ObservableObject {
         // Let the chord ring freely through the intro gap and into the sequence —
         // stopping it early creates an unnatural cutoff.
         guard status == .playing else { return }
-        try? await Task.sleep(nanoseconds: introGapNanoseconds)
+        try? await Task.sleep(nanoseconds: self.postChordGapNanoseconds)
         guard status == .playing else { return }
         await audioPlayback.playSequence(notes: sequence, bpm: tempoBpm) { _ in }
         guard status == .playing else { return }
@@ -241,7 +254,7 @@ class ExerciseModel: ObservableObject {
     /// Returns (midi, cents) when a valid pitch is detected, nil otherwise.
     private func detectRawNote(samples: [Float], sampleRate: UInt32) -> (midi: Int, cents: Int)? {
         let rms = computeRMS(samples)
-        guard rms >= silenceRMSThreshold else {
+        guard rms >= silenceThreshold else {
             liveMidi = nil
             liveCents = 0
             resetStability()
@@ -260,7 +273,7 @@ class ExerciseModel: ObservableObject {
     private func checkStability(pitchClass: Int) -> Bool {
         if pitchClass == stabilityPitchClass {
             stabilityCount += 1
-            if !pitchConsumed && stabilityCount >= 3 {
+            if !pitchConsumed && stabilityCount >= framesToConfirm {
                 pitchConsumed = true
                 return true
             }
@@ -317,7 +330,7 @@ class ExerciseModel: ObservableObject {
                 completeTest(passed: false, attemptsUsed: currentAttempt, attemptNotes: detectedNotes)
             } else {
                 Task {
-                    try? await Task.sleep(nanoseconds: retryDelayNanoseconds)
+                    try? await Task.sleep(nanoseconds: self.wrongNotePauseNanoseconds)
                     guard self.isSessionRunning else { return }
                     await self.retryCurrentTest(attempt: self.currentAttempt + 1)
                 }
@@ -334,7 +347,7 @@ class ExerciseModel: ObservableObject {
         persistTestRecord(score: testScore, attemptsUsed: attemptsUsed, passed: passed, attemptNotes: attemptNotes)
 
         Task {
-            try? await Task.sleep(nanoseconds: retryDelayNanoseconds)
+            try? await Task.sleep(nanoseconds: self.wrongNotePauseNanoseconds)
             guard self.isSessionRunning else { return }
             await self.startFreshTest()
         }

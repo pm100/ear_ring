@@ -28,6 +28,11 @@ data class ExerciseState(
     val tempoBpm: Int = 100,
     val showTestNotes: Boolean = false,
     val keySignatureMode: Int = 0,  // 0=inline accidentals, 1=key signature
+    val maxRetries: Int = DEFAULT_MAX_ATTEMPTS,
+    val silenceThreshold: Float = DEFAULT_SILENCE_THRESHOLD,
+    val framesToConfirm: Int = DEFAULT_FRAMES_TO_CONFIRM,
+    val postChordGapMs: Long = DEFAULT_POST_CHORD_GAP_MS,
+    val wrongNotePauseMs: Long = DEFAULT_WRONG_NOTE_PAUSE_MS,
     val sequence: List<Int> = emptyList(),
     val detected: List<DetectedNote> = emptyList(),
     val status: ExerciseStatus = ExerciseStatus.STOPPED,
@@ -59,11 +64,13 @@ data class ExerciseState(
 }
 
 private const val DEFAULT_MAX_ATTEMPTS = 5
-private const val RETRY_DELAY_MS = 3000L
-private const val INTRO_GAP_MS = 800L
+private const val DEFAULT_SILENCE_THRESHOLD = 0.003f
+private const val DEFAULT_FRAMES_TO_CONFIRM = 3
+private const val DEFAULT_POST_CHORD_GAP_MS = 800L
+private const val DEFAULT_WRONG_NOTE_PAUSE_MS = 3000L
 // Gap between the last note of the sequence ending and mic start.
 // Piano sustain continues after `onDone` fires; this silence lets it fade so
-// the mic doesn't immediately pick up speaker resonance as a "sung" note.
+// the mic doesn't immediately pick up speaker resonance as a "played" note.
 private const val POST_SEQUENCE_GAP_MS = 700L
 
 private const val PREFS_NAME = "ear_ring_settings"
@@ -75,6 +82,11 @@ private const val PREF_SEQUENCE_LENGTH = "sequenceLength"
 private const val PREF_TEMPO_BPM = "tempoBpm"
 private const val PREF_SHOW_TEST_NOTES = "showTestNotes"
 private const val PREF_KEY_SIG_MODE = "keySignatureMode"
+private const val PREF_MAX_RETRIES = "maxRetries"
+private const val PREF_SILENCE_THRESHOLD = "silenceThreshold"
+private const val PREF_FRAMES_TO_CONFIRM = "framesToConfirm"
+private const val PREF_POST_CHORD_GAP_MS = "postChordGapMs"
+private const val PREF_WRONG_NOTE_PAUSE_MS = "wrongNotePauseMs"
 
 class ExerciseViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -92,6 +104,11 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             tempoBpm = prefs.getInt(PREF_TEMPO_BPM, 100),
             showTestNotes = prefs.getBoolean(PREF_SHOW_TEST_NOTES, false),
             keySignatureMode = prefs.getInt(PREF_KEY_SIG_MODE, 0),
+            maxRetries = prefs.getInt(PREF_MAX_RETRIES, DEFAULT_MAX_ATTEMPTS),
+            silenceThreshold = prefs.getFloat(PREF_SILENCE_THRESHOLD, DEFAULT_SILENCE_THRESHOLD),
+            framesToConfirm = prefs.getInt(PREF_FRAMES_TO_CONFIRM, DEFAULT_FRAMES_TO_CONFIRM),
+            postChordGapMs = prefs.getLong(PREF_POST_CHORD_GAP_MS, DEFAULT_POST_CHORD_GAP_MS),
+            wrongNotePauseMs = prefs.getLong(PREF_WRONG_NOTE_PAUSE_MS, DEFAULT_WRONG_NOTE_PAUSE_MS),
         )
     }
 
@@ -105,6 +122,11 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putInt(PREF_TEMPO_BPM, state.tempoBpm)
             .putBoolean(PREF_SHOW_TEST_NOTES, state.showTestNotes)
             .putInt(PREF_KEY_SIG_MODE, state.keySignatureMode)
+            .putInt(PREF_MAX_RETRIES, state.maxRetries)
+            .putFloat(PREF_SILENCE_THRESHOLD, state.silenceThreshold)
+            .putInt(PREF_FRAMES_TO_CONFIRM, state.framesToConfirm)
+            .putLong(PREF_POST_CHORD_GAP_MS, state.postChordGapMs)
+            .putLong(PREF_WRONG_NOTE_PAUSE_MS, state.wrongNotePauseMs)
             .apply()
     }
 
@@ -134,6 +156,11 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     fun setTempoBpm(bpm: Int) { _state.value = _state.value.copy(tempoBpm = bpm); saveSettings(_state.value) }
     fun setShowTestNotes(show: Boolean) { _state.value = _state.value.copy(showTestNotes = show); saveSettings(_state.value) }
     fun setKeySignatureMode(mode: Int) { _state.value = _state.value.copy(keySignatureMode = mode); saveSettings(_state.value) }
+    fun setMaxRetries(n: Int) { _state.value = _state.value.copy(maxRetries = n); saveSettings(_state.value) }
+    fun setSilenceThreshold(v: Float) { _state.value = _state.value.copy(silenceThreshold = v); saveSettings(_state.value) }
+    fun setFramesToConfirm(n: Int) { _state.value = _state.value.copy(framesToConfirm = n); saveSettings(_state.value) }
+    fun setPostChordGapMs(ms: Long) { _state.value = _state.value.copy(postChordGapMs = ms); saveSettings(_state.value) }
+    fun setWrongNotePauseMs(ms: Long) { _state.value = _state.value.copy(wrongNotePauseMs = ms); saveSettings(_state.value) }
 
     fun startExercise() {
         audioPlayback.cancelPlayback()
@@ -146,7 +173,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             seed = System.currentTimeMillis(),
             highlightIndex = -1,
             currentAttempt = 1,
-            maxAttempts = DEFAULT_MAX_ATTEMPTS,
+            maxAttempts = _state.value.maxRetries,
             testsCompleted = 0,
             cumulativeScorePercent = 0,
             sessionRunning = true
@@ -219,7 +246,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             onDone = {
                 if (_state.value.sessionRunning) {
                     viewModelScope.launch {
-                        delay(INTRO_GAP_MS)
+                        delay(_state.value.postChordGapMs)
                         if (_state.value.sessionRunning) {
                             audioPlayback.playSequence(
                                 midiNotes = state.sequence,
@@ -301,7 +328,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             cumulativeScorePercent = state.cumulativeScorePercent + scorePercent
         )
         viewModelScope.launch {
-            delay(RETRY_DELAY_MS)
+            delay(_state.value.wrongNotePauseMs)
             if (_state.value.sessionRunning) {
                 startFreshTest()
             }
@@ -310,7 +337,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
 
     private fun scheduleRetry(nextAttempt: Int) {
         viewModelScope.launch {
-            delay(RETRY_DELAY_MS)
+            delay(_state.value.wrongNotePauseMs)
             if (_state.value.sessionRunning) {
                 retryCurrentTest(nextAttempt)
             }

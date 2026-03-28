@@ -10,11 +10,79 @@ pub use music_theory::{
 };
 pub use pitch_detection::detect_pitch;
 
+// ── Help content ──────────────────────────────────────────────────────────────
+
+const HELP_MD: &str = include_str!("help.md");
+
+/// Parse the embedded help.md into a JSON array:
+/// `[{"title":"...","body":"..."},...]`
+/// Each section starts with a `## Title` line; body is everything until the next section.
+pub fn help_sections_json() -> String {
+    let mut sections: Vec<(String, String)> = Vec::new();
+    let mut current_title: Option<String> = None;
+    let mut current_body: Vec<&str> = Vec::new();
+
+    for line in HELP_MD.lines() {
+        if let Some(title) = line.strip_prefix("## ") {
+            if let Some(t) = current_title.take() {
+                sections.push((t, current_body.join("\n").trim().to_string()));
+                current_body.clear();
+            }
+            current_title = Some(title.trim().to_string());
+        } else if current_title.is_some() {
+            current_body.push(line);
+        }
+    }
+    if let Some(t) = current_title {
+        sections.push((t, current_body.join("\n").trim().to_string()));
+    }
+
+    let mut json = String::from("[");
+    for (i, (title, body)) in sections.iter().enumerate() {
+        if i > 0 { json.push(','); }
+        json.push_str(&format!(
+            "{{\"title\":{},\"body\":{}}}",
+            json_string(title),
+            json_string(body)
+        ));
+    }
+    json.push(']');
+    json
+}
+
+fn json_string(s: &str) -> String {
+    let mut out = String::from('"');
+    for c in s.chars() {
+        match c {
+            '"'  => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => {},
+            c    => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
 // ── C-compatible FFI surface ──────────────────────────────────────────────────
 // These thin wrappers are called from the React Native Turbo Native Module
 // (Swift / Kotlin) without requiring uniffi code-gen at this stage.
 
 use std::os::raw::{c_float, c_int, c_uchar, c_uint};
+
+/// Returns a pointer to a null-terminated UTF-8 JSON string containing the
+/// help sections: `[{"title":"...","body":"..."},...]`.
+/// The pointer is valid for the lifetime of the process (static storage).
+#[no_mangle]
+pub extern "C" fn ear_ring_help_content() -> *const std::os::raw::c_char {
+    use std::ffi::CString;
+    use std::sync::OnceLock;
+    static CACHE: OnceLock<CString> = OnceLock::new();
+    CACHE.get_or_init(|| {
+        CString::new(help_sections_json()).unwrap_or_else(|_| CString::new("[]").unwrap())
+    }).as_ptr()
+}
 
 /// Detect pitch from a raw f32 PCM buffer.
 ///
@@ -620,5 +688,16 @@ mod android_jni {
         root_chroma: jint,
     ) -> jint {
         staff_position_in_key(midi as u8, root_chroma as u8) as jint
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeHelpContent(
+        env: JNIEnv,
+        _class: JClass,
+    ) -> jstring {
+        let json = super::help_sections_json();
+        env.new_string(json)
+            .map(|s| s.into_raw())
+            .unwrap_or(std::ptr::null_mut())
     }
 }

@@ -64,6 +64,8 @@ fun ExerciseScreen(
         active = state.status == ExerciseStatus.LISTENING,
         midiMin = midiMin,
         midiMax = midiMax,
+        silenceThreshold = state.silenceThreshold,
+        framesToConfirm = state.framesToConfirm,
         warmupFrames = 10,
         onConfirmed = { midi, hz ->
             val cents = EarRingCore.freqToCents(hz)
@@ -168,7 +170,7 @@ fun ExerciseScreen(
 private fun statusText(state: com.earring.ExerciseState): String =
     when (state.status) {
         ExerciseStatus.PLAYING -> "Listen carefully…"
-        ExerciseStatus.LISTENING -> "👂 Sing note ${state.currentNoteIndex + 1} of ${state.sequence.size}"
+        ExerciseStatus.LISTENING -> "👂 Play note ${state.currentNoteIndex + 1} of ${state.sequence.size}"
         ExerciseStatus.RETRY_DELAY ->
             if (state.detected.lastOrNull()?.correct == false && state.currentAttempt < state.maxAttempts) {
                 "Wrong note. Replaying the same test…"

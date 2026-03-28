@@ -117,7 +117,6 @@ extension View {
 struct HomeView: View {
     @EnvironmentObject var model: ExerciseModel
     @Binding var path: NavigationPath
-    private let bpmOptions = [60, 80, 100, 120, 140]
 
     var body: some View {
         ScrollView {
@@ -191,19 +190,6 @@ struct HomeView: View {
                     }
                 }
 
-                sectionLabel("Tempo (BPM)").padding(.top, 16)
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible()), count: bpmOptions.count),
-                    spacing: 6
-                ) {
-                    ForEach(bpmOptions, id: \.self) { bpm in
-                        Button("\(bpm)") {
-                            model.tempoBpm = bpm
-                        }
-                        .buttonStyle(ChipButtonStyle(selected: model.tempoBpm == bpm))
-                    }
-                }
-
                 HStack(spacing: 8) {
                     Toggle(isOn: Binding(
                         get: { model.showTestNotes },
@@ -228,16 +214,6 @@ struct HomeView: View {
                         path.append(AppRoute.exercise)
                     }
                     .buttonStyle(PrimaryButtonStyle(height: 52, fontSize: 18))
-
-                    Button("🎙 Mic Setup") {
-                        path.append(AppRoute.setup)
-                    }
-                    .buttonStyle(OutlinedButtonStyle(height: 48, fontSize: 16))
-
-                    Button("📊 Progress") {
-                        path.append(AppRoute.progress)
-                    }
-                    .buttonStyle(OutlinedButtonStyle(height: 48, fontSize: 16))
                 }
                 .padding(.top, 32)
                 .padding(.bottom, 16)

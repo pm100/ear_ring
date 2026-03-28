@@ -58,19 +58,39 @@ the task complete. This keeps the spec accurate for future agents.**
 
 ---
 
+## Navigation — Bottom Tab Bar
+
+All platforms use a **persistent 5-tab bottom navigation bar** visible on every screen except Exercise.
+
+| Tab index | Label | Icon |
+|-----------|-------|------|
+| 0 | Home | 🏠 (Home / house) |
+| 1 | Mic | 🎙 (Microphone) |
+| 2 | Progress | 📊 (Bar chart) |
+| 3 | Settings | ⚙️ (Gear / settings) |
+| 4 | Help | ❓ (Help / question mark) |
+
+- The bottom bar is **hidden** during Exercise (Exercise is a push route on the Home stack, not a tab).
+- Tapping a tab always navigates to that tab's root screen (not a sub-page of it).
+- The previously separate "Mic Setup" and "Progress" buttons on the Home screen are removed; they are accessed via tabs.
+
+---
+
 ## Screen Inventory
 
-Every platform must implement all 5 screens:
+Every platform must implement all 7 screens:
 
 | Screen | Navigation trigger |
 |--------|--------------------|
-| Home | App launch / leaving Exercise via Back or Stop |
-| Exercise | "Start Exercise" from Home |
-| Mic Setup | "Mic Setup" from Home |
+| Home | App launch / leaving Exercise via Back or Stop; Home tab |
+| Exercise | "Start Exercise" button on Home — push route (no tab bar) |
+| Mic Setup | Mic tab |
 | Results | Reserved legacy screen; **not shown during continuous testing mode** |
-| Progress | "Progress" from Home |
+| Progress | Progress tab |
+| Settings | Settings tab |
+| Help | Help tab |
 
-Back navigation must work on every screen except Home.
+Back navigation must work on Exercise (and Results if reached):
 - **Android & iOS**: system back gesture only — no on-screen "← Back" button.
 - **Desktop/Tauri**: on-screen "← Back" button (no system back gesture available).
 
@@ -113,11 +133,6 @@ Section label: "Sequence Length"
 Chip row: 2  3  4  5  6  7  8   (single row, equal width)
 
 [16dp space]
-Section label: "Tempo (BPM)"
-Chip row: 60  80  100  120  140   (single row, equal width)
-  — Default selection: 100 BPM
-
-[16dp space]
 Row (same line): ☐ Display Test Notes    ☐ Use Key Signature
   — Both checkboxes on one row with a gap between them
   — "Display Test Notes" default: unchecked (hidden)
@@ -127,10 +142,10 @@ Row (same line): ☐ Display Test Notes    ☐ Use Key Signature
 
 [32dp space]
 [▶ Start Exercise]    — full-width filled primary button, 52dp tall, 18sp
-[🎙 Mic Setup]        — full-width outlined button, 48dp tall, 16sp
-[📊 Progress]         — full-width outlined button, 48dp tall, 16sp
 [16dp space]
 ```
+
+**Removed from Home (now in Settings tab):** Tempo (BPM), Mic Setup button, Progress button.
 
 Section labels: small/label typography, muted colour, left-aligned, 6dp bottom margin.
 
@@ -148,10 +163,10 @@ MusicStaff            — full width, 160dp tall (see Staff spec below)
                         MUST start EMPTY for each attempt when "Display Test Notes" = Hide
                         If "Display Test Notes" = Show:
                           - draw the target sequence in EXPECTED black before listening starts
-                          - each correctly sung note turns its target note green
+                          - each correctly played note turns its target note green
                           - a wrong note replaces the current target slot with the detected note in red
                         If "Display Test Notes" = Hide:
-                          - only detected/sung notes are shown on the staff
+                          - only detected/played notes are shown on the staff
                         Use the same left-to-right fixed 44dp note spacing as Mic Setup
                         Correct notes: green
                         Wrong notes: red
@@ -159,7 +174,7 @@ MusicStaff            — full width, 160dp tall (see Staff spec below)
 [12dp space]
 Status text           — bodyLarge, muted colour, centred
   PLAYING:     "Listen carefully…"
-  LISTENING:   "Sing note N of M"
+  LISTENING:   "Play note N of M"
   RETRY_DELAY: "Wrong note. Replaying the same test…" OR
                "Starting the next test…"
   STOPPED:     "Testing stopped"
@@ -184,7 +199,7 @@ PitchMeter            — 90dp circle (see Pitch Meter spec below)
 [20dp space]
 Current attempt row (if one or more notes were detected this attempt):
   Label: "Current attempt"
-  Render sung note labels only
+  Render played note labels only
   Correct labels: green
   Wrong labels: red
 ```
@@ -197,19 +212,19 @@ Exercise dynamics:
   3. Wait an 800ms gap after the chord before the prompt starts
   4. App plays the hidden test sequence
   5. App automatically switches to listening mode
-- If the user sings a wrong note:
+- If the user plays a wrong note:
   - show that wrong note on the staff in red
   - keep the detected note visible on the staff for a few seconds
-  - pause 3 seconds
+  - pause 3 seconds (default, configurable as Wrong-Note Pause in Settings)
   - replay the **same** test sequence
 - If "Display Test Notes" is enabled, expected notes are shown in black and the current slot updates to green/red as notes are judged.
 - Correct detected notes must be shown on the staff in green immediately.
 - Correct detected notes must remain visible on the staff until the next attempt or next test begins.
 - Display staff notes as proper note symbols: filled noteheads with stems, plus a sharp/flat accidental before the notehead when needed.
-- Retry the same test up to the retry cap (default 5 attempts total).
+- Retry the same test up to the retry cap (default 5 attempts total, configurable in Settings).
 - If the user gets the test right, or exhausts retries, immediately generate a **fresh** test and continue hands-free.
 - The user should be able to keep playing indefinitely without touching the app until they choose Stop/Back.
-- The hidden test sequence playback speed is controlled by the selected Home-screen tempo setting.
+- The hidden test sequence playback speed is controlled by the BPM setting (configured in Settings tab).
 - Per-test score:
   - first-try success = 100%
   - later successes scale down by attempt number
@@ -227,12 +242,12 @@ Exercise control flow (canonical state machine):
    - If `Display Test Notes = Show`, draw the target test notes in black before any audio plays.
 3. **Prompt playback**
    - Play the tonic triad as a single chord.
-   - Wait the post-chord gap.
+   - Wait the post-chord gap (default 800ms, configurable in Settings).
    - Play the hidden test sequence at the selected BPM.
 4. **Auto listening**
    - Transition to listening automatically with no user action.
    - Evaluate live pitch using the same stability / spacing rules as Mic Setup.
-   - As each sung note is confirmed:
+   - As each played note is confirmed:
      - correct note -> render it green on the staff
      - wrong note -> render the detected note red in the current slot / current attempt history
 5. **Attempt resolution**
@@ -257,11 +272,11 @@ Exercise control flow (canonical state machine):
 Layout: vertical column, 16dp padding.
 
 ```
-                        [Mic Setup]        (centred title; system back gesture on iOS/Android;
-                                            ← Back button on Desktop)
+                        [Mic Setup]        (tab — no back button on iOS/Android;
+                                            Mic tab on all platforms)
 
 [24dp space]
-"Sing or play a note to test your microphone."   — bodyMedium, centred
+"Play a note to test your microphone."   — bodyMedium, centred
 
 [16dp space]
 👂 Listening…           — ear emoji (28sp) + "Listening…" label (subheadline semibold, primary colour)
@@ -288,7 +303,7 @@ Hz display            — bodyMedium, muted, shown only when pitch detected
 PitchMeter            — 90dp circle
 
 Mic Setup **starts listening automatically on entry** — there is NO Start Listening button
-and NO Stop button. The user exits via system back gesture (iOS/Android) or ← Back (Desktop).
+and NO Stop button. The user exits by tapping another tab.
 
 NO test note buttons.
 ```
@@ -325,7 +340,7 @@ Divider
 "Note by Note"        — titleMedium, semibold
 
 For each note (index, expectedLabel, detectedLabel, correct):
-  Row:  "N."  |  "Expected: X"  |  "Sung: Y"  |  ✓/✗/—
+  Row:  "N."  |  "Expected: X"  |  "Played: Y"  |  ✓/✗/—
   ✓ = green, ✗ = red, — = muted (not attempted)
   Divider between rows (muted colour)
 
@@ -345,7 +360,7 @@ Do not rely on this screen for persistence in continuous testing mode.
 Layout: vertically scrollable column, 16dp padding.
 
 ```
-                        [Progress]         (centred title; system back gesture)
+                        [Progress]         (tab — no back button)
 
 Streak card:
   🔥 N day streak     — prominent display
@@ -368,6 +383,73 @@ Recent tests:
     Pass/fail summary with attempts used
     Score percentage
 ```
+
+---
+
+### Settings Screen
+
+Layout: vertically scrollable column, 16dp padding.
+
+```
+                        [Settings]         (tab — no back button)
+
+[16dp space]
+Section label: "Tempo (BPM)"
+Chip row: 60  80  100  120  140   (single row, equal width)
+  — Default selection: 100 BPM
+
+[16dp space]
+Section label: "Max Retries"
+Chip row: 1  2  3  4  5  6  7   (single row, equal width)
+  — Default: 5
+
+[16dp space]
+Section label: "Mic Sensitivity (Silence Threshold)"
+Slider: 0.001 – 0.020, step 0.001, default 0.003
+  — Lower = more sensitive (picks up quieter sound)
+  — Current value shown as label (e.g. "0.003")
+
+[16dp space]
+Section label: "Note Stability (Frames to Confirm)"
+Chip row: 1  2  3  4  5  6  7   (single row, equal width)
+  — Default: 3
+
+[16dp space]
+Section label: "Post-Chord Gap"
+Slider: 200ms – 2000ms, step 100ms, default 800ms
+  — Gap between chord and test sequence playback
+  — Current value shown as label (e.g. "800 ms")
+
+[16dp space]
+Section label: "Wrong-Note Pause"
+Slider: 500ms – 5000ms, step 500ms, default 3000ms
+  — Pause before replaying sequence after a wrong note
+  — Current value shown as label (e.g. "3000 ms")
+```
+
+All settings persist across app restarts.
+- Android: SharedPreferences
+- iOS: UserDefaults
+- Desktop: localStorage
+
+---
+
+### Help Screen
+
+Layout: vertically scrollable column, 16dp padding.
+
+```
+                        [Help]             (tab — no back button)
+
+Sections loaded from the shared Rust core (rust/src/help.md, embedded at compile time).
+Each platform calls EarRingCore.helpContent() / cmd_help_content() which returns JSON:
+  [{"title":"...","body":"..."},...]
+Body text uses \n\n to separate paragraphs. Platforms split on \n\n and render each as a paragraph.
+```
+
+**help.md is the single source of truth for help text.** Edit `rust/src/help.md` to change
+any help content — it propagates to all three platforms automatically at next build.
+Sections start with `## Section Title`; paragraphs are separated by blank lines.
 
 ---
 
@@ -539,15 +621,17 @@ Circular widget, **90dp/px diameter**.
 - Pitch-shift: find nearest available sample, playbackRate = 2^(delta_semitones/12)
 - Cache samples locally after first download
 - Sequence playback: 600ms between notes
-- Sequence playback interval: `60000 / bpm` milliseconds, where BPM is selected on the Home screen
+- Sequence playback interval: `60000 / bpm` milliseconds, where BPM is selected in the Settings tab
 - Default test tempo: 100 BPM
+- Post-chord gap before test sequence: 800ms (default, configurable in Settings)
+- Wrong-note pause before replaying: 3000ms (default, configurable in Settings)
 
 **Shared pitch detection pipeline** — used identically by both Mic Setup and Exercise screens:
 - Sample rate: 44100 Hz
 - Buffer size: 4096 samples
 - Pass raw f32 PCM to Rust `detect_pitch()`
-- Silence threshold: RMS < 0.003 → ignore frame
-- Require 3 consecutive frames with the same pitch class (midi % 12) before confirming a note
+- Silence threshold: RMS < silenceThreshold (default 0.003, configurable in Settings) → ignore frame
+- Require N consecutive frames with the same pitch class (midi % 12) before confirming a note (default N=3, configurable in Settings as "Note Stability")
 - After confirming a pitch, do not confirm it again until the pitch class changes or silence resets stability
 - The detection and display dynamics (stability rules, note rendering, staff updates) must use the same code path on each platform; only the post-confirmation action differs per screen
 
@@ -628,8 +712,13 @@ verification). Wait for the logcat message `Displayed com.earring/.MainActivity`
 ```
 Known approximate tap targets on the Home screen (1080×2400):
 - "Start Exercise" button: (540, 1810)
-- "Mic Setup" button: (540, 1968)
-- "Progress" button: (540, 2060)
+
+Bottom nav tab bar tap targets (approx, bottom of 1080×2400 screen):
+- Home tab:     (108, 2340)
+- Mic tab:      (324, 2340)
+- Progress tab: (540, 2340)
+- Settings tab: (756, 2340)
+- Help tab:     (972, 2340)
 
 **Back navigation:**
 ```powershell
@@ -700,8 +789,8 @@ $bmp.Save("C:\work\ear_ring\tauri_cap.png")
 **Navigate to a specific screen without clicking** (most reliable):
 Temporarily change the initial `useState` in `desktop/src/App.tsx`:
 ```tsx
-// Change 'home' to 'setup', 'exercise', etc. — Vite hot-reloads instantly
-const [screen, setScreen] = useState<Screen>('setup');
+// Change 'home' to 'setup', 'exercise', 'settings', 'help', etc. — Vite hot-reloads instantly
+const [screen, setScreen] = useState<Screen>('settings');
 ```
 Revert to `'home'` after capturing. Hot-reload takes ~2–3 seconds.
 

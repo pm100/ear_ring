@@ -10,10 +10,12 @@ interface Props {
   rangeEnd: number;
   rootChroma?: number;
   keySignatureMode?: number;
+  silenceThreshold?: number;
+  framesToConfirm?: number;
 }
 
 
-export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma = 0, keySignatureMode = 0 }: Props) {
+export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma = 0, keySignatureMode = 0, silenceThreshold, framesToConfirm }: Props) {
   const [hz, setHz] = useState(0);
   const [currentMidi, setCurrentMidi] = useState<number>(-1);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
@@ -32,9 +34,9 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
       if (midi >= 0) {
         const pitchClass = midi % 12;
         frameNotesRef.current.push(pitchClass);
-        if (frameNotesRef.current.length > 3) frameNotesRef.current.shift();
+        if (frameNotesRef.current.length > (framesToConfirm ?? 3)) frameNotesRef.current.shift();
         const last = frameNotesRef.current;
-        if (last.length === 3 && last[0] === last[1] && last[1] === last[2]) {
+        if (last.length === (framesToConfirm ?? 3) && last[0] === last[1] && last[1] === last[2]) {
           if (midi < midiMin || midi > midiMax) return;
           setCurrentMidi(midi);
           // Only suppress re-confirm for a *sustained* note (same midi, no silence).
@@ -60,7 +62,7 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
 
   // Auto-start on entry, auto-stop on unmount
   useEffect(() => {
-    start(handleHz);
+    start(handleHz, silenceThreshold);
     return () => stop();
   }, [start, stop, handleHz]);
 
@@ -74,7 +76,7 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
         <span className="screen-title">Mic Setup</span>
       </div>
 
-      <p className="setup-instruction">Sing or play a note to test your microphone.</p>
+      <p className="setup-instruction">Play a note to test your microphone.</p>
 
       <div className="listening-indicator">
         <span className="listening-ear">👂</span>
