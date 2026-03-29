@@ -114,6 +114,16 @@ int32_t ear_ring_staff_position_in_key(uint8_t midi, uint8_t root_chroma);
 /// The pointer is valid for the lifetime of the process. Do not free it.
 const char *ear_ring_help_content(void);
 
+/// Returns a pointer to a static null-terminated UTF-8 JSON string listing
+/// available instruments: `[{"id":0,"name":"Piano","semitones":0},...]`.
+/// The pointer is valid for the lifetime of the process. Do not free it.
+const char *ear_ring_instrument_list(void);
+
+/// Convert a concert MIDI note number to the written/display MIDI for a given
+/// instrument index (as returned by ear_ring_instrument_list).
+/// Clamps the result to 0–127. Returns the unchanged MIDI if index is out of range.
+int32_t ear_ring_transpose_display_midi(int32_t concert_midi, int32_t instrument_index);
+
 #ifdef __cplusplus
 }
 #endif

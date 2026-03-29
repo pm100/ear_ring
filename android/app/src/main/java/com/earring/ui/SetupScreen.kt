@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.earring.EarRingCore
 import com.earring.MusicTheory
 import com.earring.ui.components.MusicStaff
 import com.earring.ui.components.NoteState
@@ -16,18 +17,16 @@ import com.earring.ui.components.PitchMeter
 import com.earring.ui.components.StaffNote
 
 @Composable
-fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71, rootChroma: Int = 0, keySignatureMode: Int = 0, silenceThreshold: Float = 0.003f, framesToConfirm: Int = 3) {
+fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71, rootChroma: Int = 0, keySignatureMode: Int = 0, silenceThreshold: Float = 0.003f, framesToConfirm: Int = 3, instrumentIndex: Int = 0) {
     val noteStepDp = 44.dp
     val midiMin = rangeStart
     val midiMax = rangeEnd
     val maxHistory = 8
 
-    var displayMidi by remember { mutableIntStateOf(-1) }
-    val noteHistory = remember { mutableStateListOf<Int>() }
+    var concertMidi by remember { mutableIntStateOf(-1) }
+    val concertHistory = remember { mutableStateListOf<Int>() }
 
     // Shared pitch detection — identical pipeline to ExerciseScreen.
-    // Auto-starts on entry; onConfirmed appends every stable note (same-note
-    // repetition is handled by PitchStabilityTracker resetting on silence).
     val liveHz = rememberPitchDetector(
         active = true,
         midiMin = midiMin,
@@ -35,14 +34,18 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71, ro
         silenceThreshold = silenceThreshold,
         framesToConfirm = framesToConfirm,
         onConfirmed = { midi, _ ->
-            displayMidi = midi
-            noteHistory.add(midi)
-            if (noteHistory.size > maxHistory) noteHistory.removeAt(0)
+            concertMidi = midi
+            concertHistory.add(midi)
+            if (concertHistory.size > maxHistory) concertHistory.removeAt(0)
         }
     )
 
     // Clear display when silence detected
-    if (liveHz <= 0f) displayMidi = -1
+    if (liveHz <= 0f) concertMidi = -1
+
+    // Apply instrument transposition for display
+    val displayMidi = if (concertMidi >= 0) EarRingCore.transposeDisplayMidi(concertMidi, instrumentIndex) else -1
+    val displayHistory = concertHistory.map { EarRingCore.transposeDisplayMidi(it, instrumentIndex) }
 
     BackHandler { onBack() }
 
@@ -83,8 +86,8 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71, ro
         Spacer(Modifier.height(16.dp))
 
         MusicStaff(
-            notes = noteHistory.mapIndexed { i, m ->
-                StaffNote(m, if (i == noteHistory.size - 1) NoteState.ACTIVE else NoteState.EXPECTED)
+            notes = displayHistory.mapIndexed { i, m ->
+                StaffNote(m, if (i == displayHistory.size - 1) NoteState.ACTIVE else NoteState.EXPECTED)
             },
             modifier = Modifier.fillMaxWidth(),
             fixedSpacingDp = noteStepDp,

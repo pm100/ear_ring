@@ -138,7 +138,8 @@ fun EarRingApp() {
                     rootChroma = state.rootNote,
                     keySignatureMode = state.keySignatureMode,
                     silenceThreshold = state.silenceThreshold,
-                    framesToConfirm = state.framesToConfirm
+                    framesToConfirm = state.framesToConfirm,
+                    instrumentIndex = state.instrumentIndex
                 )
             }
             composable(Routes.RESULTS) {

@@ -57,6 +57,9 @@ class ExerciseModel: ObservableObject {
     @Published var wrongNotePauseNanoseconds: UInt64 = ud.object(forKey: "wrongNotePauseNs") != nil ? UInt64(ud.integer(forKey: "wrongNotePauseNs")) : 3_000_000_000 {
         didSet { UserDefaults.standard.set(Int(wrongNotePauseNanoseconds), forKey: "wrongNotePauseNs") }
     }
+    @Published var instrumentIndex: Int = ud.object(forKey: "instrumentIndex") != nil ? ud.integer(forKey: "instrumentIndex") : 0 {
+        didSet { UserDefaults.standard.set(instrumentIndex, forKey: "instrumentIndex") }
+    }
     @Published var sequence: [Int] = []
     @Published var detectedNotes: [DetectedNote] = []
     @Published var status: ExerciseStatus = .stopped

@@ -33,6 +33,7 @@ data class ExerciseState(
     val framesToConfirm: Int = DEFAULT_FRAMES_TO_CONFIRM,
     val postChordGapMs: Long = DEFAULT_POST_CHORD_GAP_MS,
     val wrongNotePauseMs: Long = DEFAULT_WRONG_NOTE_PAUSE_MS,
+    val instrumentIndex: Int = 0,
     val sequence: List<Int> = emptyList(),
     val detected: List<DetectedNote> = emptyList(),
     val status: ExerciseStatus = ExerciseStatus.STOPPED,
@@ -87,6 +88,7 @@ private const val PREF_SILENCE_THRESHOLD = "silenceThreshold"
 private const val PREF_FRAMES_TO_CONFIRM = "framesToConfirm"
 private const val PREF_POST_CHORD_GAP_MS = "postChordGapMs"
 private const val PREF_WRONG_NOTE_PAUSE_MS = "wrongNotePauseMs"
+private const val PREF_INSTRUMENT_INDEX = "instrumentIndex"
 
 class ExerciseViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -109,6 +111,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             framesToConfirm = prefs.getInt(PREF_FRAMES_TO_CONFIRM, DEFAULT_FRAMES_TO_CONFIRM),
             postChordGapMs = prefs.getLong(PREF_POST_CHORD_GAP_MS, DEFAULT_POST_CHORD_GAP_MS),
             wrongNotePauseMs = prefs.getLong(PREF_WRONG_NOTE_PAUSE_MS, DEFAULT_WRONG_NOTE_PAUSE_MS),
+            instrumentIndex = prefs.getInt(PREF_INSTRUMENT_INDEX, 0),
         )
     }
 
@@ -127,6 +130,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putInt(PREF_FRAMES_TO_CONFIRM, state.framesToConfirm)
             .putLong(PREF_POST_CHORD_GAP_MS, state.postChordGapMs)
             .putLong(PREF_WRONG_NOTE_PAUSE_MS, state.wrongNotePauseMs)
+            .putInt(PREF_INSTRUMENT_INDEX, state.instrumentIndex)
             .apply()
     }
 
@@ -161,6 +165,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     fun setFramesToConfirm(n: Int) { _state.value = _state.value.copy(framesToConfirm = n); saveSettings(_state.value) }
     fun setPostChordGapMs(ms: Long) { _state.value = _state.value.copy(postChordGapMs = ms); saveSettings(_state.value) }
     fun setWrongNotePauseMs(ms: Long) { _state.value = _state.value.copy(wrongNotePauseMs = ms); saveSettings(_state.value) }
+    fun setInstrumentIndex(idx: Int) { _state.value = _state.value.copy(instrumentIndex = idx); saveSettings(_state.value) }
 
     fun startExercise() {
         audioPlayback.cancelPlayback()

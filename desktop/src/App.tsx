@@ -31,6 +31,7 @@ const defaultSettings: ExerciseSettings = (() => {
     framesToConfirm: 3,
     postChordGapMs: 800,
     wrongNotePauseMs: 3000,
+    instrumentIndex: 0,
   };
 })();
 
@@ -103,6 +104,7 @@ export default function App() {
         framesToConfirm: settings.framesToConfirm,
         postChordGapMs: settings.postChordGapMs,
         wrongNotePauseMs: settings.wrongNotePauseMs,
+        instrumentIndex: settings.instrumentIndex,
         sequence,
         detected: [],
         status: 'playing',
@@ -161,6 +163,7 @@ export default function App() {
           keySignatureMode={settings.keySignatureMode}
           silenceThreshold={settings.silenceThreshold}
           framesToConfirm={settings.framesToConfirm}
+          instrumentIndex={settings.instrumentIndex}
         />
       )}
       {screen === 'results' && (

@@ -447,6 +447,36 @@ pub fn accidental_in_key(midi: u8, root_chroma: u8) -> Option<&'static str> {
     }
 }
 
+// ── Instrument transposition ──────────────────────────────────────────────────
+
+pub struct InstrumentInfo {
+    pub name: &'static str,
+    /// Semitones to add to concert MIDI to get written/display MIDI.
+    /// written = concert + semitones
+    pub semitones: i32,
+}
+
+pub const INSTRUMENTS: &[InstrumentInfo] = &[
+    InstrumentInfo { name: "Piano",             semitones:  0 },
+    InstrumentInfo { name: "Guitar",            semitones:  0 },
+    InstrumentInfo { name: "Transposed Guitar", semitones: 12 },
+    InstrumentInfo { name: "Soprano Sax",       semitones:  2 },
+    InstrumentInfo { name: "Alto Sax",          semitones:  9 },
+    InstrumentInfo { name: "Tenor Sax",         semitones:  2 },
+    InstrumentInfo { name: "Trumpet",           semitones:  2 },
+    InstrumentInfo { name: "Clarinet",          semitones:  2 },
+];
+
+/// Convert a concert MIDI number to the written/display MIDI for a given instrument.
+/// The result is clamped to the valid MIDI range 0–127.
+pub fn transpose_display_midi(concert_midi: i32, instrument_index: usize) -> i32 {
+    let semitones = INSTRUMENTS
+        .get(instrument_index)
+        .map(|i| i.semitones)
+        .unwrap_or(0);
+    (concert_midi + semitones).clamp(0, 127)
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

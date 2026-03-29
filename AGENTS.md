@@ -394,6 +394,14 @@ Layout: vertically scrollable column, 16dp padding.
                         [Settings]         (tab — no back button)
 
 [16dp space]
+Section label: "Instrument"
+Dropdown (outlined, full width): Piano | Guitar | Transposed Guitar | Soprano Sax | Alto Sax |
+                                  Tenor Sax | Trumpet | Clarinet
+  — Default: Piano (index 0)
+  — Selecting a transposing instrument causes Mic Setup and Exercise screens to display
+    written pitch instead of concert pitch (display only — detection stays in concert pitch)
+
+[16dp space]
 Section label: "Tempo (BPM)"
 Chip row: 60  80  100  120  140   (single row, equal width)
   — Default selection: 100 BPM
@@ -673,6 +681,32 @@ Persistence rules:
 - Continuous testing mode does **not** show Results before persistence; users later inspect outcomes from Home -> Progress.
 
 Streak = number of consecutive calendar days with at least one session.
+
+---
+
+## Instrument Transposition
+
+The app supports transposing instruments. The canonical instrument list is defined in Rust
+(`music_theory.rs` — `INSTRUMENTS` array) and exposed via FFI to all platforms.
+
+**Transposition is display-only.** Concert pitch is used for all pitch detection, comparison,
+key/range settings, and audio playback. Transposition is applied at the last moment before
+rendering note labels and staff notes in Mic Setup and Exercise screens.
+
+**Written = Concert + Semitones**
+
+| Instrument         | Semitones | Notes |
+|--------------------|-----------|-------|
+| Piano              | 0         | Non-transposing |
+| Guitar             | 0         | Sounds as written (concert) |
+| Transposed Guitar  | +12       | Octave-transposing; written C4 = concert C3 |
+| Soprano Sax        | +2        | Bb instrument |
+| Alto Sax           | +9        | Eb instrument |
+| Tenor Sax          | +2        | Detect A4/440Hz → display B4 |
+| Trumpet            | +2        | Bb instrument |
+| Clarinet           | +2        | Bb instrument |
+
+The instrument index (0 = Piano) is persisted across restarts on all platforms.
 
 ---
 

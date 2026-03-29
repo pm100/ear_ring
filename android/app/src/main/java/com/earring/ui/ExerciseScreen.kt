@@ -75,17 +75,18 @@ fun ExerciseScreen(
 
     val liveMidi = if (liveHz > 0f) EarRingCore.freqToMidi(liveHz) else -1
     val noteStepDp = 44.dp
+    val instrIdx = state.instrumentIndex
     val staffNotes = if (state.showTestNotes) {
         state.sequence.mapIndexed { index, expectedMidi ->
             val attemptNote = state.detected.getOrNull(index)
             when {
-                attemptNote == null -> StaffNote(expectedMidi, NoteState.EXPECTED)
-                attemptNote.correct -> StaffNote(expectedMidi, NoteState.CORRECT)
-                else -> StaffNote(attemptNote.midi, NoteState.INCORRECT)
+                attemptNote == null -> StaffNote(EarRingCore.transposeDisplayMidi(expectedMidi, instrIdx), NoteState.EXPECTED)
+                attemptNote.correct -> StaffNote(EarRingCore.transposeDisplayMidi(expectedMidi, instrIdx), NoteState.CORRECT)
+                else -> StaffNote(EarRingCore.transposeDisplayMidi(attemptNote.midi, instrIdx), NoteState.INCORRECT)
             }
         }
     } else {
-        state.detected.map { StaffNote(it.midi, if (it.correct) NoteState.CORRECT else NoteState.INCORRECT) }
+        state.detected.map { StaffNote(EarRingCore.transposeDisplayMidi(it.midi, instrIdx), if (it.correct) NoteState.CORRECT else NoteState.INCORRECT) }
     }
 
     // Guard against double back-navigation (predictive back + BackHandler race).
@@ -157,7 +158,7 @@ fun ExerciseScreen(
             ) {
                 state.detected.forEach {
                     Text(
-                        text = MusicTheory.midiToLabel(it.midi),
+                        text = MusicTheory.midiToLabel(EarRingCore.transposeDisplayMidi(it.midi, instrIdx)),
                         color = if (it.correct) androidx.compose.ui.graphics.Color(0xFF4CAF50) else androidx.compose.ui.graphics.Color(0xFFF44336),
                         fontWeight = FontWeight.SemiBold
                     )

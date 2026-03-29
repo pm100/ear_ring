@@ -6,21 +6,27 @@ struct ExerciseView: View {
     @EnvironmentObject var progressModel: ProgressModel
     @Binding var path: NavigationPath
 
+    @State private var transpSemitones: Int = 0
+
+    private func transpMidi(_ midi: Int) -> Int {
+        min(127, max(0, midi + transpSemitones))
+    }
+
     private var staffNotes: [StaffDisplayNote] {
         if model.showTestNotes {
             return model.sequence.enumerated().map { index, expectedMidi in
                 if index < model.detectedNotes.count {
                     let detected = model.detectedNotes[index]
                     return StaffDisplayNote(
-                        midi: detected.isCorrect ? expectedMidi : detected.midi,
+                        midi: transpMidi(detected.isCorrect ? expectedMidi : detected.midi),
                         state: detected.isCorrect ? .correct : .incorrect
                     )
                 }
-                return StaffDisplayNote(midi: expectedMidi, state: .expected)
+                return StaffDisplayNote(midi: transpMidi(expectedMidi), state: .expected)
             }
         }
         return model.detectedNotes.map {
-            StaffDisplayNote(midi: $0.midi, state: $0.isCorrect ? .correct : .incorrect)
+            StaffDisplayNote(midi: transpMidi($0.midi), state: $0.isCorrect ? .correct : .incorrect)
         }
     }
 
@@ -72,7 +78,7 @@ struct ExerciseView: View {
                 Spacer().frame(height: 4)
                 HStack(spacing: 10) {
                     ForEach(Array(model.detectedNotes.enumerated()), id: \.offset) { _, note in
-                        Text(MusicTheory.midiToLabel(note.midi))
+                        Text(MusicTheory.midiToLabel(transpMidi(note.midi)))
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(note.isCorrect ? .erSuccess : .erError)
                     }
@@ -92,6 +98,7 @@ struct ExerciseView: View {
         }
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
+            loadTransposition()
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
@@ -100,6 +107,19 @@ struct ExerciseView: View {
                 progressModel.reload()
             }
         }
+        .onChange(of: model.instrumentIndex) { _ in
+            loadTransposition()
+        }
+    }
+
+    private func loadTransposition() {
+        guard let json = try? JSONSerialization.jsonObject(with: Data(EarRingCore.instrumentList().utf8)),
+              let arr = json as? [[String: Any]],
+              arr.indices.contains(model.instrumentIndex) else {
+            transpSemitones = 0
+            return
+        }
+        transpSemitones = (arr[model.instrumentIndex]["semitones"] as? Int) ?? 0
     }
 
     private var statusMessage: String {

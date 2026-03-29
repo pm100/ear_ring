@@ -11,8 +11,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.earring.EarRingCore
 import com.earring.ExerciseViewModel
+import org.json.JSONArray
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(viewModel: ExerciseViewModel) {
     val state by viewModel.state.collectAsState()
@@ -20,6 +23,15 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
     val retryOptions = listOf(1, 2, 3, 5, 8, 10)
     val stabilityOptions = listOf(2, 3, 4, 5)
     val wrongPauseOptions = listOf(1000L to "1s", 2000L to "2s", 3000L to "3s", 5000L to "5s")
+
+    // Parse instrument list from Rust core once
+    val instrumentNames = remember {
+        try {
+            val arr = JSONArray(EarRingCore.instrumentList())
+            List(arr.length()) { arr.getJSONObject(it).getString("name") }
+        } catch (_: Exception) { listOf("Piano") }
+    }
+    var instrumentExpanded by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -29,6 +41,34 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
     ) {
         Spacer(Modifier.height(8.dp))
 
+        Text("Instrument", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 4.dp))
+        SectionLabel("Instrument")
+        ExposedDropdownMenuBox(
+            expanded = instrumentExpanded,
+            onExpandedChange = { instrumentExpanded = !instrumentExpanded }
+        ) {
+            OutlinedTextField(
+                value = instrumentNames.getOrElse(state.instrumentIndex) { "Piano" },
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = instrumentExpanded) },
+                modifier = Modifier.menuAnchor().fillMaxWidth()
+            )
+            ExposedDropdownMenu(
+                expanded = instrumentExpanded,
+                onDismissRequest = { instrumentExpanded = false }
+            ) {
+                instrumentNames.forEachIndexed { idx, name ->
+                    DropdownMenuItem(
+                        text = { Text(name) },
+                        onClick = { viewModel.setInstrumentIndex(idx); instrumentExpanded = false }
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
         Text("Playback", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 4.dp))
         SectionLabel("Tempo (BPM)")

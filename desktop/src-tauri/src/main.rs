@@ -118,6 +118,16 @@ fn cmd_help_content() -> String {
     help_sections_json()
 }
 
+#[tauri::command]
+fn cmd_instrument_list() -> String {
+    ear_ring_core::instrument_list_json()
+}
+
+#[tauri::command]
+fn cmd_transpose_display_midi(concert_midi: i32, instrument_index: i32) -> i32 {
+    ear_ring_core::transpose_display_midi(concert_midi, instrument_index.max(0) as usize)
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -135,6 +145,8 @@ fn main() {
             cmd_accidental_in_key,
             cmd_key_sig_positions,
             cmd_help_content,
+            cmd_instrument_list,
+            cmd_transpose_display_midi,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

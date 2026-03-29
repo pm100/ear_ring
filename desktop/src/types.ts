@@ -27,6 +27,7 @@ export interface ExerciseSettings {
   framesToConfirm: number;    // default 3
   postChordGapMs: number;     // default 800
   wrongNotePauseMs: number;   // default 3000
+  instrumentIndex: number;    // default 0 (Piano)
 }
 
 export interface ExerciseState {
@@ -43,7 +44,8 @@ export interface ExerciseState {
   framesToConfirm: number;
   postChordGapMs: number;
   wrongNotePauseMs: number;
-  sequence: number[]; // MIDI values
+  instrumentIndex: number;
+  sequence: number[];// MIDI values
   detected: DetectedNote[];
   status: ExerciseStatus;
   currentNoteIndex: number;

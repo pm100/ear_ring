@@ -5,8 +5,9 @@ pub use music_theory::{
     accidental_in_key, freq_to_note, generate_sequence, intro_chord, is_correct_note,
     is_sharp_key, key_accidental_count, key_sig_staff_positions, key_signature_pitch_classes,
     midi_to_freq, midi_to_label, note_name, preferred_midi_label, preferred_note_label,
-    scale_name, scale_notes, staff_position, staff_position_in_key, test_score, Note, NoteName,
-    ScaleType, FLAT_ORDER, FLAT_STAFF_POSITIONS, SHARP_ORDER, SHARP_STAFF_POSITIONS,
+    scale_name, scale_notes, staff_position, staff_position_in_key, test_score,
+    transpose_display_midi, Note, NoteName, ScaleType,
+    FLAT_ORDER, FLAT_STAFF_POSITIONS, SHARP_ORDER, SHARP_STAFF_POSITIONS,
 };
 pub use pitch_detection::detect_pitch;
 
@@ -65,6 +66,24 @@ fn json_string(s: &str) -> String {
     out
 }
 
+// ── Instrument list ──────────────────────────────────────────────────────────
+
+pub fn instrument_list_json() -> String {
+    use music_theory::INSTRUMENTS;
+    let mut json = String::from("[");
+    for (i, inst) in INSTRUMENTS.iter().enumerate() {
+        if i > 0 { json.push(','); }
+        json.push_str(&format!(
+            "{{\"id\":{},\"name\":{},\"semitones\":{}}}",
+            i,
+            json_string(inst.name),
+            inst.semitones
+        ));
+    }
+    json.push(']');
+    json
+}
+
 // ── C-compatible FFI surface ──────────────────────────────────────────────────
 // These thin wrappers are called from the React Native Turbo Native Module
 // (Swift / Kotlin) without requiring uniffi code-gen at this stage.
@@ -82,6 +101,29 @@ pub extern "C" fn ear_ring_help_content() -> *const std::os::raw::c_char {
     CACHE.get_or_init(|| {
         CString::new(help_sections_json()).unwrap_or_else(|_| CString::new("[]").unwrap())
     }).as_ptr()
+}
+
+/// Returns a JSON array of available instruments:
+/// `[{"id":0,"name":"Piano","semitones":0},...]`
+/// The pointer is valid for the lifetime of the process (static storage).
+#[no_mangle]
+pub extern "C" fn ear_ring_instrument_list() -> *const std::os::raw::c_char {
+    use std::ffi::CString;
+    use std::sync::OnceLock;
+    static CACHE: OnceLock<CString> = OnceLock::new();
+    CACHE.get_or_init(|| {
+        CString::new(instrument_list_json()).unwrap_or_else(|_| CString::new("[]").unwrap())
+    }).as_ptr()
+}
+
+/// Convert concert MIDI to written/display MIDI for the given instrument index.
+/// Clamps to 0–127. Returns the unchanged MIDI if the index is out of range.
+#[no_mangle]
+pub extern "C" fn ear_ring_transpose_display_midi(
+    concert_midi: c_int,
+    instrument_index: c_int,
+) -> c_int {
+    transpose_display_midi(concert_midi, instrument_index.max(0) as usize) as c_int
 }
 
 /// Detect pitch from a raw f32 PCM buffer.
@@ -699,5 +741,26 @@ mod android_jni {
         env.new_string(json)
             .map(|s| s.into_raw())
             .unwrap_or(std::ptr::null_mut())
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeInstrumentList(
+        env: JNIEnv,
+        _class: JClass,
+    ) -> jstring {
+        let json = super::instrument_list_json();
+        env.new_string(json)
+            .map(|s| s.into_raw())
+            .unwrap_or(std::ptr::null_mut())
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeTransposeDisplayMidi(
+        _env: JNIEnv,
+        _class: JClass,
+        concert_midi: jint,
+        instrument_index: jint,
+    ) -> jint {
+        super::transpose_display_midi(concert_midi, instrument_index.max(0) as usize) as jint
     }
 }

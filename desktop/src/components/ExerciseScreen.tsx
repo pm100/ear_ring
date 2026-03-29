@@ -69,6 +69,18 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   useEffect(() => { currentAttemptRef.current = currentAttempt; }, [currentAttempt]);
   useEffect(() => { sequenceRef.current = sequence; }, [sequence]);
 
+  // Load transposition semitones for the selected instrument
+  const [transpSemitones, setTranspSemitones] = useState(0);
+  useEffect(() => {
+    invoke<string>('cmd_instrument_list')
+      .then(json => {
+        const list = JSON.parse(json) as { id: number; semitones: number }[];
+        setTranspSemitones(list[exercise.instrumentIndex ?? 0]?.semitones ?? 0);
+      })
+      .catch(() => {});
+  }, [exercise.instrumentIndex]);
+  const transpMidi = (midi: number) => Math.max(0, Math.min(127, midi + transpSemitones));
+
   const schedule = useCallback((callback: () => void, ms: number) => {
     const id = window.setTimeout(callback, ms);
     timersRef.current.push(id);
@@ -291,14 +303,14 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     ? sequence.map((expectedMidi, index) => {
         const attemptNote = displayedNotes[index];
         if (!attemptNote) {
-          return { midi: expectedMidi, state: 'expected' };
+          return { midi: transpMidi(expectedMidi), state: 'expected' };
         }
         return attemptNote.correct
-          ? { midi: expectedMidi, state: 'correct' }
-          : { midi: attemptNote.midi, state: 'incorrect' };
+          ? { midi: transpMidi(expectedMidi), state: 'correct' }
+          : { midi: transpMidi(attemptNote.midi), state: 'incorrect' };
       })
     : displayedNotes.map(note => ({
-        midi: note.midi,
+        midi: transpMidi(note.midi),
         state: note.correct ? 'correct' : 'incorrect',
       }));
 
@@ -331,7 +343,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
           <div className="note-tracker">
             {detected.map((note, i) => (
               <div key={i} className={`note-tracker-item ${note.correct ? 'tracker-correct' : 'tracker-incorrect'}`}>
-                <div className="tracker-note">{preferredMidiLabel(note.midi, exercise.rootNote)}</div>
+                <div className="tracker-note">{preferredMidiLabel(transpMidi(note.midi), exercise.rootNote)}</div>
               </div>
             ))}
           </div>

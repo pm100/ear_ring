@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { invoke } from '@tauri-apps/api/tauri';
 import { ExerciseSettings } from '../types';
 
 interface Props {
@@ -16,9 +17,18 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 style={{ fontSize: 14, fontWeight: 700, color: '#757575', textTransform: 'uppercase', letterSpacing: 1, margin: '20px 0 8px' }}>{children}</h2>;
 }
 
+interface InstrumentInfo { id: number; name: string; semitones: number; }
+
 export default function SettingsScreen({ settings, onUpdateSettings, onBack }: Props) {
   const set = <K extends keyof ExerciseSettings>(key: K, value: ExerciseSettings[K]) =>
     onUpdateSettings(prev => ({ ...prev, [key]: value }));
+
+  const [instruments, setInstruments] = useState<InstrumentInfo[]>([]);
+  useEffect(() => {
+    invoke<string>('cmd_instrument_list')
+      .then(json => setInstruments(JSON.parse(json) as InstrumentInfo[]))
+      .catch(() => setInstruments([{ id: 0, name: 'Piano', semitones: 0 }]));
+  }, []);
 
   return (
     <div className="screen" style={{ paddingBottom: 72 }}>
@@ -28,7 +38,17 @@ export default function SettingsScreen({ settings, onUpdateSettings, onBack }: P
         <div style={{ width: 48 }} />
       </div>
 
-      <SectionTitle>Playback</SectionTitle>
+      <SectionTitle>Instrument</SectionTitle>
+      <span className="section-label" style={{ marginTop: 0 }}>Instrument</span>
+      <select
+        value={settings.instrumentIndex}
+        onChange={e => set('instrumentIndex', parseInt(e.target.value))}
+        style={{ width: '100%', padding: '8px 12px', fontSize: 14, borderRadius: 4, border: '1px solid #bdbdbd', marginBottom: 4 }}
+      >
+        {instruments.map(inst => (
+          <option key={inst.id} value={inst.id}>{inst.name}</option>
+        ))}
+      </select>
       <span className="section-label" style={{ marginTop: 0 }}>Tempo (BPM)</span>
       <div className="chip-row">
         {BPM_OPTIONS.map(bpm => (

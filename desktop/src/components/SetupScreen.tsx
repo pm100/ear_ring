@@ -1,8 +1,11 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/tauri';
 import PitchMeter from './PitchMeter';
 import MusicStaff from './MusicStaff';
 import { useAudioCapture } from '../hooks/useAudioCapture';
 import { freqToMidi, preferredMidiLabel } from '../music';
+
+interface InstrumentInfo { id: number; name: string; semitones: number; }
 
 interface Props {
   onBack: () => void;
@@ -12,10 +15,11 @@ interface Props {
   keySignatureMode?: number;
   silenceThreshold?: number;
   framesToConfirm?: number;
+  instrumentIndex?: number;
 }
 
 
-export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma = 0, keySignatureMode = 0, silenceThreshold, framesToConfirm }: Props) {
+export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma = 0, keySignatureMode = 0, silenceThreshold, framesToConfirm, instrumentIndex = 0 }: Props) {
   const [hz, setHz] = useState(0);
   const [currentMidi, setCurrentMidi] = useState<number>(-1);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
@@ -60,13 +64,27 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
     }
   }, [midiMin, midiMax]);
 
+  // Load instrument transposition semitones once
+  const [transpSemitones, setTranspSemitones] = useState(0);
+  useEffect(() => {
+    invoke<string>('cmd_instrument_list')
+      .then(json => {
+        const list = JSON.parse(json) as InstrumentInfo[];
+        setTranspSemitones(list[instrumentIndex]?.semitones ?? 0);
+      })
+      .catch(() => {});
+  }, [instrumentIndex]);
+
   // Auto-start on entry, auto-stop on unmount
   useEffect(() => {
     start(handleHz, silenceThreshold);
     return () => stop();
   }, [start, stop, handleHz]);
 
-  const noteLabel = currentMidi >= 0 ? preferredMidiLabel(currentMidi, rootChroma) : '—';
+  const transpMidi = (midi: number) => Math.max(0, Math.min(127, midi + transpSemitones));
+  const displayMidi = currentMidi >= 0 ? transpMidi(currentMidi) : -1;
+  const displayHistory = noteHistory.map(transpMidi);
+  const noteLabel = displayMidi >= 0 ? preferredMidiLabel(displayMidi, rootChroma) : '—';
   const noteHz = currentMidi >= 0 ? (440 * Math.pow(2, (currentMidi - 69) / 12)) : null;
 
   return (
@@ -84,9 +102,9 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
       </div>
 
       <MusicStaff
-        notes={noteHistory.map((midi, index) => ({
+        notes={displayHistory.map((midi, index) => ({
           midi,
-          state: index === noteHistory.length - 1 ? 'active' : 'expected',
+          state: index === displayHistory.length - 1 ? 'active' : 'expected',
         }))}
         fixedSpacing={NOTE_STEP}
         rootChroma={rootChroma}
@@ -94,7 +112,7 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
       />
 
       <div className="setup-note-display">
-        <div className={`setup-note-name${currentMidi >= 0 ? ' detected' : ''}`}
+        <div className={`setup-note-name${displayMidi >= 0 ? ' detected' : ''}`}
              style={{ fontSize: noteLabel.length >= 3 ? '56px' : '72px' }}>
           {noteLabel}
         </div>

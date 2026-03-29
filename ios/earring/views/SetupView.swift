@@ -4,8 +4,16 @@ struct SetupView: View {
     @EnvironmentObject var model: ExerciseModel
     @Environment(\.dismiss) private var dismiss
 
-    @State private var displayedMidi: Int = -1
-    @State private var noteHistory: [Int] = []
+    @State private var concertMidi: Int = -1
+    @State private var concertHistory: [Int] = []
+    @State private var transpSemitones: Int = 0
+
+    private var displayMidi: Int {
+        concertMidi >= 0 ? min(127, max(0, concertMidi + transpSemitones)) : -1
+    }
+    private var displayHistory: [Int] {
+        concertHistory.map { min(127, max(0, $0 + transpSemitones)) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -32,10 +40,10 @@ struct SetupView: View {
             // ── Music staff ───────────────────────────────────────────────
             Spacer().frame(height: 16)
             MusicStaffView(
-                notes: noteHistory.enumerated().map { index, midi in
+                notes: displayHistory.enumerated().map { index, midi in
                     StaffDisplayNote(
                         midi: midi,
-                        state: index == noteHistory.count - 1 ? .active : .expected
+                        state: index == displayHistory.count - 1 ? .active : .expected
                     )
                 },
                 fixedSpacing: 44,
@@ -49,18 +57,16 @@ struct SetupView: View {
             HStack {
                 Spacer()
                 VStack(spacing: 2) {
-                    Text(displayedMidi >= 0 ? MusicTheory.midiToLabel(displayedMidi) : "—")
-                        .font(.system(size: 72, weight: .bold))
-                        .foregroundColor(displayedMidi >= 0
+                    let label = displayMidi >= 0 ? MusicTheory.midiToLabel(displayMidi) : "—"
+                    Text(label)
+                        .font(.system(size: label.count >= 3 ? 56 : 72, weight: .bold))
+                        .foregroundColor(displayMidi >= 0
                             ? Color(red: 0.247, green: 0.318, blue: 0.710)
                             : Color.secondary)
-                    if let hz = model.liveMidi.map({ _ in model.liveCents }), displayedMidi >= 0 {
-                        let _ = hz // suppress unused warning
-                        if let liveHz = approximateHz(midi: displayedMidi) {
-                            Text(String(format: "%.1f Hz", liveHz))
-                                .font(.body)
-                                .foregroundColor(.secondary)
-                        }
+                    if displayMidi >= 0, let liveHz = approximateHz(midi: concertMidi) {
+                        Text(String(format: "%.1f Hz", liveHz))
+                            .font(.body)
+                            .foregroundColor(.secondary)
                     }
                 }
                 Spacer()
@@ -81,6 +87,7 @@ struct SetupView: View {
         .background(Color(.systemBackground))
         .onAppear {
             resetState()
+            loadTransposition()
             Task { await model.startLivePitchDetection() }
         }
         .onDisappear {
@@ -91,22 +98,35 @@ struct SetupView: View {
             guard let midi = model.confirmedLiveMidi else { return }
             // Only display notes within the configured range on the Mic Setup staff.
             guard midi >= model.rangeStart && midi <= model.rangeEnd else { return }
-            displayedMidi = midi
-            var h = noteHistory + [midi]
+            concertMidi = midi
+            var h = concertHistory + [midi]
             if h.count > 8 { h.removeFirst() }
-            noteHistory = h
+            concertHistory = h
         }
         .onChange(of: model.liveMidi) { midi in
-            if midi == nil { displayedMidi = -1 }
+            if midi == nil { concertMidi = -1 }
+        }
+        .onChange(of: model.instrumentIndex) { _ in
+            loadTransposition()
         }
     }
 
     private func resetState() {
-        displayedMidi = -1
-        noteHistory = []
+        concertMidi = -1
+        concertHistory = []
     }
 
-    /// Approximate Hz from MIDI for display purposes.
+    private func loadTransposition() {
+        guard let json = try? JSONSerialization.jsonObject(with: Data(EarRingCore.instrumentList().utf8)),
+              let arr = json as? [[String: Any]],
+              arr.indices.contains(model.instrumentIndex) else {
+            transpSemitones = 0
+            return
+        }
+        transpSemitones = (arr[model.instrumentIndex]["semitones"] as? Int) ?? 0
+    }
+
+    /// Approximate Hz from concert MIDI for display purposes.
     private func approximateHz(midi: Int) -> Double? {
         guard midi >= 0 else { return nil }
         return 440.0 * pow(2.0, Double(midi - 69) / 12.0)

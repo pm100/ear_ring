@@ -115,4 +115,15 @@ struct EarRingCore {
         guard let ptr = ear_ring_help_content() else { return "[]" }
         return String(cString: ptr)
     }
+
+    /// Returns a JSON string: `[{"id":0,"name":"Piano","semitones":0},...]`
+    static func instrumentList() -> String {
+        guard let ptr = ear_ring_instrument_list() else { return "[]" }
+        return String(cString: ptr)
+    }
+
+    /// Convert concert MIDI to written/display MIDI for the given instrument index.
+    static func transposeDisplayMidi(_ concertMidi: Int, instrumentIndex: Int) -> Int {
+        Int(ear_ring_transpose_display_midi(Int32(concertMidi), Int32(instrumentIndex)))
+    }
 }
