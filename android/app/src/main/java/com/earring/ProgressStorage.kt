@@ -78,6 +78,11 @@ object ProgressStorage {
         saveTests(context, tests.takeLast(500))
     }
 
+    fun clearAll(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().remove(SESSIONS_KEY).remove(TESTS_KEY).apply()
+    }
+
     private fun saveSessions(context: Context, sessions: List<SessionRecord>) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(SESSIONS_KEY, gson.toJson(sessions.takeLast(200))).apply()

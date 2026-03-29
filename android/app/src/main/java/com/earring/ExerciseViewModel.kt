@@ -89,10 +89,18 @@ private const val PREF_FRAMES_TO_CONFIRM = "framesToConfirm"
 private const val PREF_POST_CHORD_GAP_MS = "postChordGapMs"
 private const val PREF_WRONG_NOTE_PAUSE_MS = "wrongNotePauseMs"
 private const val PREF_INSTRUMENT_INDEX = "instrumentIndex"
+private const val PREF_HAS_LAUNCHED = "hasLaunched"
 
 class ExerciseViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    /** True if this is the very first launch (flag not yet set). Marks as launched. */
+    fun consumeFirstLaunch(): Boolean {
+        if (prefs.getBoolean(PREF_HAS_LAUNCHED, false)) return false
+        prefs.edit().putBoolean(PREF_HAS_LAUNCHED, true).apply()
+        return true
+    }
 
     private fun loadInitialState(): ExerciseState {
         val rootNote = prefs.getInt(PREF_ROOT_NOTE, 0)
@@ -134,6 +142,30 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .apply()
     }
 
+    /** Resets all settings to their defaults. Does NOT affect progress data.
+     *  Also clears the first-launch flag so Help screen shows on next launch. */
+    fun resetSettings() {
+        val defaults = ExerciseState()
+        prefs.edit()
+            .putInt(PREF_ROOT_NOTE, defaults.rootNote)
+            .putInt(PREF_RANGE_START, defaults.rangeStart)
+            .putInt(PREF_RANGE_END, defaults.rangeEnd)
+            .putInt(PREF_SCALE_ID, defaults.scaleId)
+            .putInt(PREF_SEQUENCE_LENGTH, defaults.sequenceLength)
+            .putInt(PREF_TEMPO_BPM, defaults.tempoBpm)
+            .putBoolean(PREF_SHOW_TEST_NOTES, defaults.showTestNotes)
+            .putInt(PREF_KEY_SIG_MODE, defaults.keySignatureMode)
+            .putInt(PREF_MAX_RETRIES, defaults.maxRetries)
+            .putFloat(PREF_SILENCE_THRESHOLD, defaults.silenceThreshold)
+            .putInt(PREF_FRAMES_TO_CONFIRM, defaults.framesToConfirm)
+            .putLong(PREF_POST_CHORD_GAP_MS, defaults.postChordGapMs)
+            .putLong(PREF_WRONG_NOTE_PAUSE_MS, defaults.wrongNotePauseMs)
+            .putInt(PREF_INSTRUMENT_INDEX, defaults.instrumentIndex)
+            .remove(PREF_HAS_LAUNCHED)
+            .apply()
+        _state.value = defaults
+    }
+
     private val _state = MutableStateFlow(loadInitialState())
     val state: StateFlow<ExerciseState> = _state.asStateFlow()
 
@@ -165,7 +197,14 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     fun setFramesToConfirm(n: Int) { _state.value = _state.value.copy(framesToConfirm = n); saveSettings(_state.value) }
     fun setPostChordGapMs(ms: Long) { _state.value = _state.value.copy(postChordGapMs = ms); saveSettings(_state.value) }
     fun setWrongNotePauseMs(ms: Long) { _state.value = _state.value.copy(wrongNotePauseMs = ms); saveSettings(_state.value) }
-    fun setInstrumentIndex(idx: Int) { _state.value = _state.value.copy(instrumentIndex = idx); saveSettings(_state.value) }
+    fun setInstrumentIndex(idx: Int) {
+        val json = EarRingCore.instrumentList()
+        val arr = try { org.json.JSONArray(json) } catch (_: Exception) { null }
+        val rangeStart = arr?.optJSONObject(idx)?.optInt("rangeStart", _state.value.rangeStart) ?: _state.value.rangeStart
+        val rangeEnd   = arr?.optJSONObject(idx)?.optInt("rangeEnd",   _state.value.rangeEnd)   ?: _state.value.rangeEnd
+        _state.value = _state.value.copy(instrumentIndex = idx, rangeStart = rangeStart, rangeEnd = rangeEnd)
+        saveSettings(_state.value)
+    }
 
     fun startExercise() {
         audioPlayback.cancelPlayback()

@@ -52,6 +52,7 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
                 value = instrumentNames.getOrElse(state.instrumentIndex) { "Piano" },
                 onValueChange = {},
                 readOnly = true,
+                singleLine = true,
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = instrumentExpanded) },
                 modifier = Modifier.menuAnchor().fillMaxWidth()
             )
@@ -139,6 +140,32 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             selected = wrongPauseOptions.indexOfFirst { it.first == state.wrongNotePauseMs }.coerceAtLeast(0),
             onSelect = { viewModel.setWrongNotePauseMs(wrongPauseOptions[it].first) }
         )
+
+        Spacer(Modifier.height(32.dp))
+
+        var showResetConfirm by remember { mutableStateOf(false) }
+        if (showResetConfirm) {
+            AlertDialog(
+                onDismissRequest = { showResetConfirm = false },
+                title = { Text("Reset Settings?") },
+                text = { Text("All settings will be restored to their defaults. Your progress history will not be affected.") },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.resetSettings(); showResetConfirm = false }) {
+                        Text("Reset", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showResetConfirm = false }) { Text("Cancel") }
+                }
+            )
+        }
+        Button(
+            onClick = { showResetConfirm = true },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+        ) {
+            Text("Reset to Defaults", color = MaterialTheme.colorScheme.onErrorContainer)
+        }
 
         Spacer(Modifier.height(16.dp))
     }

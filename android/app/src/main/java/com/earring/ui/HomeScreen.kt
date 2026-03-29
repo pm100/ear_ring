@@ -81,6 +81,7 @@ fun HomeScreen(
                         value = MusicTheory.NOTE_NAMES[state.rootNote],
                         onValueChange = {},
                         readOnly = true,
+                        singleLine = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = keyExpanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth()
                     )
@@ -112,6 +113,7 @@ fun HomeScreen(
                         value = MusicTheory.SCALE_NAMES[state.scaleId],
                         onValueChange = {},
                         readOnly = true,
+                        singleLine = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = scaleExpanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth()
                     )
@@ -157,17 +159,26 @@ fun HomeScreen(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Checkbox(
-                checked = state.showTestNotes,
-                onCheckedChange = { viewModel.setShowTestNotes(it) }
-            )
-            Text("Display Test Notes", style = MaterialTheme.typography.bodyLarge)
-            Spacer(Modifier.width(16.dp))
-            Checkbox(
-                checked = state.keySignatureMode == 1,
-                onCheckedChange = { viewModel.setKeySignatureMode(if (it) 1 else 0) }
-            )
-            Text("Use Key Signature", style = MaterialTheme.typography.bodyLarge)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Checkbox(
+                    checked = state.showTestNotes,
+                    onCheckedChange = { viewModel.setShowTestNotes(it) }
+                )
+                Text("Display Test Notes", style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Checkbox(
+                    checked = state.keySignatureMode == 1,
+                    onCheckedChange = { viewModel.setKeySignatureMode(if (it) 1 else 0) }
+                )
+                Text("Use Key Signature", style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+            }
         }
         Spacer(Modifier.height(32.dp))
 

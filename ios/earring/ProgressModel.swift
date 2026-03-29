@@ -53,6 +53,10 @@ enum ProgressStore {
             UserDefaults.standard.set(data, forKey: testsKey)
         }
     }
+    static func clearAll() {
+        UserDefaults.standard.removeObject(forKey: historyKey)
+        UserDefaults.standard.removeObject(forKey: testsKey)
+    }
 }
 
 @MainActor
@@ -90,6 +94,11 @@ class ProgressModel: ObservableObject {
     }
 
     func reload() {
+        load()
+    }
+
+    func clearAllProgress() {
+        ProgressStore.clearAll()
         load()
     }
 

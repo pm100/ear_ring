@@ -56,6 +56,12 @@ class ProgressViewModel(application: Application) : AndroidViewModel(application
         loadSessions()
     }
 
+    fun clearAllProgress() {
+        val context = getApplication<Application>()
+        ProgressStorage.clearAll(context)
+        _state.value = ProgressState()
+    }
+
     private fun computeStreak(sessions: List<SessionRecord>): Int {
         val sorted = sessions.sortedByDescending { it.timestamp }
         var streak = 0

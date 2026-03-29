@@ -59,6 +59,7 @@ const defaultExercise: ExerciseState = {
 };
 
 const SETTINGS_KEY = 'ear_ring_settings';
+const HAS_LAUNCHED_KEY = 'ear_ring_has_launched';
 
 function loadSettings(): ExerciseSettings {
   try {
@@ -68,16 +69,34 @@ function loadSettings(): ExerciseSettings {
   return defaultSettings;
 }
 
+function getInitialScreen(): Screen {
+  if (!localStorage.getItem(HAS_LAUNCHED_KEY)) {
+    localStorage.setItem(HAS_LAUNCHED_KEY, '1');
+    return 'help';
+  }
+  return 'home';
+}
+
 const TAB_SCREENS: Screen[] = ['home', 'setup', 'progress', 'settings', 'help'];
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('home');
+  const [screen, setScreen] = useState<Screen>(getInitialScreen);
   const [settings, setSettings] = useState<ExerciseSettings>(loadSettings);
   const [exercise, setExercise] = useState<ExerciseState>({ ...defaultExercise, ...loadSettings() });
 
   useEffect(() => {
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
   }, [settings]);
+
+  const resetSettings = useCallback(() => {
+    setSettings(defaultSettings);
+    localStorage.removeItem(HAS_LAUNCHED_KEY);
+  }, []);
+
+  const clearProgress = useCallback(() => {
+    localStorage.removeItem('ear_ring_sessions');
+    localStorage.removeItem('ear_ring_tests');
+  }, []);
 
   const startExercise = useCallback(async (rootNote: number, rangeStart: number, rangeEnd: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean, keySignatureMode: number) => {
     const seed = Date.now();
@@ -175,12 +194,13 @@ export default function App() {
         />
       )}
       {screen === 'progress' && (
-        <ProgressScreen onBack={() => setScreen('home')} />
+        <ProgressScreen onBack={() => setScreen('home')} onClearProgress={clearProgress} />
       )}
       {screen === 'settings' && (
         <SettingsScreen
           settings={settings}
           onUpdateSettings={setSettings}
+          onResetSettings={resetSettings}
           onBack={() => setScreen('home')}
         />
       )}

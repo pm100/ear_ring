@@ -1,6 +1,6 @@
 ## Getting Started
 
-Open the Mic tab and play some notes — you should see tem detected on the staff and pitch meter. This confirms your microphone is working. If it doesnt correctly register the notes try playing at different volumes and make sure you stop and start as crisply as possible
+In the settings tab select your instrument, then open the Mic tab and play some notes — you should see note detected on the staff and pitch meter. This confirms your microphone is working. If it doesnt correctly register the notes try playing at different volumes and make sure you stop and start as crisply as possible. 
 
 On the Home tab, choose a key, scale, and range to match your instrument.
 

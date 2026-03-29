@@ -58,7 +58,10 @@ class ExerciseModel: ObservableObject {
         didSet { UserDefaults.standard.set(Int(wrongNotePauseNanoseconds), forKey: "wrongNotePauseNs") }
     }
     @Published var instrumentIndex: Int = ud.object(forKey: "instrumentIndex") != nil ? ud.integer(forKey: "instrumentIndex") : 0 {
-        didSet { UserDefaults.standard.set(instrumentIndex, forKey: "instrumentIndex") }
+        didSet {
+            UserDefaults.standard.set(instrumentIndex, forKey: "instrumentIndex")
+            applyInstrumentRange()
+        }
     }
     @Published var sequence: [Int] = []
     @Published var detectedNotes: [DetectedNote] = []
@@ -94,6 +97,17 @@ class ExerciseModel: ObservableObject {
         let (s, e) = ExerciseModel.defaultRange(rootNote: rootNote)
         rangeStart = s
         rangeEnd = e
+    }
+
+    func applyInstrumentRange() {
+        guard let json = try? JSONSerialization.jsonObject(with: Data(EarRingCore.instrumentList().utf8)),
+              let arr = json as? [[String: Any]],
+              arr.indices.contains(instrumentIndex) else { return }
+        let obj = arr[instrumentIndex]
+        if let s = obj["rangeStart"] as? Int, let e = obj["rangeEnd"] as? Int {
+            rangeStart = s
+            rangeEnd = e
+        }
     }
 
     static func defaultRange(rootNote: Int) -> (Int, Int) {
@@ -388,6 +402,31 @@ class ExerciseModel: ObservableObject {
             )
         )
         sessionPersisted = true
+    }
+
+    /** Resets all settings to their defaults. Does NOT affect progress history.
+     *  Also clears the first-launch flag so Help screen shows on next launch. */
+    func resetSettings() {
+        let ud = UserDefaults.standard
+        let keys = ["rootNote","rangeStart","rangeEnd","scaleId","sequenceLength","tempoBpm",
+                    "showTestNotes","keySignatureMode","maxRetries","silenceThreshold",
+                    "framesToConfirm","postChordGapNs","wrongNotePauseNs","instrumentIndex",
+                    "hasLaunched"]
+        keys.forEach { ud.removeObject(forKey: $0) }
+        rootNote = 0
+        rangeStart = 60
+        rangeEnd = 71
+        scaleId = 0
+        sequenceLength = 4
+        tempoBpm = 100
+        showTestNotes = false
+        keySignatureMode = 0
+        maxRetries = 5
+        silenceThreshold = 0.003
+        framesToConfirm = 3
+        postChordGapNanoseconds = 800_000_000
+        wrongNotePauseNanoseconds = 3_000_000_000
+        instrumentIndex = 0
     }
 
     private func resetStability() {

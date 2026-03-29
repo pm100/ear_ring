@@ -3,12 +3,14 @@ import { SessionRecord, TestRecord } from '../types';
 
 interface Props {
   onBack: () => void;
+  onClearProgress: () => void;
 }
 
-export default function ProgressScreen({ onBack }: Props) {
+export default function ProgressScreen({ onBack, onClearProgress }: Props) {
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [tests, setTests] = useState<TestRecord[]>([]);
   const [streak, setStreak] = useState(0);
+  const [confirmingClear, setConfirmingClear] = useState(false);
 
   useEffect(() => {
     const sessionRaw = localStorage.getItem('ear_ring_sessions');
@@ -114,6 +116,31 @@ export default function ProgressScreen({ onBack }: Props) {
               </div>
             </div>
           ))
+        )}
+      </div>
+
+      <div style={{ marginTop: 24, paddingBottom: 16 }}>
+        {confirmingClear ? (
+          <div style={{ border: '1px solid #f44336', borderRadius: 8, padding: 16 }}>
+            <p style={{ margin: '0 0 12px', fontSize: 14, color: '#212121' }}>
+              This will permanently delete all session history and test records. This cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" onClick={() => { onClearProgress(); setSessions([]); setTests([]); setStreak(0); setConfirmingClear(false); }}
+                style={{ flex: 1, padding: '8px 0', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>
+                Clear
+              </button>
+              <button type="button" onClick={() => setConfirmingClear(false)}
+                style={{ flex: 1, padding: '8px 0', background: '#e0e0e0', color: '#212121', border: 'none', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setConfirmingClear(true)}
+            style={{ width: '100%', padding: '12px 0', background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}>
+            Clear All Progress
+          </button>
         )}
       </div>
     </div>

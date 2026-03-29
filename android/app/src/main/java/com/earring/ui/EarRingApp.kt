@@ -41,6 +41,16 @@ fun EarRingApp() {
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute in TAB_ROUTES
 
+    // Navigate to Help on very first launch
+    LaunchedEffect(Unit) {
+        if (exerciseViewModel.consumeFirstLaunch()) {
+            navController.navigate(Routes.HELP) {
+                popUpTo(Routes.HOME) { saveState = true }
+                launchSingleTop = true
+            }
+        }
+    }
+
     Scaffold(
         bottomBar = {
             if (showBottomBar) {

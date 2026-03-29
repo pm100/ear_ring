@@ -6,7 +6,7 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "Ear Ring",
+    "productName": "EarRing",
     "version": "0.1.0"
   },
   "tauri": {

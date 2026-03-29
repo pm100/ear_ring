@@ -7,7 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -148,6 +148,33 @@ fun ProgressScreen(
                 Spacer(Modifier.height(8.dp))
             }
         }
+
+        Spacer(Modifier.height(24.dp))
+
+        var showClearConfirm by remember { mutableStateOf(false) }
+        if (showClearConfirm) {
+            AlertDialog(
+                onDismissRequest = { showClearConfirm = false },
+                title = { Text("Clear All Progress?") },
+                text = { Text("This will permanently delete all session history and test records. This cannot be undone.") },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.clearAllProgress(); showClearConfirm = false }) {
+                        Text("Clear", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showClearConfirm = false }) { Text("Cancel") }
+                }
+            )
+        }
+        Button(
+            onClick = { showClearConfirm = true },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+        ) {
+            Text("Clear All Progress", color = MaterialTheme.colorScheme.onErrorContainer)
+        }
+
         Spacer(Modifier.height(16.dp))
     }
 }

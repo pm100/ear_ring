@@ -400,6 +400,8 @@ Dropdown (outlined, full width): Piano | Guitar | Transposed Guitar | Soprano Sa
   — Default: Piano (index 0)
   — Selecting a transposing instrument causes Mic Setup and Exercise screens to display
     written pitch instead of concert pitch (display only — detection stays in concert pitch)
+  — Selecting a new instrument resets rangeStart/rangeEnd to that instrument's natural octave range
+    (defined in the Rust INSTRUMENTS array as range_start/range_end MIDI values)
 
 [16dp space]
 Section label: "Tempo (BPM)"
@@ -708,9 +710,49 @@ rendering note labels and staff notes in Mic Setup and Exercise screens.
 
 The instrument index (0 = Piano) is persisted across restarts on all platforms.
 
+Each instrument has a `range_start` and `range_end` (concert MIDI) in the Rust `InstrumentInfo`
+struct. These are the default 12-semitone span for that instrument. When the user selects a new
+instrument, all platforms reset `rangeStart`/`rangeEnd` to these values. The JSON from
+`instrument_list_json()` includes these fields.
+
+| Instrument         | range_start (MIDI) | range_end (MIDI) |
+|--------------------|--------------------|-----------------|
+| Piano              | 60 (C4)            | 71 (B4)         |
+| Guitar             | 52 (E3)            | 63 (D#4)        |
+| Transposed Guitar  | 52 (E3)            | 63 (D#4)        |
+| Soprano Sax        | 58 (A#3)           | 69 (A4)         |
+| Alto Sax           | 51 (D#3)           | 62 (D4)         |
+| Tenor Sax          | 46 (A#2)           | 57 (A3)         |
+| Trumpet            | 55 (G3)            | 66 (F#4)        |
+| Clarinet           | 55 (G3)            | 66 (F#4)        |
+
+## First Launch Behaviour
+
+On the very first launch of the app (detected via a persistent flag), the app navigates
+to the **Help** screen instead of Home. After that, it always starts on Home.
+
+| Platform | Flag key | Storage |
+|----------|----------|---------|
+| Android  | `"hasLaunched"` | SharedPreferences (`PREFS_NAME`) |
+| iOS      | `"hasLaunched"` | UserDefaults |
+| Desktop  | `"ear_ring_has_launched"` | localStorage |
+
 ---
 
-## Platform Exceptions
+## Key / Note Name Convention
+
+All chromatic note names use the **circle-of-fifths flat convention**:
+`C  Db  D  Eb  E  F  Gb  G  Ab  A  Bb  B`
+
+This is defined in `NoteName::display_name()` in `rust/src/music_theory.rs`.
+Android and iOS call `EarRingCore.noteName()` → Rust JNI. Desktop/Tauri has its own
+`NOTE_NAMES` array that must also use flats.
+
+Do **not** use sharps (C#/D#/F#/G#/A#) anywhere in note-name display.
+
+---
+
+
 
 ### iOS — Home Screen title row
 SwiftUI cannot directly reference the app icon from `Assets.xcassets/AppIcon` as a UI image.

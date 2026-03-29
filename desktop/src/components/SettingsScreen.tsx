@@ -5,6 +5,7 @@ import { ExerciseSettings } from '../types';
 interface Props {
   settings: ExerciseSettings;
   onUpdateSettings: React.Dispatch<React.SetStateAction<ExerciseSettings>>;
+  onResetSettings: () => void;
   onBack: () => void;
 }
 
@@ -17,9 +18,9 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 style={{ fontSize: 14, fontWeight: 700, color: '#757575', textTransform: 'uppercase', letterSpacing: 1, margin: '20px 0 8px' }}>{children}</h2>;
 }
 
-interface InstrumentInfo { id: number; name: string; semitones: number; }
+interface InstrumentInfo { id: number; name: string; semitones: number; rangeStart: number; rangeEnd: number; }
 
-export default function SettingsScreen({ settings, onUpdateSettings, onBack }: Props) {
+export default function SettingsScreen({ settings, onUpdateSettings, onResetSettings, onBack }: Props) {
   const set = <K extends keyof ExerciseSettings>(key: K, value: ExerciseSettings[K]) =>
     onUpdateSettings(prev => ({ ...prev, [key]: value }));
 
@@ -27,7 +28,7 @@ export default function SettingsScreen({ settings, onUpdateSettings, onBack }: P
   useEffect(() => {
     invoke<string>('cmd_instrument_list')
       .then(json => setInstruments(JSON.parse(json) as InstrumentInfo[]))
-      .catch(() => setInstruments([{ id: 0, name: 'Piano', semitones: 0 }]));
+      .catch(() => setInstruments([{ id: 0, name: 'Piano', semitones: 0, rangeStart: 60, rangeEnd: 71 }]));
   }, []);
 
   return (
@@ -42,7 +43,15 @@ export default function SettingsScreen({ settings, onUpdateSettings, onBack }: P
       <span className="section-label" style={{ marginTop: 0 }}>Instrument</span>
       <select
         value={settings.instrumentIndex}
-        onChange={e => set('instrumentIndex', parseInt(e.target.value))}
+        onChange={e => {
+          const idx = parseInt(e.target.value);
+          const inst = instruments[idx];
+          onUpdateSettings(prev => ({
+            ...prev,
+            instrumentIndex: idx,
+            ...(inst ? { rangeStart: inst.rangeStart, rangeEnd: inst.rangeEnd } : {}),
+          }));
+        }}
         style={{ width: '100%', padding: '8px 12px', fontSize: 14, borderRadius: 4, border: '1px solid #bdbdbd', marginBottom: 4 }}
       >
         {instruments.map(inst => (
@@ -110,6 +119,39 @@ export default function SettingsScreen({ settings, onUpdateSettings, onBack }: P
             onClick={() => set('wrongNotePauseMs', opt.value)}>{opt.label}</button>
         ))}
       </div>
+
+      <div style={{ marginTop: 32, paddingBottom: 16 }}>
+        <ResetButton onReset={onResetSettings} />
+      </div>
     </div>
+  );
+}
+
+function ResetButton({ onReset }: { onReset: () => void }) {
+  const [confirming, setConfirming] = React.useState(false);
+  if (confirming) {
+    return (
+      <div style={{ border: '1px solid #f44336', borderRadius: 8, padding: 16 }}>
+        <p style={{ margin: '0 0 12px', fontSize: 14, color: '#212121' }}>
+          Reset all settings to defaults? Your progress history will not be affected.
+        </p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" onClick={() => { onReset(); setConfirming(false); }}
+            style={{ flex: 1, padding: '8px 0', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>
+            Reset
+          </button>
+          <button type="button" onClick={() => setConfirming(false)}
+            style={{ flex: 1, padding: '8px 0', background: '#e0e0e0', color: '#212121', border: 'none', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <button type="button" onClick={() => setConfirming(true)}
+      style={{ width: '100%', padding: '12px 0', background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}>
+      Reset to Defaults
+    </button>
   );
 }

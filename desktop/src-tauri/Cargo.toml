@@ -11,3 +11,6 @@ tauri = { version = "1.6", features = ["shell-open", "http-all"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ear_ring_core = { path = "../../rust" }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

@@ -19,7 +19,13 @@ extension View {
 struct ContentView: View {
     @EnvironmentObject var exerciseModel: ExerciseModel
     @EnvironmentObject var progressModel: ProgressModel
-    @State private var selectedTab: Int = 0
+    @State private var selectedTab: Int = {
+        if !UserDefaults.standard.bool(forKey: "hasLaunched") {
+            UserDefaults.standard.set(true, forKey: "hasLaunched")
+            return 4  // Help tab
+        }
+        return 0
+    }()
 
     var body: some View {
         TabView(selection: $selectedTab) {

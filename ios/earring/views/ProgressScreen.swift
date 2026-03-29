@@ -4,6 +4,7 @@ import SwiftUI
 struct ProgressScreen: View {
     @EnvironmentObject var progressModel: ProgressModel
     @Environment(\.dismiss) private var dismiss
+    @State private var showClearConfirm = false
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -130,6 +131,22 @@ struct ProgressScreen: View {
                             Divider()
                         }
                     }
+                }
+
+                Spacer().frame(height: 24)
+
+                Button(action: { showClearConfirm = true }) {
+                    Text("Clear All Progress")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                }
+                .buttonStyle(.bordered)
+                .tint(.red)
+                .alert("Clear All Progress?", isPresented: $showClearConfirm) {
+                    Button("Clear", role: .destructive) { progressModel.clearAllProgress() }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("This will permanently delete all session history and test records. This cannot be undone.")
                 }
 
                 Spacer().frame(height: 16)

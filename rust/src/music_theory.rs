@@ -45,16 +45,16 @@ impl NoteName {
     pub fn display_name(self) -> &'static str {
         match self {
             NoteName::C => "C",
-            NoteName::Cs => "C#",
+            NoteName::Cs => "Db",
             NoteName::D => "D",
-            NoteName::Ds => "D#",
+            NoteName::Ds => "Eb",
             NoteName::E => "E",
             NoteName::F => "F",
-            NoteName::Fs => "F#",
+            NoteName::Fs => "Gb",
             NoteName::G => "G",
-            NoteName::Gs => "G#",
+            NoteName::Gs => "Ab",
             NoteName::A => "A",
-            NoteName::As => "A#",
+            NoteName::As => "Bb",
             NoteName::B => "B",
         }
     }
@@ -454,17 +454,21 @@ pub struct InstrumentInfo {
     /// Semitones to add to concert MIDI to get written/display MIDI.
     /// written = concert + semitones
     pub semitones: i32,
+    /// Natural concert MIDI range start (inclusive) for this instrument.
+    pub range_start: i32,
+    /// Natural concert MIDI range end (inclusive) for this instrument.
+    pub range_end: i32,
 }
 
 pub const INSTRUMENTS: &[InstrumentInfo] = &[
-    InstrumentInfo { name: "Piano",             semitones:  0 },
-    InstrumentInfo { name: "Guitar",            semitones:  0 },
-    InstrumentInfo { name: "Transposed Guitar", semitones: 12 },
-    InstrumentInfo { name: "Soprano Sax",       semitones:  2 },
-    InstrumentInfo { name: "Alto Sax",          semitones:  9 },
-    InstrumentInfo { name: "Tenor Sax",         semitones:  2 },
-    InstrumentInfo { name: "Trumpet",           semitones:  2 },
-    InstrumentInfo { name: "Clarinet",          semitones:  2 },
+    InstrumentInfo { name: "Piano",             semitones:  0, range_start: 60, range_end: 71 },
+    InstrumentInfo { name: "Guitar",            semitones:  0, range_start: 52, range_end: 63 },
+    InstrumentInfo { name: "Transposed Guitar", semitones: 12, range_start: 52, range_end: 63 },
+    InstrumentInfo { name: "Soprano Sax",       semitones:  2, range_start: 58, range_end: 69 },
+    InstrumentInfo { name: "Alto Sax",          semitones:  9, range_start: 51, range_end: 62 },
+    InstrumentInfo { name: "Tenor Sax",         semitones:  2, range_start: 46, range_end: 57 },
+    InstrumentInfo { name: "Trumpet",           semitones:  2, range_start: 55, range_end: 66 },
+    InstrumentInfo { name: "Clarinet",          semitones:  2, range_start: 55, range_end: 66 },
 ];
 
 /// Convert a concert MIDI number to the written/display MIDI for a given instrument.
