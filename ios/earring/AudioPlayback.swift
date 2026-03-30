@@ -25,6 +25,15 @@ class AudioPlayback {
 
     // MARK: - Lifecycle
 
+    /// Pre-configure the audio session so playback can start instantly.
+    /// Only sets up the session — does not start the engine (which needs nodes attached first).
+    func prepareForPlayback() {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playAndRecord, mode: .default,
+                                 options: [.defaultToSpeaker, .allowBluetooth])
+        try? session.setActive(true)
+    }
+
     func cancelPlayback() {
         isCancelled = true
         stopAllPlayers()
@@ -153,30 +162,32 @@ class AudioPlayback {
     /// in a tight synchronous loop for near-simultaneous onset.
     func playChord(notes: [Int], holdMs: UInt64 = 600) async {
         guard !isCancelled else { return }
-        // Pre-load all samples (fast if cached, network download if first run).
-        var pendingPlays: [(URL, Float)] = []
-        for midi in notes {
-            do {
+        // Download all samples in parallel so chord onset isn't delayed by sequential fetches.
+        var results: [Int: (URL, Float)] = [:]
+        await withTaskGroup(of: (Int, URL, Float)?.self) { group in
+            for (i, midi) in notes.enumerated() {
                 let sample = nearestSample(for: midi)
                 let pitchCents = Float((midi - sample.midi) * 100)
-                let url = try await downloadIfNeeded(name: sample.name)
-                pendingPlays.append((url, pitchCents))
-            } catch {
-                print("[AudioPlayback] Failed to load sample for midi \(midi): \(error)")
+                group.addTask { [weak self] in
+                    guard let self else { return nil }
+                    guard let url = try? await self.downloadIfNeeded(name: sample.name) else { return nil }
+                    return (i, url, pitchCents)
+                }
+            }
+            for await result in group {
+                if let (i, url, cents) = result { results[i] = (url, cents) }
             }
         }
         guard !isCancelled else { return }
         // Start all notes with no awaits between them → simultaneous onset.
-        for (url, pitchCents) in pendingPlays {
+        for i in notes.indices {
+            guard let (url, pitchCents) = results[i] else { continue }
             do {
                 _ = try startNode(url: url, pitchCents: pitchCents)
             } catch {
                 print("[AudioPlayback] Chord note error: \(error)")
             }
         }
-        // Wait for the hold duration (so playChord returns at the right time for
-        // sequencing), but don't tear down — let chord ring with natural decay.
-        // Caller stops sound via stopAllPlayers() when ready.
         try? await Task.sleep(nanoseconds: holdMs * 1_000_000)
     }
 }

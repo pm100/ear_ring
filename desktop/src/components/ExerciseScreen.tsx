@@ -53,6 +53,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   const stableCountRef = useRef(0);
   const stablePitchClassRef = useRef(-1);
   const pitchConsumedRef = useRef(false);
+  const warmupCountRef = useRef(0);
   const currentNoteIndexRef = useRef(0);
   const detectedRef = useRef<DetectedNote[]>([]);
   const currentAttemptRef = useRef(1);
@@ -138,6 +139,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
           if (!sessionRunningRef.current) return;
           cancelPlayback();
           setStatus('listening');
+          warmupCountRef.current = exercise.warmupFrames;
           startCapture(handleHzDetectedRef.current, exercise.silenceThreshold);
         }, 700);
       },
@@ -196,6 +198,11 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       stableCountRef.current = 0;
       stablePitchClassRef.current = -1;
       pitchConsumedRef.current = false;
+      warmupCountRef.current = 0;
+      return;
+    }
+    if (warmupCountRef.current > 0) {
+      warmupCountRef.current--;
       return;
     }
 
@@ -221,6 +228,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
 
      if (!pitchConsumedRef.current && stableCountRef.current >= exercise.framesToConfirm) {
        pitchConsumedRef.current = true;
+       if (midiResult < exercise.rangeStart - 6 || midiResult > exercise.rangeEnd + 6) return;
        const expected = sequenceRef.current[idx];
        const correct = await invoke<boolean>('cmd_is_correct_note', {
          detectedMidi: midiResult,

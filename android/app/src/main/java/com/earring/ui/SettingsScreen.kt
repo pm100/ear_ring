@@ -22,6 +22,7 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
     val bpmOptions = listOf("60", "80", "100", "120", "140")
     val retryOptions = listOf(1, 2, 3, 5, 8, 10)
     val stabilityOptions = listOf(2, 3, 4, 5)
+    val warmupOptions = listOf(0, 1, 2, 3, 4, 5, 6)
     val wrongPauseOptions = listOf(1000L to "1s", 2000L to "2s", 3000L to "3s", 5000L to "5s")
 
     // Parse instrument list from Rust core once
@@ -114,6 +115,17 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             items = stabilityOptions.map { it.toString() },
             selected = stabilityOptions.indexOf(state.framesToConfirm).coerceAtLeast(0),
             onSelect = { viewModel.setFramesToConfirm(stabilityOptions[it]) }
+        )
+
+        Spacer(Modifier.height(12.dp))
+        SectionLabel("Mic Warmup Frames")
+        Text("Frames discarded when mic opens (both Exercise and Mic Setup)",
+            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 6.dp))
+        ChipRow(
+            items = warmupOptions.map { it.toString() },
+            selected = warmupOptions.indexOf(state.warmupFrames).coerceAtLeast(0),
+            onSelect = { viewModel.setWarmupFrames(warmupOptions[it]) }
         )
 
         Spacer(Modifier.height(16.dp))

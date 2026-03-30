@@ -12,6 +12,7 @@ interface Props {
 const BPM_OPTIONS = [60, 80, 100, 120, 140];
 const RETRY_OPTIONS = [1, 2, 3, 5, 8, 10];
 const STABILITY_OPTIONS = [2, 3, 4, 5];
+const WARMUP_OPTIONS = [0, 1, 2, 3, 4, 5, 6];
 const WRONG_PAUSE_OPTIONS = [{ label: '1s', value: 1000 }, { label: '2s', value: 2000 }, { label: '3s', value: 3000 }, { label: '5s', value: 5000 }];
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -96,6 +97,16 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
           <button key={n} type="button"
             className={`chip ${settings.framesToConfirm === n ? 'chip-selected' : ''}`}
             onClick={() => set('framesToConfirm', n)}>{n}</button>
+        ))}
+      </div>
+
+      <span className="section-label">Mic Warmup Frames</span>
+      <p style={{ fontSize: 12, color: '#757575', marginBottom: 6 }}>Frames discarded when mic opens (both Exercise and Mic Setup)</p>
+      <div className="chip-row">
+        {WARMUP_OPTIONS.map(n => (
+          <button key={n} type="button"
+            className={`chip ${settings.warmupFrames === n ? 'chip-selected' : ''}`}
+            onClick={() => set('warmupFrames', n)}>{n}</button>
         ))}
       </div>
 

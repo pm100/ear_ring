@@ -5,6 +5,7 @@ struct SettingsView: View {
     private let bpmOptions = [60, 80, 100, 120, 140]
     private let retryOptions = [1, 2, 3, 5, 8, 10]
     private let stabilityOptions = [2, 3, 4, 5]
+    private let warmupOptions = [0, 1, 2, 3, 4, 5, 6]
     private let wrongPauseOptions: [(UInt64, String)] = [
         (1_000_000_000, "1s"), (2_000_000_000, "2s"),
         (3_000_000_000, "3s"), (5_000_000_000, "5s")
@@ -67,6 +68,15 @@ struct SettingsView: View {
                          selected: stabilityOptions.firstIndex(of: model.framesToConfirm) ?? 0,
                          count: stabilityOptions.count) { idx in
                     model.framesToConfirm = stabilityOptions[idx]
+                }
+
+                sectionLabel("Mic Warmup Frames").padding(.top, 8)
+                Text("Frames discarded when mic opens (both Exercise and Mic Setup)")
+                    .font(.caption).foregroundColor(.erMuted).padding(.bottom, 6)
+                chipGrid(options: warmupOptions.map { "\($0)" },
+                         selected: warmupOptions.firstIndex(of: model.warmupFrames) ?? 4,
+                         count: warmupOptions.count) { idx in
+                    model.warmupFrames = warmupOptions[idx]
                 }
 
                 sectionHeader("Timing").padding(.top, 16)

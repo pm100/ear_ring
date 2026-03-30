@@ -25,6 +25,7 @@ export interface ExerciseSettings {
   maxRetries: number;         // default 5
   silenceThreshold: number;   // default 0.003
   framesToConfirm: number;    // default 3
+  warmupFrames: number;       // default 4
   postChordGapMs: number;     // default 800
   wrongNotePauseMs: number;   // default 3000
   instrumentIndex: number;    // default 0 (Piano)
@@ -42,6 +43,7 @@ export interface ExerciseState {
   maxRetries: number;
   silenceThreshold: number;
   framesToConfirm: number;
+  warmupFrames: number;
   postChordGapMs: number;
   wrongNotePauseMs: number;
   instrumentIndex: number;

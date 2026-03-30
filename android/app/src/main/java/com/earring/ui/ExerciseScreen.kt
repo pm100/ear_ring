@@ -54,8 +54,8 @@ fun ExerciseScreen(
         }
     }
 
-    val midiMin = state.rangeStart
-    val midiMax = state.rangeEnd
+    val midiMin = (state.rangeStart - 6).coerceAtLeast(0)
+    val midiMax = (state.rangeEnd + 6).coerceAtMost(127)
 
     // Shared pitch detection — same pipeline as SetupScreen.
     // warmupFrames absorbs mic-settling transients when auto-starting.
@@ -66,7 +66,7 @@ fun ExerciseScreen(
         midiMax = midiMax,
         silenceThreshold = state.silenceThreshold,
         framesToConfirm = state.framesToConfirm,
-        warmupFrames = 10,
+        warmupFrames = state.warmupFrames,
         onConfirmed = { midi, hz ->
             val cents = EarRingCore.freqToCents(hz)
             viewModel.confirmNote(midi, cents)

@@ -29,6 +29,7 @@ const defaultSettings: ExerciseSettings = (() => {
     maxRetries: 5,
     silenceThreshold: 0.003,
     framesToConfirm: 3,
+    warmupFrames: 4,
     postChordGapMs: 800,
     wrongNotePauseMs: 3000,
     instrumentIndex: 0,
@@ -121,6 +122,7 @@ export default function App() {
         maxRetries: settings.maxRetries,
         silenceThreshold: settings.silenceThreshold,
         framesToConfirm: settings.framesToConfirm,
+        warmupFrames: settings.warmupFrames,
         postChordGapMs: settings.postChordGapMs,
         wrongNotePauseMs: settings.wrongNotePauseMs,
         instrumentIndex: settings.instrumentIndex,
@@ -182,6 +184,7 @@ export default function App() {
           keySignatureMode={settings.keySignatureMode}
           silenceThreshold={settings.silenceThreshold}
           framesToConfirm={settings.framesToConfirm}
+          warmupFrames={settings.warmupFrames}
           instrumentIndex={settings.instrumentIndex}
         />
       )}

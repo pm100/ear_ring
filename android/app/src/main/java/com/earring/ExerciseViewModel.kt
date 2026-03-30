@@ -31,6 +31,7 @@ data class ExerciseState(
     val maxRetries: Int = DEFAULT_MAX_ATTEMPTS,
     val silenceThreshold: Float = DEFAULT_SILENCE_THRESHOLD,
     val framesToConfirm: Int = DEFAULT_FRAMES_TO_CONFIRM,
+    val warmupFrames: Int = DEFAULT_WARMUP_FRAMES,
     val postChordGapMs: Long = DEFAULT_POST_CHORD_GAP_MS,
     val wrongNotePauseMs: Long = DEFAULT_WRONG_NOTE_PAUSE_MS,
     val instrumentIndex: Int = 0,
@@ -67,6 +68,7 @@ data class ExerciseState(
 private const val DEFAULT_MAX_ATTEMPTS = 5
 private const val DEFAULT_SILENCE_THRESHOLD = 0.003f
 private const val DEFAULT_FRAMES_TO_CONFIRM = 3
+private const val DEFAULT_WARMUP_FRAMES = 4
 private const val DEFAULT_POST_CHORD_GAP_MS = 800L
 private const val DEFAULT_WRONG_NOTE_PAUSE_MS = 3000L
 // Gap between the last note of the sequence ending and mic start.
@@ -86,6 +88,7 @@ private const val PREF_KEY_SIG_MODE = "keySignatureMode"
 private const val PREF_MAX_RETRIES = "maxRetries"
 private const val PREF_SILENCE_THRESHOLD = "silenceThreshold"
 private const val PREF_FRAMES_TO_CONFIRM = "framesToConfirm"
+private const val PREF_WARMUP_FRAMES = "warmupFrames"
 private const val PREF_POST_CHORD_GAP_MS = "postChordGapMs"
 private const val PREF_WRONG_NOTE_PAUSE_MS = "wrongNotePauseMs"
 private const val PREF_INSTRUMENT_INDEX = "instrumentIndex"
@@ -117,6 +120,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             maxRetries = prefs.getInt(PREF_MAX_RETRIES, DEFAULT_MAX_ATTEMPTS),
             silenceThreshold = prefs.getFloat(PREF_SILENCE_THRESHOLD, DEFAULT_SILENCE_THRESHOLD),
             framesToConfirm = prefs.getInt(PREF_FRAMES_TO_CONFIRM, DEFAULT_FRAMES_TO_CONFIRM),
+            warmupFrames = prefs.getInt(PREF_WARMUP_FRAMES, DEFAULT_WARMUP_FRAMES),
             postChordGapMs = prefs.getLong(PREF_POST_CHORD_GAP_MS, DEFAULT_POST_CHORD_GAP_MS),
             wrongNotePauseMs = prefs.getLong(PREF_WRONG_NOTE_PAUSE_MS, DEFAULT_WRONG_NOTE_PAUSE_MS),
             instrumentIndex = prefs.getInt(PREF_INSTRUMENT_INDEX, 0),
@@ -136,6 +140,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putInt(PREF_MAX_RETRIES, state.maxRetries)
             .putFloat(PREF_SILENCE_THRESHOLD, state.silenceThreshold)
             .putInt(PREF_FRAMES_TO_CONFIRM, state.framesToConfirm)
+            .putInt(PREF_WARMUP_FRAMES, state.warmupFrames)
             .putLong(PREF_POST_CHORD_GAP_MS, state.postChordGapMs)
             .putLong(PREF_WRONG_NOTE_PAUSE_MS, state.wrongNotePauseMs)
             .putInt(PREF_INSTRUMENT_INDEX, state.instrumentIndex)
@@ -158,6 +163,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putInt(PREF_MAX_RETRIES, defaults.maxRetries)
             .putFloat(PREF_SILENCE_THRESHOLD, defaults.silenceThreshold)
             .putInt(PREF_FRAMES_TO_CONFIRM, defaults.framesToConfirm)
+            .putInt(PREF_WARMUP_FRAMES, defaults.warmupFrames)
             .putLong(PREF_POST_CHORD_GAP_MS, defaults.postChordGapMs)
             .putLong(PREF_WRONG_NOTE_PAUSE_MS, defaults.wrongNotePauseMs)
             .putInt(PREF_INSTRUMENT_INDEX, defaults.instrumentIndex)
@@ -195,6 +201,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     fun setMaxRetries(n: Int) { _state.value = _state.value.copy(maxRetries = n); saveSettings(_state.value) }
     fun setSilenceThreshold(v: Float) { _state.value = _state.value.copy(silenceThreshold = v); saveSettings(_state.value) }
     fun setFramesToConfirm(n: Int) { _state.value = _state.value.copy(framesToConfirm = n); saveSettings(_state.value) }
+    fun setWarmupFrames(n: Int) { _state.value = _state.value.copy(warmupFrames = n); saveSettings(_state.value) }
     fun setPostChordGapMs(ms: Long) { _state.value = _state.value.copy(postChordGapMs = ms); saveSettings(_state.value) }
     fun setWrongNotePauseMs(ms: Long) { _state.value = _state.value.copy(wrongNotePauseMs = ms); saveSettings(_state.value) }
     fun setInstrumentIndex(idx: Int) {
@@ -321,6 +328,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     fun confirmNote(midi: Int, cents: Int) {
         val state = _state.value
         if (state.status != ExerciseStatus.LISTENING) return
+        if (midi < state.rangeStart || midi > state.rangeEnd) return
         val index = state.currentNoteIndex
         if (index >= state.sequence.size) return
 

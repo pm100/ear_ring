@@ -51,6 +51,9 @@ class ExerciseModel: ObservableObject {
     @Published var framesToConfirm: Int = ud.object(forKey: "framesToConfirm") != nil ? ud.integer(forKey: "framesToConfirm") : 3 {
         didSet { UserDefaults.standard.set(framesToConfirm, forKey: "framesToConfirm") }
     }
+    @Published var warmupFrames: Int = ud.object(forKey: "warmupFrames") != nil ? ud.integer(forKey: "warmupFrames") : 4 {
+        didSet { UserDefaults.standard.set(warmupFrames, forKey: "warmupFrames") }
+    }
     @Published var postChordGapNanoseconds: UInt64 = ud.object(forKey: "postChordGapNs") != nil ? UInt64(ud.integer(forKey: "postChordGapNs")) : 800_000_000 {
         didSet { UserDefaults.standard.set(Int(postChordGapNanoseconds), forKey: "postChordGapNs") }
     }
@@ -130,10 +133,6 @@ class ExerciseModel: ObservableObject {
     // Piano sustain continues after playSequence returns; this silence lets it fade so
     // the mic doesn't immediately pick up speaker resonance as a "played" note.
     private let postSequenceGapNanoseconds: UInt64 = 700_000_000
-    // Frames to discard when the mic first opens to absorb mic-settling transients.
-    // 4 frames × ~93ms = ~370ms — enough to swallow hardware noise, not long enough
-    // to be noticeable. Mic Setup uses the same value via startLivePitchDetection.
-    private let micWarmupFrames: Int = 4
 
     var isCapturing: Bool { audioCapture.isRunning }
     var isSessionRunning: Bool { status != .stopped }
@@ -184,6 +183,9 @@ class ExerciseModel: ObservableObject {
         liveCents = 0
         confirmedLiveMidi = nil
         resetStability()
+        // Apply warmup on every entry so mic-settling transients are discarded
+        // on both the Exercise and Mic Setup screens.
+        warmupFramesRemaining = warmupFrames
 
         let capture = audioCapture
         await Task.detached(priority: .userInitiated) {
@@ -203,6 +205,7 @@ class ExerciseModel: ObservableObject {
     }
 
     private func startFreshTest() async {
+        audioPlayback.prepareForPlayback()
         let seed = UInt64(Date().timeIntervalSince1970 * 1000)
         sequence = EarRingCore.generateSequence(
             rootChroma: rootNote,
@@ -257,10 +260,11 @@ class ExerciseModel: ObservableObject {
         detectedNotes = []
         currentNoteIndex = 0
         resetStability()
-        warmupFramesRemaining = micWarmupFrames
         status = .listening
         // Use the same detection path as Mic Setup — confirmed notes arrive via
         // confirmedLiveMidi.didSet which calls commitNote when status == .listening.
+        // warmupFramesRemaining is set inside startLivePitchDetection() so both
+        // Exercise and Setup get the same warmup value.
         await startLivePitchDetection()
     }
 
@@ -303,9 +307,9 @@ class ExerciseModel: ObservableObject {
     }
 
     /// Single audio callback used by BOTH Exercise and Mic Setup.
-    /// Warmup frames are consumed first (set to micWarmupFrames at exercise listen
-    /// start, and to 5 after each committed note). Confirmed notes are published
-    /// via confirmedLiveMidi; the didSet handles exercise commit when appropriate.
+    /// Warmup frames are consumed first (set to warmupFrames in startLivePitchDetection()).
+    /// Confirmed notes are published via confirmedLiveMidi; the didSet handles exercise
+    /// commit when appropriate.
     private func processAudioLive(samples: [Float], sampleRate: UInt32) {
         if warmupFramesRemaining > 0 {
             warmupFramesRemaining -= 1
@@ -319,6 +323,7 @@ class ExerciseModel: ObservableObject {
     }
 
     private func commitNote(midi: Int, cents: Int) {
+        guard midi >= max(0, rangeStart - 6) && midi <= min(127, rangeEnd + 6) else { return }
         guard currentNoteIndex < sequence.count else { return }
 
         let expectedMidi = sequence[currentNoteIndex]
@@ -329,11 +334,11 @@ class ExerciseModel: ObservableObject {
 
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(correct ? .success : .error)
-        // Reset stability for the next note, with a post-commit debounce so a
-        // sustained note can't immediately re-confirm.
-        // (5 frames ≈ 465ms at 44100Hz / 4096 samples)
-        resetStability()
-        warmupFramesRemaining = 5
+        // pitchConsumed is already true (set by checkStability on confirmation), so the
+        // same pitch class cannot re-trigger. A different pitch class resets pitchConsumed
+        // naturally via the else-branch in checkStability. Silence resets everything via
+        // detectRawNote. No extra warmup or full stability reset needed here — that was
+        // causing the user to have to repeat notes multiple times in Exercise.
 
         if correct {
             if currentNoteIndex >= sequence.count {
@@ -410,7 +415,7 @@ class ExerciseModel: ObservableObject {
         let ud = UserDefaults.standard
         let keys = ["rootNote","rangeStart","rangeEnd","scaleId","sequenceLength","tempoBpm",
                     "showTestNotes","keySignatureMode","maxRetries","silenceThreshold",
-                    "framesToConfirm","postChordGapNs","wrongNotePauseNs","instrumentIndex",
+                    "framesToConfirm","warmupFrames","postChordGapNs","wrongNotePauseNs","instrumentIndex",
                     "hasLaunched"]
         keys.forEach { ud.removeObject(forKey: $0) }
         rootNote = 0
@@ -424,6 +429,7 @@ class ExerciseModel: ObservableObject {
         maxRetries = 5
         silenceThreshold = 0.003
         framesToConfirm = 3
+        warmupFrames = 4
         postChordGapNanoseconds = 800_000_000
         wrongNotePauseNanoseconds = 3_000_000_000
         instrumentIndex = 0

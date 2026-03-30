@@ -15,16 +15,18 @@ interface Props {
   keySignatureMode?: number;
   silenceThreshold?: number;
   framesToConfirm?: number;
+  warmupFrames?: number;
   instrumentIndex?: number;
 }
 
 
-export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma = 0, keySignatureMode = 0, silenceThreshold, framesToConfirm, instrumentIndex = 0 }: Props) {
+export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma = 0, keySignatureMode = 0, silenceThreshold, framesToConfirm, warmupFrames = 4, instrumentIndex = 0 }: Props) {
   const [hz, setHz] = useState(0);
   const [currentMidi, setCurrentMidi] = useState<number>(-1);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
   const frameNotesRef = useRef<number[]>([]);
   const lastConfirmedMidiRef = useRef<number>(-1);
+  const warmupCountRef = useRef<number>(warmupFrames);
   const { start, stop } = useAudioCapture();
 
   const NOTE_STEP = 44;
@@ -33,6 +35,16 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
 
   const handleHz = useCallback(async (detectedHz: number) => {
     setHz(detectedHz);
+    if (detectedHz <= 0) {
+      frameNotesRef.current = [];
+      lastConfirmedMidiRef.current = -1;
+      warmupCountRef.current = 0;
+      return;
+    }
+    if (warmupCountRef.current > 0) {
+      warmupCountRef.current--;
+      return;
+    }
     if (detectedHz > 0) {
       const midi = freqToMidi(detectedHz);
       if (midi >= 0) {
@@ -56,11 +68,6 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
           }
         }
       }
-    } else {
-      // Silence — reset so same note can be detected again after a break
-      frameNotesRef.current = [];
-      lastConfirmedMidiRef.current = -1;
-      setCurrentMidi(-1);
     }
   }, [midiMin, midiMax]);
 

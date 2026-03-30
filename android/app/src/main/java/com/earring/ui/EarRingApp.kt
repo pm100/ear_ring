@@ -149,6 +149,7 @@ fun EarRingApp() {
                     keySignatureMode = state.keySignatureMode,
                     silenceThreshold = state.silenceThreshold,
                     framesToConfirm = state.framesToConfirm,
+                    warmupFrames = state.warmupFrames,
                     instrumentIndex = state.instrumentIndex
                 )
             }

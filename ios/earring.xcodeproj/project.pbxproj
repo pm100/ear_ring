@@ -23,6 +23,8 @@
 		AA200000000000DA /* ProgressScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100000000000DA /* ProgressScreen.swift */; };
 		AA200000000000EA /* MusicStaffView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100000000000EA /* MusicStaffView.swift */; };
 		AA200000000000FA /* PitchMeterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100000000000FA /* PitchMeterView.swift */; };
+		AA20000000000100 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000100 /* SettingsView.swift */; };
+		AA20000000000110 /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000110 /* HelpView.swift */; };
 		B5EF2949546CBF9135D51680 /* PianoRangePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 928562E53D2D807A5FEED52B /* PianoRangePickerView.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
@@ -47,6 +49,8 @@
 		AA100000000000DA /* ProgressScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressScreen.swift; sourceTree = "<group>"; };
 		AA100000000000EA /* MusicStaffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicStaffView.swift; sourceTree = "<group>"; };
 		AA100000000000FA /* PitchMeterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PitchMeterView.swift; sourceTree = "<group>"; };
+		AA10000000000100 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		AA10000000000110 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = earring/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* earring-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "earring-Bridging-Header.h"; path = "earring/earring-Bridging-Header.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -119,6 +123,8 @@
 				AA100000000000DA /* ProgressScreen.swift */,
 				AA100000000000EA /* MusicStaffView.swift */,
 				AA100000000000FA /* PitchMeterView.swift */,
+				AA10000000000100 /* SettingsView.swift */,
+				AA10000000000110 /* HelpView.swift */,
 				928562E53D2D807A5FEED52B /* PianoRangePickerView.swift */,
 			);
 			name = views;
@@ -234,6 +240,8 @@
 				AA200000000000DA /* ProgressScreen.swift in Sources */,
 				AA200000000000EA /* MusicStaffView.swift in Sources */,
 				AA200000000000FA /* PitchMeterView.swift in Sources */,
+				AA20000000000100 /* SettingsView.swift in Sources */,
+				AA20000000000110 /* HelpView.swift in Sources */,
 				B5EF2949546CBF9135D51680 /* PianoRangePickerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

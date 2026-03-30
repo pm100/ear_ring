@@ -17,7 +17,7 @@ import com.earring.ui.components.PitchMeter
 import com.earring.ui.components.StaffNote
 
 @Composable
-fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71, rootChroma: Int = 0, keySignatureMode: Int = 0, silenceThreshold: Float = 0.003f, framesToConfirm: Int = 3, instrumentIndex: Int = 0) {
+fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71, rootChroma: Int = 0, keySignatureMode: Int = 0, silenceThreshold: Float = 0.003f, framesToConfirm: Int = 3, warmupFrames: Int = 4, instrumentIndex: Int = 0) {
     val noteStepDp = 44.dp
     val midiMin = rangeStart
     val midiMax = rangeEnd
@@ -33,6 +33,7 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 71, ro
         midiMax = midiMax,
         silenceThreshold = silenceThreshold,
         framesToConfirm = framesToConfirm,
+        warmupFrames = warmupFrames,
         onConfirmed = { midi, _ ->
             concertMidi = midi
             concertHistory.add(midi)
