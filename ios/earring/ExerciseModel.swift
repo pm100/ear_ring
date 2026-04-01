@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import AVFoundation
 
 struct DetectedNote {
     var midi: Int
@@ -128,6 +129,7 @@ class ExerciseModel: ObservableObject {
     private var pitchConsumed: Bool = false
     private var warmupFramesRemaining: Int = 0
     private var sessionPersisted = false
+    private var diagFrameCount: Int = 0
 
     // Gap between the last note of the sequence ending and mic start.
     // Piano sustain continues after playSequence returns; this silence lets it fade so
@@ -159,6 +161,7 @@ class ExerciseModel: ObservableObject {
     func cleanup() {
         audioCapture.stop()
         audioPlayback.cancelPlayback()
+        audioPlayback.stopEngine()
         liveMidi = nil
         liveCents = 0
         warmupFramesRemaining = 0
@@ -186,6 +189,7 @@ class ExerciseModel: ObservableObject {
         // Apply warmup on every entry so mic-settling transients are discarded
         // on both the Exercise and Mic Setup screens.
         warmupFramesRemaining = warmupFrames
+        diagFrameCount = 0
 
         let capture = audioCapture
         await Task.detached(priority: .userInitiated) {
@@ -247,10 +251,11 @@ class ExerciseModel: ObservableObject {
         guard status == .playing else { return }
         await audioPlayback.playSequence(notes: sequence, bpm: tempoBpm) { _ in }
         guard status == .playing else { return }
-        // Let all notes ring through the settling gap, then stop just before the mic
-        // opens so the pitch detector doesn't pick up residual piano sound.
+        // Let all notes ring through the settling gap, then stop the playback engine
+        // entirely so it doesn't compete with the capture engine for audio routes.
         try? await Task.sleep(nanoseconds: postSequenceGapNanoseconds)
-        audioPlayback.stopAllPlayers()
+        audioPlayback.stopEngine()
+        print("[EAR] playback engine stopped, starting capture")
         if status == .playing {
             await startListening()
         }
@@ -261,6 +266,8 @@ class ExerciseModel: ObservableObject {
         currentNoteIndex = 0
         resetStability()
         status = .listening
+        let session = AVAudioSession.sharedInstance()
+        print("[EAR] startListening — session category=\(session.category.rawValue) mode=\(session.mode.rawValue) active=\(session.isOtherAudioPlaying)")
         // Use the same detection path as Mic Setup — confirmed notes arrive via
         // confirmedLiveMidi.didSet which calls commitNote when status == .listening.
         // warmupFramesRemaining is set inside startLivePitchDetection() so both
@@ -311,6 +318,11 @@ class ExerciseModel: ObservableObject {
     /// Confirmed notes are published via confirmedLiveMidi; the didSet handles exercise
     /// commit when appropriate.
     private func processAudioLive(samples: [Float], sampleRate: UInt32) {
+        diagFrameCount += 1
+        if diagFrameCount <= 10 {
+            let rms = computeRMS(samples)
+            print("[EAR] frame \(diagFrameCount) rms=\(String(format: "%.5f", rms)) warmup=\(warmupFramesRemaining) sampleRate=\(sampleRate)")
+        }
         if warmupFramesRemaining > 0 {
             warmupFramesRemaining -= 1
             return

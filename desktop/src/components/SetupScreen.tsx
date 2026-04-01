@@ -27,7 +27,7 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
   const frameNotesRef = useRef<number[]>([]);
   const lastConfirmedMidiRef = useRef<number>(-1);
   const warmupCountRef = useRef<number>(warmupFrames);
-  const { start, stop } = useAudioCapture();
+  const { start, stop, destroy } = useAudioCapture();
 
   const NOTE_STEP = 44;
   const midiMin = rangeStart;
@@ -82,11 +82,11 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
       .catch(() => {});
   }, [instrumentIndex]);
 
-  // Auto-start on entry, auto-stop on unmount
+  // Auto-start on entry, full cleanup on unmount
   useEffect(() => {
     start(handleHz, silenceThreshold);
-    return () => stop();
-  }, [start, stop, handleHz]);
+    return () => destroy();
+  }, [start, destroy, handleHz]);
 
   const transpMidi = (midi: number) => Math.max(0, Math.min(127, midi + transpSemitones));
   const displayMidi = currentMidi >= 0 ? transpMidi(currentMidi) : -1;

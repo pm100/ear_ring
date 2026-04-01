@@ -58,24 +58,19 @@ class AudioCapture: @unchecked Sendable {
         }
     }
 
-    /// Stop capturing. Switches mode back to .default so AVAudioPlayer pitch
-    /// shifting works correctly, while keeping the category as .playAndRecord
-    /// to avoid full session teardown/re-setup between playback and recording.
+    /// Stop capturing. Keeps the audio session active in .playAndRecord so the
+    /// next capture/playback cycle doesn't need to re-acquire hardware. The session
+    /// stays in .measurement mode — AVAudioUnitTimePitch playback is unaffected by
+    /// the input-processing mode, and avoiding the mode switch eliminates transient
+    /// noise when capture restarts.
     func stop() {
         guard let engine = engine else { return }
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         self.engine = nil
         isRunning = false
-
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord,
-                                    mode: .default,
-                                    options: [.defaultToSpeaker, .allowBluetooth])
-            try session.setActive(false, options: .notifyOthersOnDeactivation)
-        } catch {
-            print("[AudioCapture] Session stop error: \(error)")
-        }
+        // Intentionally NOT deactivating the session or switching mode.
+        // Deactivating releases audio hardware; re-acquiring it on the next cycle
+        // is slow and produces transient noise that warmup frames may not absorb.
     }
 }

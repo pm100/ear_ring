@@ -27,10 +27,13 @@ class AudioPlayback {
 
     /// Pre-configure the audio session so playback can start instantly.
     /// Only sets up the session — does not start the engine (which needs nodes attached first).
+    /// Preserves the current mode to avoid disrupting .measurement if AudioCapture set it.
     func prepareForPlayback() {
         let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playAndRecord, mode: .default,
-                                 options: [.defaultToSpeaker, .allowBluetooth])
+        if session.category != .playAndRecord {
+            try? session.setCategory(.playAndRecord, mode: .default,
+                                     options: [.defaultToSpeaker, .allowBluetooth])
+        }
         try? session.setActive(true)
     }
 
@@ -47,6 +50,15 @@ class AudioPlayback {
             player.stop()
             engine.detach(player)   // also disconnects
             engine.detach(pitch)
+        }
+    }
+
+    /// Fully stop the playback engine so it doesn't compete with AudioCapture's
+    /// engine for the shared AVAudioSession hardware routes.
+    func stopEngine() {
+        stopAllPlayers()
+        if engine.isRunning {
+            engine.stop()
         }
     }
 
@@ -78,11 +90,18 @@ class AudioPlayback {
     }
 
     /// Ensure the audio session and engine are in a state ready for playback.
+    /// Keeps the existing session mode (.measurement or .default) — switching to
+    /// .default is unnecessary because AVAudioUnitTimePitch works in any mode.
     private func ensureEngineRunning() throws {
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .default,
-                                options: [.defaultToSpeaker, .allowBluetooth])
-        try session.setActive(true)
+        // Only configure if the category isn't already .playAndRecord.
+        if session.category != .playAndRecord {
+            try session.setCategory(.playAndRecord, mode: .default,
+                                    options: [.defaultToSpeaker, .allowBluetooth])
+        }
+        if !session.isOtherAudioPlaying {
+            try? session.setActive(true)
+        }
         if !engine.isRunning {
             try engine.start()
         }

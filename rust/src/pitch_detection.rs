@@ -140,4 +140,75 @@ mod tests {
         let samples = vec![0.0f32; 4096];
         assert!(detect_pitch(&samples, 44100).is_none());
     }
+
+    #[test]
+    fn test_detect_e4() {
+        let samples = sine_wave(329.63, 44100, 4096);
+        let hz = detect_pitch(&samples, 44100).expect("Should detect E4");
+        assert!((hz - 329.63).abs() < 5.0, "Expected ~329.6 Hz, got {hz:.1} Hz");
+    }
+
+    #[test]
+    fn test_detect_g4() {
+        let samples = sine_wave(392.00, 44100, 4096);
+        let hz = detect_pitch(&samples, 44100).expect("Should detect G4");
+        assert!((hz - 392.0).abs() < 5.0, "Expected ~392.0 Hz, got {hz:.1} Hz");
+    }
+
+    #[test]
+    fn test_detect_c5() {
+        let samples = sine_wave(523.25, 44100, 4096);
+        let hz = detect_pitch(&samples, 44100).expect("Should detect C5");
+        assert!((hz - 523.25).abs() < 5.0, "Expected ~523.3 Hz, got {hz:.1} Hz");
+    }
+
+    #[test]
+    fn test_detect_low_c3() {
+        let samples = sine_wave(130.81, 44100, 4096);
+        let hz = detect_pitch(&samples, 44100).expect("Should detect C3");
+        assert!((hz - 130.81).abs() < 5.0, "Expected ~130.8 Hz, got {hz:.1} Hz");
+    }
+
+    #[test]
+    fn test_detect_high_c6() {
+        let samples = sine_wave(1046.50, 44100, 4096);
+        let hz = detect_pitch(&samples, 44100).expect("Should detect C6");
+        assert!((hz - 1046.5).abs() < 10.0, "Expected ~1046.5 Hz, got {hz:.1} Hz");
+    }
+
+    #[test]
+    fn test_quiet_sine_still_detected() {
+        // A quiet signal (amplitude 0.05) should still be detectable by YIN
+        let samples: Vec<f32> = (0..4096)
+            .map(|i| 0.05 * (2.0 * PI * 440.0 * i as f32 / 44100.0).sin())
+            .collect();
+        let hz = detect_pitch(&samples, 44100).expect("Should detect quiet A4");
+        assert!((hz - 440.0).abs() < 5.0, "Expected ~440 Hz, got {hz:.1} Hz");
+    }
+
+    #[test]
+    fn test_near_silence_noise() {
+        // Very low amplitude noise — should return None
+        let samples: Vec<f32> = (0..4096)
+            .map(|i| 0.0001 * (2.0 * PI * 440.0 * i as f32 / 44100.0).sin())
+            .collect();
+        // YIN may or may not detect this; the point is it doesn't crash
+        let _ = detect_pitch(&samples, 44100);
+    }
+
+    /// Simulate a sequence of notes (as separate buffers) and verify each is detected.
+    /// This mirrors the Exercise flow where notes arrive one at a time.
+    #[test]
+    fn test_sequence_detection() {
+        let notes = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5
+        for &freq in &notes {
+            let samples = sine_wave(freq, 44100, 4096);
+            let hz = detect_pitch(&samples, 44100)
+                .unwrap_or_else(|| panic!("Should detect {freq:.1} Hz"));
+            assert!(
+                (hz - freq).abs() < 5.0,
+                "Expected ~{freq:.1} Hz, got {hz:.1} Hz"
+            );
+        }
+    }
 }

@@ -651,6 +651,56 @@ Circular widget, **90dp/px diameter**.
 
 ---
 
+## Audio Session Architecture — Platform Rules
+
+These rules exist because of a diagnosed bug where Exercise pitch detection was
+unreliable on iOS and desktop while Mic Setup worked perfectly. The root causes were:
+1. **Competing engines** — playback engine left running while capture engine started
+2. **Session deactivation between cycles** — releasing audio hardware on every retry
+3. **Mode flip-flopping** — switching between audio session modes each cycle
+
+**Do not change these patterns without understanding the rules below.**
+
+### iOS (`AVAudioSession`)
+
+- The audio session **must stay active** throughout the Exercise screen (from first note
+  played until the user leaves). Do **not** call `setActive(false)` between test attempts.
+- `AudioCapture.stop()` only stops the tap and AVAudioEngine. It does NOT deactivate
+  the session. Only `AudioCapture.destroy()` (on screen exit) deactivates the session.
+- The session runs in `.measurement` category mode throughout — both playback and capture.
+  Do **not** switch to `.default` mode for playback. `AVAudioUnitTimePitch` (used for
+  pitch-shifting piano samples) works correctly in `.measurement` mode. The old comment
+  that `.default` was required was incorrect; it applied to `AVAudioPlayer.rate`, not
+  `AVAudioUnitTimePitch`.
+- Before starting `AudioCapture`, always call `audioPlayback.stopEngine()` to fully stop
+  the playback `AVAudioEngine`. Two concurrently running `AVAudioEngine` instances compete
+  for the same hardware routes and degrade microphone input quality.
+- `AudioPlayback.stopEngine()` stops and invalidates the engine; `ensureEngineRunning()`
+  recreates and restarts it lazily on next playback request.
+
+### Desktop / Tauri (Web Audio API)
+
+- The `AudioContext` and `MediaStream` (microphone handle) **must stay alive** for the
+  entire Exercise session. Do **not** call `getUserMedia()` or create a new `AudioContext`
+  on each retry — doing so triggers hardware release/reacquire, causing a silent gap that
+  the 3-frame stability check cannot distinguish from silence.
+- `useAudioCapture.stop()` — pauses detection only (`activeRef = false`). Hardware kept.
+- `useAudioCapture.destroy()` — full teardown (close AudioContext, stop MediaStream
+  tracks). Call this **only** on component unmount or when the user leaves Exercise.
+- `ensureAudioPipeline()` — lazily creates AudioContext + ScriptProcessorNode once and
+  reuses across all start/stop cycles within a session.
+- `ExerciseScreen` calls `stopCapture()` between retries and `destroyCapture()` on unmount.
+- `SetupScreen` calls `destroy()` on unmount only.
+
+### Android
+
+- Android is **architecturally clean** — no fixes needed. `MediaPlayer` handles playback
+  (one instance per note, auto-released on completion) and `AudioRecord` handles capture.
+  There is no shared audio session concept; the two cannot compete. Changing this
+  architecture is not necessary and would likely introduce bugs.
+
+---
+
 ## Data Persistence
 
 Sessions stored as a list of records:

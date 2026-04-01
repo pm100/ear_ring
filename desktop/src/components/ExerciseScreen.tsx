@@ -62,7 +62,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   const timersRef = useRef<number[]>([]);
   const handleHzDetectedRef = useRef<(hz: number) => void>(() => {});
 
-  const { start: startCapture, stop: stopCapture } = useAudioCapture();
+  const { start: startCapture, stop: stopCapture, destroy: destroyCapture } = useAudioCapture();
   const { playChord, playSequence, cancelPlayback } = useAudioPlayback();
 
   useEffect(() => { currentNoteIndexRef.current = currentNoteIndex; }, [currentNoteIndex]);
@@ -276,10 +276,10 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     }
     sessionRunningRef.current = false;
     clearTimers();
-    stopCapture();
+    destroyCapture();
     cancelPlayback();
     onStop();
-  }, [cancelPlayback, clearTimers, cumulativeScorePercent, exercise, onStop, sessionSaved, stopCapture, testsCompleted]);
+  }, [cancelPlayback, clearTimers, cumulativeScorePercent, destroyCapture, exercise, onStop, sessionSaved, testsCompleted]);
 
   useEffect(() => {
     sessionRunningRef.current = true;
@@ -287,10 +287,10 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     return () => {
       sessionRunningRef.current = false;
       clearTimers();
-      stopCapture();
+      destroyCapture();
       cancelPlayback();
     };
-  }, [cancelPlayback, clearTimers, playPromptForSequence, stopCapture]);
+  }, [cancelPlayback, clearTimers, destroyCapture, playPromptForSequence]);
 
   const statusText = () => {
     switch (status) {
