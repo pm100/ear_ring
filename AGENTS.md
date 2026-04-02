@@ -15,6 +15,16 @@ Key things you will find here:
 
 ---
 
+## ⛔ Git Commit / Push Rules
+
+**Never commit or push unless the user explicitly tells you to.**
+
+- Do not run `git commit` or `git push` on your own initiative, even after completing a task.
+- Do not ask "should I commit this?" — wait for the user to say so.
+- This applies to every session, regardless of how complete or correct the changes are.
+
+---
+
 ## Shared Logic Rule
 
 **Keep cross-platform app logic in the shared Rust core whenever practical.**
