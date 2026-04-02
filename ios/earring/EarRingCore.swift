@@ -66,11 +66,24 @@ struct EarRingCore {
         return String(cString: buf)
     }
 
-    /// Display name for a scale ID (0–4).
+    /// Display name for a scale ID (0–3).
     static func scaleName(scaleId: Int) -> String {
         var buf = [CChar](repeating: 0, count: 32)
         ear_ring_scale_name(UInt8(scaleId), &buf, 32)
         return String(cString: buf)
+    }
+
+    /// Display label for a scale with the implied major key, e.g. "Natural Minor (Eb)".
+    static func scaleLabel(rootChroma: Int, scaleId: Int) -> String {
+        var buf = [CChar](repeating: 0, count: 48)
+        ear_ring_scale_label(UInt8(rootChroma), UInt8(scaleId), &buf, 48)
+        return String(cString: buf)
+    }
+
+    /// Returns the effective major key chroma for key-signature display.
+    /// For Major returns rootChroma; for modal/minor scales returns the implied major key chroma.
+    static func effectiveKeyChroma(rootChroma: Int, scaleId: Int) -> Int {
+        Int(ear_ring_effective_key_chroma(UInt8(rootChroma), UInt8(scaleId)))
     }
 
     static func isSharpKey(rootChroma: Int) -> Bool {

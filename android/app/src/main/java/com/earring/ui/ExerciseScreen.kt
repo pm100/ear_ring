@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -113,11 +114,29 @@ fun ExerciseScreen(
 
         Spacer(Modifier.height(8.dp))
 
+        if (state.status == ExerciseStatus.LISTENING) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("👂", fontSize = 28.sp)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Listening…",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
         MusicStaff(
             notes = staffNotes,
             modifier = Modifier.fillMaxWidth(),
             fixedSpacingDp = noteStepDp,
-            rootChroma = state.rootNote,
+            rootChroma = EarRingCore.effectiveKeyChroma(state.rootNote, state.scaleId),
             keySignatureMode = state.keySignatureMode
         )
 
@@ -171,7 +190,7 @@ fun ExerciseScreen(
 private fun statusText(state: com.earring.ExerciseState): String =
     when (state.status) {
         ExerciseStatus.PLAYING -> "Listen carefully…"
-        ExerciseStatus.LISTENING -> "👂 Play note ${state.currentNoteIndex + 1} of ${state.sequence.size}"
+        ExerciseStatus.LISTENING -> "Play note ${state.currentNoteIndex + 1} of ${state.sequence.size}"
         ExerciseStatus.RETRY_DELAY ->
             if (state.detected.lastOrNull()?.correct == false && state.currentAttempt < state.maxAttempts) {
                 "Wrong note. Replaying the same test…"

@@ -110,7 +110,7 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedTextField(
-                        value = MusicTheory.SCALE_NAMES[state.scaleId],
+                        value = MusicTheory.scaleLabel(state.rootNote, state.scaleId),
                         onValueChange = {},
                         readOnly = true,
                         singleLine = true,
@@ -121,9 +121,9 @@ fun HomeScreen(
                         expanded = scaleExpanded,
                         onDismissRequest = { scaleExpanded = false }
                     ) {
-                        MusicTheory.SCALE_NAMES.forEachIndexed { index, name ->
+                        MusicTheory.SCALE_NAMES.forEachIndexed { index, _ ->
                             DropdownMenuItem(
-                                text = { Text(name) },
+                                text = { Text(MusicTheory.scaleLabel(state.rootNote, index)) },
                                 onClick = {
                                     viewModel.setScaleId(index)
                                     scaleExpanded = false

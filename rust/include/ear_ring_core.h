@@ -76,10 +76,21 @@ int32_t ear_ring_midi_to_label(uint8_t midi, char *out_buf, uint32_t buf_len);
 /// Returns bytes written (excluding null), or -1 on error.
 int32_t ear_ring_note_name(uint8_t chroma, char *out_buf, uint32_t buf_len);
 
-/// Display name for a scale ID (0–4).
+/// Display name for a scale ID (0–3).
 /// Writes a null-terminated string into out_buf.
 /// Returns bytes written (excluding null), or -1 on error.
 int32_t ear_ring_scale_name(uint8_t scale_id, char *out_buf, uint32_t buf_len);
+
+/// Display label for a scale with the implied major key in parentheses for non-major scales.
+/// e.g. root_chroma=0 (C), scale_id=1 (Natural Minor) → "Natural Minor (Eb)"
+/// Writes a null-terminated string into out_buf.
+/// Returns bytes written (excluding null), or -1 on error.
+int32_t ear_ring_scale_label(uint8_t root_chroma, uint8_t scale_id, char *out_buf, uint32_t buf_len);
+
+/// Returns the effective major key chroma for key-signature and note-spelling display.
+/// For Major this equals root_chroma; for modal/minor scales returns the implied major key chroma.
+/// e.g. root_chroma=0 (C), scale_id=1 (Natural Minor) → 3 (Eb major).
+uint8_t ear_ring_effective_key_chroma(uint8_t root_chroma, uint8_t scale_id);
 
 /// Returns 1 if the major key for this root chroma uses sharps, 0 for flats.
 int32_t ear_ring_is_sharp_key(uint8_t root_chroma);

@@ -4,7 +4,9 @@ object MusicTheory {
 
     val NOTE_NAMES: List<String> get() = (0..11).map { EarRingCore.noteName(it) }
 
-    val SCALE_NAMES: List<String> get() = (0..4).map { EarRingCore.scaleName(it) }
+    val SCALE_NAMES: List<String> get() = (0..3).map { EarRingCore.scaleName(it) }
+
+    fun scaleLabel(rootChroma: Int, scaleId: Int): String = EarRingCore.scaleLabel(rootChroma, scaleId)
 
     fun midiToLabel(midi: Int): String = EarRingCore.midiToLabel(midi)
 

@@ -123,7 +123,10 @@ Row (equal width, 8dp gap):
               Dropdown (outlined, full width of column): C  C#  D  D#  E  F  F#  G  G#  A  A#  B
                 — Selecting a new key auto-resets the range to one octave from the new key closest to middle C
   Right half — Section label: "Scale"
-               Dropdown (outlined, full width of column): Major | Natural Minor | Harmonic Minor | Dorian | Mixolydian
+               Dropdown (outlined, full width of column): Major | Natural Minor | Dorian | Mixolydian
+                 — Scale IDs: 0=Major, 1=Natural Minor, 2=Dorian, 3=Mixolydian (Harmonic Minor removed)
+                 — Non-major scales show the implied major key in parentheses, e.g. "Natural Minor (Eb)"
+                   when key=C. The label updates dynamically as the Key dropdown changes.
 
 [16dp space]
 Section label: "Range  (RangeLow – RangeHigh)"   — label updates dynamically with current range
@@ -134,8 +137,8 @@ PianoRangePicker
   — Connected by a primary-colour line; primary highlight on keys within the selected range
   — Handle area: 22dp tall above the keyboard
   — Drag a handle to resize range (minimum span = 12 semitones); tap elsewhere to shift range
-  — Default: one octave (12 semitones) from rootNote, using the octave closest to middle C
-    e.g. root=C → (C4, B4) = MIDI 60–71; root=G → (G3, F#4) = MIDI 55–65
+  — Default: one octave (12 semitones, inclusive) from rootNote, using the octave closest to middle C
+    e.g. root=C → (C4, C5) = MIDI 60–72; root=G → (G3, G4) = MIDI 55–67
   — On first display, scroll position centers the selected range in the viewport
 
 [16dp space]

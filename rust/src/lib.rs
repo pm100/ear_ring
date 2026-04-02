@@ -2,11 +2,11 @@ pub mod music_theory;
 pub mod pitch_detection;
 
 pub use music_theory::{
-    accidental_in_key, freq_to_note, generate_sequence, intro_chord, is_correct_note,
-    is_sharp_key, key_accidental_count, key_sig_staff_positions, key_signature_pitch_classes,
-    midi_to_freq, midi_to_label, note_name, preferred_midi_label, preferred_note_label,
-    scale_name, scale_notes, staff_position, staff_position_in_key, test_score,
-    transpose_display_midi, Note, NoteName, ScaleType,
+    accidental_in_key, effective_key_chroma, freq_to_note, generate_sequence, intro_chord,
+    is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
+    key_signature_pitch_classes, midi_to_freq, midi_to_label, note_name, preferred_midi_label,
+    preferred_note_label, scale_label, scale_name, scale_notes, staff_position,
+    staff_position_in_key, test_score, transpose_display_midi, Note, NoteName, ScaleType,
     FLAT_ORDER, FLAT_STAFF_POSITIONS, SHARP_ORDER, SHARP_STAFF_POSITIONS,
 };
 pub use pitch_detection::detect_pitch;
@@ -198,7 +198,7 @@ pub extern "C" fn ear_ring_staff_position(midi: c_uchar) -> c_int {
 /// Generate a sequence of MIDI note numbers.
 ///
 /// * `root_chroma` – pitch class of the root note (0 = C, 1 = C#, …, 11 = B)
-/// * `scale_id`    – 0=Major, 1=NaturalMinor, 2=HarmonicMinor, 3=Dorian, 4=Mixolydian
+/// * `scale_id`    – 0=Major, 1=NaturalMinor, 2=Dorian, 3=Mixolydian
 /// * `length`      – number of notes to generate
 /// * `range_start` – lowest accepted MIDI note (inclusive)
 /// * `range_end`   – highest accepted MIDI note (inclusive)
@@ -222,9 +222,8 @@ pub extern "C" fn ear_ring_generate_sequence(
     let scale = match scale_id {
         0 => ScaleType::Major,
         1 => ScaleType::NaturalMinor,
-        2 => ScaleType::HarmonicMinor,
-        3 => ScaleType::Dorian,
-        4 => ScaleType::Mixolydian,
+        2 => ScaleType::Dorian,
+        3 => ScaleType::Mixolydian,
         _ => return -1,
     };
     let notes = generate_sequence(root_chroma, scale, range_start, range_end, length, seed);
@@ -248,9 +247,8 @@ pub extern "C" fn ear_ring_intro_chord(
     let scale = match scale_id {
         0 => ScaleType::Major,
         1 => ScaleType::NaturalMinor,
-        2 => ScaleType::HarmonicMinor,
-        3 => ScaleType::Dorian,
-        4 => ScaleType::Mixolydian,
+        2 => ScaleType::Dorian,
+        3 => ScaleType::Mixolydian,
         _ => return -1,
     };
     let root = Note::from_midi(root_midi);
@@ -328,7 +326,7 @@ pub extern "C" fn ear_ring_note_name(
     copy_len as c_int
 }
 
-/// Display name for a scale ID (0–4).
+/// Display name for a scale ID (0–3).
 /// Writes a null-terminated UTF-8 string into `out_buf`.
 /// Returns the number of bytes written (excluding null), or -1 on error.
 #[no_mangle]
@@ -348,6 +346,38 @@ pub extern "C" fn ear_ring_scale_name(
         *out_buf.add(copy_len) = 0;
     }
     copy_len as c_int
+}
+
+/// Display label for a scale given the current root key, e.g. "Natural Minor (Eb)".
+/// For Major the label is just "Major" with no parenthetical.
+/// Writes a null-terminated UTF-8 string into `out_buf`.
+/// Returns the number of bytes written (excluding null), or -1 on error.
+#[no_mangle]
+pub extern "C" fn ear_ring_scale_label(
+    root_chroma: c_uchar,
+    scale_id: c_uchar,
+    out_buf: *mut std::os::raw::c_char,
+    buf_len: c_uint,
+) -> c_int {
+    if out_buf.is_null() || buf_len == 0 {
+        return -1;
+    }
+    let label = scale_label(root_chroma, scale_id);
+    let bytes = label.as_bytes();
+    let copy_len = bytes.len().min(buf_len as usize - 1);
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr() as *const std::os::raw::c_char, out_buf, copy_len);
+        *out_buf.add(copy_len) = 0;
+    }
+    copy_len as c_int
+}
+
+/// Returns the effective major key chroma for display purposes.
+/// For Major this equals root_chroma; for modal/minor scales returns the implied major key chroma.
+/// e.g. root_chroma=0 (C), scale_id=1 (Natural Minor) → 3 (Eb major).
+#[no_mangle]
+pub extern "C" fn ear_ring_effective_key_chroma(root_chroma: c_uchar, scale_id: c_uchar) -> c_uchar {
+    effective_key_chroma(root_chroma, scale_id)
 }
 
 /// Returns 1 if the major key with this root chroma uses sharps, 0 for flats.
@@ -461,10 +491,10 @@ mod android_jni {
     use jni::JNIEnv;
 
     use super::{
-        accidental_in_key, detect_pitch, freq_to_note, generate_sequence, intro_chord,
-        is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
-        midi_to_label, note_name, preferred_midi_label, preferred_note_label, scale_name,
-        staff_position, staff_position_in_key, test_score, Note, ScaleType,
+        accidental_in_key, detect_pitch, effective_key_chroma, freq_to_note, generate_sequence,
+        intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
+        midi_to_label, note_name, preferred_midi_label, preferred_note_label, scale_label,
+        scale_name, staff_position, staff_position_in_key, test_score, Note, ScaleType,
     };
 
     #[no_mangle]
@@ -536,9 +566,8 @@ mod android_jni {
         let scale = match scale_id {
             0 => ScaleType::Major,
             1 => ScaleType::NaturalMinor,
-            2 => ScaleType::HarmonicMinor,
-            3 => ScaleType::Dorian,
-            4 => ScaleType::Mixolydian,
+            2 => ScaleType::Dorian,
+            3 => ScaleType::Mixolydian,
             _ => ScaleType::Major,
         };
         let notes = generate_sequence(
@@ -569,9 +598,8 @@ mod android_jni {
         let scale = match scale_id {
             0 => ScaleType::Major,
             1 => ScaleType::NaturalMinor,
-            2 => ScaleType::HarmonicMinor,
-            3 => ScaleType::Dorian,
-            4 => ScaleType::Mixolydian,
+            2 => ScaleType::Dorian,
+            3 => ScaleType::Mixolydian,
             _ => ScaleType::Major,
         };
         let root = Note::from_midi(root_midi as u8);
@@ -646,6 +674,29 @@ mod android_jni {
         env.new_string(name)
             .map(|s| s.into_raw())
             .unwrap_or(std::ptr::null_mut())
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeScaleLabel(
+        env: JNIEnv,
+        _class: JClass,
+        root_chroma: jint,
+        scale_id: jint,
+    ) -> jstring {
+        let label = scale_label(root_chroma as u8, scale_id as u8);
+        env.new_string(label)
+            .map(|s| s.into_raw())
+            .unwrap_or(std::ptr::null_mut())
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeEffectiveKeyChroma(
+        _env: JNIEnv,
+        _class: JClass,
+        root_chroma: jint,
+        scale_id: jint,
+    ) -> jint {
+        effective_key_chroma(root_chroma as u8, scale_id as u8) as jint
     }
 
     #[no_mangle]

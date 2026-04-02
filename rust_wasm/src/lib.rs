@@ -44,9 +44,8 @@ pub fn wasm_generate_sequence(root_chroma: u8, scale_id: u8, length: u8, range_s
     let scale = match scale_id {
         0 => ScaleType::Major,
         1 => ScaleType::NaturalMinor,
-        2 => ScaleType::HarmonicMinor,
-        3 => ScaleType::Dorian,
-        4 => ScaleType::Mixolydian,
+        2 => ScaleType::Dorian,
+        3 => ScaleType::Mixolydian,
         _ => ScaleType::Major,
     };
     generate_sequence(root_chroma, scale, range_start, range_end, length, seed)
@@ -60,9 +59,8 @@ pub fn wasm_intro_chord(root_midi: u8, scale_id: u8) -> Vec<u8> {
     let scale = match scale_id {
         0 => ScaleType::Major,
         1 => ScaleType::NaturalMinor,
-        2 => ScaleType::HarmonicMinor,
-        3 => ScaleType::Dorian,
-        4 => ScaleType::Mixolydian,
+        2 => ScaleType::Dorian,
+        3 => ScaleType::Mixolydian,
         _ => ScaleType::Major,
     };
     intro_chord(Note::from_midi(root_midi), scale)

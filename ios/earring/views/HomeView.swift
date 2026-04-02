@@ -163,7 +163,7 @@ struct HomeView: View {
                             set: { model.scaleId = $0 }
                         )) {
                             ForEach(0..<MusicTheory.SCALE_NAMES.count, id: \.self) { i in
-                                Text(MusicTheory.SCALE_NAMES[i]).tag(i)
+                                Text(MusicTheory.scaleLabel(rootChroma: model.rootNote, scaleId: i)).tag(i)
                             }
                         }
                         .pickerStyle(.menu)

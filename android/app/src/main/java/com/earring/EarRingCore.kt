@@ -24,6 +24,8 @@ object EarRingCore {
     @JvmStatic external fun nativeMidiToLabel(midi: Int): String
     @JvmStatic external fun nativeNoteName(chroma: Int): String
     @JvmStatic external fun nativeScaleName(scaleId: Int): String
+    @JvmStatic external fun nativeScaleLabel(rootChroma: Int, scaleId: Int): String
+    @JvmStatic external fun nativeEffectiveKeyChroma(rootChroma: Int, scaleId: Int): Int
     @JvmStatic external fun nativeIsSharpKey(rootChroma: Int): Int
     @JvmStatic external fun nativeKeyAccidentalCount(rootChroma: Int): Int
     @JvmStatic external fun nativePreferredMidiLabel(midi: Int, rootChroma: Int): String
@@ -76,7 +78,27 @@ object EarRingCore {
 
     fun scaleName(scaleId: Int): String =
         if (loaded) nativeScaleName(scaleId) else
-            listOf("Major","Natural Minor","Harmonic Minor","Dorian","Mixolydian").getOrElse(scaleId) { "?" }
+            listOf("Major","Natural Minor","Dorian","Mixolydian").getOrElse(scaleId) { "?" }
+
+    fun scaleLabel(rootChroma: Int, scaleId: Int): String =
+        if (loaded) nativeScaleLabel(rootChroma, scaleId) else {
+            val base = scaleName(scaleId)
+            val offsets = listOf(null, 3, 10, 5)
+            val offset = offsets.getOrElse(scaleId) { null }
+            if (offset == null) base
+            else {
+                val flat = listOf("C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B")
+                val key = flat[(rootChroma + offset) % 12]
+                "$base ($key)"
+            }
+        }
+
+    fun effectiveKeyChroma(rootChroma: Int, scaleId: Int): Int =
+        if (loaded) nativeEffectiveKeyChroma(rootChroma, scaleId)
+        else {
+            val offsets = listOf(0, 3, 10, 5)
+            (rootChroma + (offsets.getOrElse(scaleId) { 0 })) % 12
+        }
 
     fun isSharpKey(rootChroma: Int): Boolean =
         if (loaded) nativeIsSharpKey(rootChroma) != 0

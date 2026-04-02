@@ -7,11 +7,17 @@ import { freqToMidi, preferredMidiLabel } from '../music';
 
 interface InstrumentInfo { id: number; name: string; semitones: number; }
 
+const IMPLIED_MAJOR_OFFSETS = [0, 3, 10, 5]; // indexed by scaleId (Major, NaturalMinor, Dorian, Mixolydian)
+function effectiveKeyChroma(rootChroma: number, scaleId: number): number {
+  return (rootChroma + (IMPLIED_MAJOR_OFFSETS[scaleId] ?? 0)) % 12;
+}
+
 interface Props {
   onBack: () => void;
   rangeStart: number;
   rangeEnd: number;
   rootChroma?: number;
+  scaleId?: number;
   keySignatureMode?: number;
   silenceThreshold?: number;
   framesToConfirm?: number;
@@ -20,7 +26,7 @@ interface Props {
 }
 
 
-export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma = 0, keySignatureMode = 0, silenceThreshold, framesToConfirm, warmupFrames = 4, instrumentIndex = 0 }: Props) {
+export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma = 0, scaleId = 0, keySignatureMode = 0, silenceThreshold, framesToConfirm, warmupFrames = 4, instrumentIndex = 0 }: Props) {
   const [hz, setHz] = useState(0);
   const [currentMidi, setCurrentMidi] = useState<number>(-1);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
@@ -91,7 +97,8 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
   const transpMidi = (midi: number) => Math.max(0, Math.min(127, midi + transpSemitones));
   const displayMidi = currentMidi >= 0 ? transpMidi(currentMidi) : -1;
   const displayHistory = noteHistory.map(transpMidi);
-  const noteLabel = displayMidi >= 0 ? preferredMidiLabel(displayMidi, rootChroma) : '—';
+  const effChroma = effectiveKeyChroma(rootChroma, scaleId);
+  const noteLabel = displayMidi >= 0 ? preferredMidiLabel(displayMidi, effChroma) : '—';
   const noteHz = currentMidi >= 0 ? (440 * Math.pow(2, (currentMidi - 69) / 12)) : null;
 
   return (
@@ -114,7 +121,7 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
           state: index === displayHistory.length - 1 ? 'active' : 'expected',
         }))}
         fixedSpacing={NOTE_STEP}
-        rootChroma={rootChroma}
+        rootChroma={effChroma}
         keySignatureMode={keySignatureMode}
       />
 

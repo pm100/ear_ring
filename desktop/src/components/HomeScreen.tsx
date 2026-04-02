@@ -8,7 +8,18 @@ interface Props {
 }
 
 const NOTE_NAMES = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
-const SCALE_NAMES = ['Major','Natural Minor','Harmonic Minor','Dorian','Mixolydian'];
+const SCALE_NAMES = ['Major','Natural Minor','Dorian','Mixolydian'];
+// Semitones to add to root chroma to get implied major key; null = no parenthetical (Major).
+const IMPLIED_MAJOR_OFFSETS: (number | null)[] = [null, 3, 10, 5];
+
+function scaleLabel(rootNote: number, scaleId: number): string {
+  const base = SCALE_NAMES[scaleId];
+  if (!base) return '?';
+  const offset = IMPLIED_MAJOR_OFFSETS[scaleId];
+  if (offset === null || offset === undefined) return base;
+  const keyName = NOTE_NAMES[(rootNote + offset) % 12];
+  return `${base} (${keyName})`;
+}
 
 const PIANO_MIDI_MIN = 36;
 const PIANO_MIDI_MAX = 84;
@@ -41,12 +52,13 @@ function midiLabel(midi: number): string {
   return `${NOTE_NAMES[midi % 12]}${oct}`;
 }
 function defaultRangeForKey(rootNote: number): [number, number] {
-  let best = 60;
+  const rn = Number.isFinite(rootNote) ? rootNote : 0;
+  let best = 60 + rn;
   for (let oct = 2; oct <= 6; oct++) {
-    const c = (oct + 1) * 12 + (Number.isFinite(rootNote) ? rootNote : 0);
+    const c = (oct + 1) * 12 + rn;
     if (Math.abs(c - 60) < Math.abs(best - 60)) best = c;
   }
-  return [best, best + 11];
+  return [best, best + 12];
 }
 
 /** Return valid range, falling back to defaults if values are missing or NaN. */
@@ -228,8 +240,8 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
             onChange={e => onUpdateSettings(prev => ({ ...prev, scaleId: Number(e.target.value) }))}
             style={{ width: '100%', padding: '8px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #ccc', marginBottom: 4 }}
           >
-            {SCALE_NAMES.map((name, i) => (
-              <option key={i} value={i}>{name}</option>
+            {SCALE_NAMES.map((_, i) => (
+              <option key={i} value={i}>{scaleLabel(settings.rootNote, i)}</option>
             ))}
           </select>
         </div>

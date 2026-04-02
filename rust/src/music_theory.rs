@@ -143,7 +143,6 @@ pub fn freq_to_note(hz: f32) -> Option<(Note, i32)> {
 pub enum ScaleType {
     Major,
     NaturalMinor,
-    HarmonicMinor,
     Dorian,
     Mixolydian,
 }
@@ -154,7 +153,6 @@ impl ScaleType {
         match self {
             ScaleType::Major => &[0, 2, 4, 5, 7, 9, 11],
             ScaleType::NaturalMinor => &[0, 2, 3, 5, 7, 8, 10],
-            ScaleType::HarmonicMinor => &[0, 2, 3, 5, 7, 8, 11],
             ScaleType::Dorian => &[0, 2, 3, 5, 7, 9, 10],
             ScaleType::Mixolydian => &[0, 2, 4, 5, 7, 9, 10],
         }
@@ -164,7 +162,6 @@ impl ScaleType {
         match self {
             ScaleType::Major => "Major",
             ScaleType::NaturalMinor => "Natural Minor",
-            ScaleType::HarmonicMinor => "Harmonic Minor",
             ScaleType::Dorian => "Dorian",
             ScaleType::Mixolydian => "Mixolydian",
         }
@@ -209,10 +206,19 @@ pub fn generate_sequence(
     }
     let n = notes.len() as u64;
     let mut rng = seed;
+    let mut last_idx: Option<usize> = None;
     (0..length)
         .map(|_| {
-            rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-            notes[((rng >> 33) % n) as usize]
+            let idx = loop {
+                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                let candidate = ((rng >> 33) % n) as usize;
+                // Reject consecutive repeats when the pool has more than one note.
+                if n == 1 || Some(candidate) != last_idx {
+                    break candidate;
+                }
+            };
+            last_idx = Some(idx);
+            notes[idx]
         })
         .collect()
 }
@@ -304,15 +310,63 @@ pub fn note_name(chroma: u8) -> &'static str {
     NoteName::from_chroma(chroma).display_name()
 }
 
-/// Display name for a scale ID (0–4).
+/// Display name for a scale ID (0–3).
 pub fn scale_name(scale_id: u8) -> &'static str {
     match scale_id {
         0 => "Major",
         1 => "Natural Minor",
-        2 => "Harmonic Minor",
-        3 => "Dorian",
-        4 => "Mixolydian",
+        2 => "Dorian",
+        3 => "Mixolydian",
         _ => "?",
+    }
+}
+
+/// Returns the effective major key chroma for key-signature and note-spelling display.
+/// For Major this is the root itself; for modal/minor scales returns the implied major key chroma.
+/// e.g. root_chroma=0 (C), scale_id=1 (Natural Minor) → 3 (Eb major).
+pub fn effective_key_chroma(root_chroma: u8, scale_id: u8) -> u8 {
+    let scale = match scale_id {
+        0 => ScaleType::Major,
+        1 => ScaleType::NaturalMinor,
+        2 => ScaleType::Dorian,
+        3 => ScaleType::Mixolydian,
+        _ => return root_chroma,
+    };
+    match implied_major_offset(scale) {
+        None => root_chroma,
+        Some(offset) => ((root_chroma as u16 + offset as u16) % 12) as u8,
+    }
+}
+
+/// Semitones to add to the scale root to get the implied major key root.
+/// Returns None for Major (scale is its own major key).
+fn implied_major_offset(scale: ScaleType) -> Option<u8> {
+    match scale {
+        ScaleType::Major => None,
+        ScaleType::NaturalMinor => Some(3),  // C minor → Eb major
+        ScaleType::Dorian => Some(10),        // D Dorian → C major
+        ScaleType::Mixolydian => Some(5),     // G Mixolydian → C major
+    }
+}
+
+/// Full display label for a scale, including implied major key for non-major scales.
+/// e.g. root_chroma=0 (C), scale_id=1 (Natural Minor) → "Natural Minor (Eb)"
+pub fn scale_label(root_chroma: u8, scale_id: u8) -> String {
+    let scale = match scale_id {
+        0 => ScaleType::Major,
+        1 => ScaleType::NaturalMinor,
+        2 => ScaleType::Dorian,
+        3 => ScaleType::Mixolydian,
+        _ => return "?".to_string(),
+    };
+    let base = scale.display_name();
+    match implied_major_offset(scale) {
+        None => base.to_string(),
+        Some(offset) => {
+            let implied_chroma = ((root_chroma as u16 + offset as u16) % 12) as u8;
+            let key_name = NoteName::from_chroma(implied_chroma).display_name();
+            format!("{} ({})", base, key_name)
+        }
     }
 }
 
@@ -461,14 +515,14 @@ pub struct InstrumentInfo {
 }
 
 pub const INSTRUMENTS: &[InstrumentInfo] = &[
-    InstrumentInfo { name: "Piano",             semitones:  0, range_start: 60, range_end: 71 },
-    InstrumentInfo { name: "Guitar",            semitones:  0, range_start: 52, range_end: 63 },
-    InstrumentInfo { name: "Transposed Guitar", semitones: 12, range_start: 52, range_end: 63 },
-    InstrumentInfo { name: "Soprano Sax",       semitones:  2, range_start: 58, range_end: 69 },
-    InstrumentInfo { name: "Alto Sax",          semitones:  9, range_start: 51, range_end: 62 },
-    InstrumentInfo { name: "Tenor Sax",         semitones:  2, range_start: 46, range_end: 57 },
-    InstrumentInfo { name: "Trumpet",           semitones:  2, range_start: 55, range_end: 66 },
-    InstrumentInfo { name: "Clarinet",          semitones:  2, range_start: 55, range_end: 66 },
+    InstrumentInfo { name: "Piano",             semitones:  0, range_start: 60, range_end: 72 },
+    InstrumentInfo { name: "Guitar",            semitones:  0, range_start: 52, range_end: 64 },
+    InstrumentInfo { name: "Transposed Guitar", semitones: 12, range_start: 52, range_end: 64 },
+    InstrumentInfo { name: "Soprano Sax",       semitones:  2, range_start: 58, range_end: 70 },
+    InstrumentInfo { name: "Alto Sax",          semitones:  9, range_start: 51, range_end: 63 },
+    InstrumentInfo { name: "Tenor Sax",         semitones:  2, range_start: 46, range_end: 58 },
+    InstrumentInfo { name: "Trumpet",           semitones:  2, range_start: 55, range_end: 67 },
+    InstrumentInfo { name: "Clarinet",          semitones:  2, range_start: 55, range_end: 67 },
 ];
 
 /// Convert a concert MIDI number to the written/display MIDI for a given instrument.

@@ -29,7 +29,7 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
   useEffect(() => {
     invoke<string>('cmd_instrument_list')
       .then(json => setInstruments(JSON.parse(json) as InstrumentInfo[]))
-      .catch(() => setInstruments([{ id: 0, name: 'Piano', semitones: 0, rangeStart: 60, rangeEnd: 71 }]));
+      .catch(() => setInstruments([{ id: 0, name: 'Piano', semitones: 0, rangeStart: 60, rangeEnd: 72 }]));
   }, []);
 
   return (

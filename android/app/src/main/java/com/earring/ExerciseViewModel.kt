@@ -22,7 +22,7 @@ enum class ExerciseStatus { PLAYING, LISTENING, RETRY_DELAY, STOPPED }
 data class ExerciseState(
     val rootNote: Int = 0,
     val rangeStart: Int = 60,   // MIDI of range low bound (default C4)
-    val rangeEnd: Int = 71,     // MIDI of range high bound (default B4)
+    val rangeEnd: Int = 72,     // MIDI of range high bound (default C5)
     val scaleId: Int = 0,
     val sequenceLength: Int = 4,
     val tempoBpm: Int = 100,
@@ -60,7 +60,7 @@ data class ExerciseState(
         fun defaultRange(rootNote: Int): Pair<Int, Int> {
             val best = (2..6).map { oct -> (oct + 1) * 12 + rootNote }
                 .minByOrNull { kotlin.math.abs(it - 60) }!!
-            return Pair(best, best + 11)
+            return Pair(best, best + 12)
         }
     }
 }

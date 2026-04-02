@@ -18,6 +18,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.earring.ExerciseViewModel
+import com.earring.EarRingCore
 import com.earring.ProgressViewModel
 
 object Routes {
@@ -145,7 +146,7 @@ fun EarRingApp() {
                     onBack = { navController.popBackStack() },
                     rangeStart = state.rangeStart,
                     rangeEnd = state.rangeEnd,
-                    rootChroma = state.rootNote,
+                    rootChroma = EarRingCore.effectiveKeyChroma(state.rootNote, state.scaleId),
                     keySignatureMode = state.keySignatureMode,
                     silenceThreshold = state.silenceThreshold,
                     framesToConfirm = state.framesToConfirm,

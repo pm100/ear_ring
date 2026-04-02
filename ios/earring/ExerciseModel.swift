@@ -117,7 +117,7 @@ class ExerciseModel: ObservableObject {
     static func defaultRange(rootNote: Int) -> (Int, Int) {
         let candidates = (2...6).map { oct -> Int in (oct + 1) * 12 + rootNote }
         let best = candidates.min(by: { abs($0 - 60) < abs($1 - 60) }) ?? 60
-        return (best, best + 11)
+        return (best, best + 12)
     }
 
     let audioCapture = AudioCapture()
@@ -432,7 +432,7 @@ class ExerciseModel: ObservableObject {
         keys.forEach { ud.removeObject(forKey: $0) }
         rootNote = 0
         rangeStart = 60
-        rangeEnd = 71
+        rangeEnd = 72
         scaleId = 0
         sequenceLength = 4
         tempoBpm = 100

@@ -20,7 +20,7 @@ const defaultSettings: ExerciseSettings = (() => {
   return {
     rootNote,
     rangeStart,
-    rangeEnd: rangeStart + 11,
+    rangeEnd: rangeStart + 12,
     scaleId: 0,
     sequenceLength: 4,
     tempoBpm: 100,
@@ -42,7 +42,7 @@ function defaultRangeForKey(rootNote: number): [number, number] {
     const candidate = (oct + 1) * 12 + rootNote;
     if (Math.abs(candidate - 60) < Math.abs(best - 60)) best = candidate;
   }
-  return [best, best + 11];
+  return [best, best + 12];
 }
 
 const defaultExercise: ExerciseState = {
@@ -181,6 +181,7 @@ export default function App() {
           rangeStart={settings.rangeStart}
           rangeEnd={settings.rangeEnd}
           rootChroma={settings.rootNote}
+          scaleId={settings.scaleId}
           keySignatureMode={settings.keySignatureMode}
           silenceThreshold={settings.silenceThreshold}
           framesToConfirm={settings.framesToConfirm}

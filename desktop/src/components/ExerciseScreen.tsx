@@ -12,7 +12,12 @@ interface Props {
   onStop: () => void;
 }
 
-const SCALE_NAMES = ['Major','Natural Minor','Harmonic Minor','Dorian','Mixolydian'];
+const SCALE_NAMES = ['Major','Natural Minor','Dorian','Mixolydian'];
+const IMPLIED_MAJOR_OFFSETS = [0, 3, 10, 5]; // indexed by scaleId
+
+function effectiveKeyChroma(rootNote: number, scaleId: number): number {
+  return (rootNote + (IMPLIED_MAJOR_OFFSETS[scaleId] ?? 0)) % 12;
+}
 
 function averageScore(cumulativeScorePercent: number, testsCompleted: number): number {
   return testsCompleted === 0 ? 0 : Math.floor(cumulativeScorePercent / testsCompleted);
@@ -304,7 +309,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     }
   };
 
-  const rootLabel = `${NOTE_NAMES[exercise.rootNote]}  ${preferredMidiLabel(exercise.rangeStart, exercise.rootNote)}–${preferredMidiLabel(exercise.rangeEnd, exercise.rootNote)}`;
+  const rootLabel = `${NOTE_NAMES[exercise.rootNote]}  ${preferredMidiLabel(exercise.rangeStart, effectiveKeyChroma(exercise.rootNote, exercise.scaleId))}–${preferredMidiLabel(exercise.rangeEnd, effectiveKeyChroma(exercise.rootNote, exercise.scaleId))}`;
   const scaleLabel = SCALE_NAMES[exercise.scaleId];
   const score = averageScore(cumulativeScorePercent, testsCompleted);
   const staffNotes: StaffDisplayNote[] = exercise.showTestNotes
@@ -329,10 +334,17 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         <span className="screen-title">{rootLabel} {scaleLabel}</span>
       </div>
 
+      {status === 'listening' && (
+        <div className="listening-indicator" style={{ marginBottom: 8 }}>
+          <span className="listening-ear">👂</span>
+          <span className="listening-label" style={{ marginLeft: 8 }}>Listening…</span>
+        </div>
+      )}
+
       <MusicStaff
         notes={staffNotes}
         fixedSpacing={noteStep}
-        rootChroma={exercise.rootNote}
+        rootChroma={effectiveKeyChroma(exercise.rootNote, exercise.scaleId)}
         keySignatureMode={exercise.keySignatureMode}
       />
 
@@ -351,7 +363,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
           <div className="note-tracker">
             {detected.map((note, i) => (
               <div key={i} className={`note-tracker-item ${note.correct ? 'tracker-correct' : 'tracker-incorrect'}`}>
-                <div className="tracker-note">{preferredMidiLabel(transpMidi(note.midi), exercise.rootNote)}</div>
+                <div className="tracker-note">{preferredMidiLabel(transpMidi(note.midi), effectiveKeyChroma(exercise.rootNote, exercise.scaleId))}</div>
               </div>
             ))}
           </div>
