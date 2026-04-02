@@ -802,6 +802,67 @@ Do **not** use sharps (C#/D#/F#/G#/A#) anywhere in note-name display.
 
 ---
 
+## iPad Native Layout (iOS)
+
+The iOS app targets **Universal** (`TARGETED_DEVICE_FAMILY = "1,2"`) — both iPhone and iPad.
+
+### Navigation
+- **iPhone**: `TabView` with 5 tabs (bottom tab bar)
+- **iPad**: `NavigationSplitView` — sidebar with tab buttons on the left, content in the detail column
+  - Sidebar uses `Button`-based rows (not `List(selection:)` — that binding initializer is unavailable on iOS)
+  - Pushing Exercise from Home via `NavigationStack` collapses the sidebar automatically
+  - All 4 orientations enabled (`UISupportedInterfaceOrientations~ipad` in Info.plist)
+
+### iPad detection
+```swift
+@Environment(\.horizontalSizeClass) var hsc
+private var isIPad: Bool { hsc == .regular }
+```
+iPad (all orientations) has `.regular` horizontal size class. iPhone always has `.compact`.
+
+### Landscape detection (use GeometryReader — NOT verticalSizeClass)
+`verticalSizeClass == .compact` only fires on iPhone landscape; on iPad both orientations are `.regular`/`.regular`.
+Use `GeometryReader` to compare actual dimensions:
+```swift
+GeometryReader { geo in
+    if isIPad && geo.size.width > geo.size.height {
+        iPadLandscapeLayout
+    } else {
+        portraitLayout
+    }
+}
+```
+
+### Adaptive sizing values
+| Property | iPhone | iPad |
+|----------|--------|------|
+| Staff height | 160 pt | 220 pt |
+| Pitch meter size | 90 pt | 130 pt |
+| Piano `keyScale` | 1.0 | 1.35 |
+| Home content `maxWidth` | unlimited | 680 pt (centred) |
+
+### MusicStaffView
+`lineSpacing` is adaptive: `size.height * 0.075`
+- At 160 pt: lineSpacing = 12 pt (iPhone)
+- At 220 pt: lineSpacing = 16.5 pt (iPad)
+All downstream values (staffTop, noteRadius, stems, accidentals) derive from lineSpacing.
+
+### PitchMeterView
+Uses `GeometryReader` internally — fills whatever `.frame()` the caller sets.
+Font size = `min(w,h) * 0.22` (or `0.18` for 3+ char labels).
+
+### PianoRangePickerView
+`keyScale: CGFloat = 1.0` parameter scales all key dimensions:
+- `whiteKeyW = 22 * keyScale`, `blackKeyW = 14 * keyScale`, `whiteKeyH = 80 * keyScale`, etc.
+- C-label font size = `8 * keyScale`
+- At `keyScale=1.35` total piano width ≈ 1452 pt — horizontal scroll always needed.
+
+### ExerciseView — iPad landscape layout
+Two-column `HStack`: staff+status+attempt on left (flexible), pitch meter+stop on right (fixed width = `meterSize + 48`).
+Portrait layout unchanged; shown on iPad portrait and all iPhone orientations.
+
+---
+
 
 
 ### iOS — Home Screen title row

@@ -5,6 +5,12 @@ struct ExerciseView: View {
     @EnvironmentObject var model: ExerciseModel
     @EnvironmentObject var progressModel: ProgressModel
     @Binding var path: NavigationPath
+    @Environment(\.horizontalSizeClass) var hsc
+    @Environment(\.verticalSizeClass) var vsc
+
+    private var isIPad: Bool { hsc == .regular }
+    private var staffHeight: CGFloat { isIPad ? 220 : 160 }
+    private var meterSize: CGFloat { isIPad ? 130 : 90 }
 
     @State private var transpSemitones: Int = 0
 
@@ -31,64 +37,15 @@ struct ExerciseView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Spacer().frame(height: 8)
-            MusicStaffView(
-                notes: staffNotes,
-                fixedSpacing: 44,
-                rootChroma: model.rootNote,
-                keySignatureMode: model.keySignatureMode
-            )
-            .frame(height: 160)
-
-            Spacer().frame(height: 12)
-            Text(statusMessage)
-                .font(.body)
-                .foregroundColor(.erMuted)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-
-            Spacer().frame(height: 8)
-            Text("Attempt \(model.currentAttempt) of \(model.maxAttempts)  •  Tests \(model.testsCompleted)  •  Score \(model.score)%")
-                .font(.subheadline)
-                .foregroundColor(.erMuted)
-                .frame(maxWidth: .infinity)
-
-            Spacer().frame(height: 16)
-            HStack {
-                Spacer()
-                PitchMeterView(midi: model.liveMidi, isActive: model.status == .listening)
-                    .frame(width: 90, height: 90)
-                Spacer()
-            }
-
-            Spacer().frame(height: 24)
-            Button("⏹ Stop Testing") {
-                model.stopExerciseSession()
-                progressModel.reload()
-                path = NavigationPath()
-            }
-            .buttonStyle(ErrorButtonStyle(height: 52, fontSize: 17))
-
-            if !model.detectedNotes.isEmpty {
-                Spacer().frame(height: 20)
-                Text("Current attempt")
-                    .font(.caption)
-                    .foregroundColor(.erMuted)
-                Spacer().frame(height: 4)
-                HStack(spacing: 10) {
-                    ForEach(Array(model.detectedNotes.enumerated()), id: \.offset) { _, note in
-                        Text(MusicTheory.midiToLabel(transpMidi(note.midi)))
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(note.isCorrect ? .erSuccess : .erError)
-                    }
+        GeometryReader { geo in
+            Group {
+                if isIPad && geo.size.width > geo.size.height {
+                    iPadLandscapeLayout
+                } else {
+                    portraitLayout
                 }
             }
-
-            Spacer()
         }
-        .padding(.horizontal, 16)
-        .background(Color(.systemBackground))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -136,5 +93,110 @@ struct ExerciseView: View {
         case .stopped:
             return "Testing stopped"
         }
+    }
+
+    // MARK: — Shared subviews
+
+    private var staffView: some View {
+        MusicStaffView(
+            notes: staffNotes,
+            fixedSpacing: 44,
+            rootChroma: model.rootNote,
+            keySignatureMode: model.keySignatureMode
+        )
+        .frame(height: staffHeight)
+    }
+
+    private var metaText: some View {
+        VStack(spacing: 4) {
+            Text(statusMessage)
+                .font(.body)
+                .foregroundColor(.erMuted)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+            Text("Attempt \(model.currentAttempt) of \(model.maxAttempts)  •  Tests \(model.testsCompleted)  •  Score \(model.score)%")
+                .font(.subheadline)
+                .foregroundColor(.erMuted)
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var pitchMeter: some View {
+        PitchMeterView(midi: model.liveMidi, isActive: model.status == .listening)
+            .frame(width: meterSize, height: meterSize)
+    }
+
+    private var stopButton: some View {
+        Button("⏹ Stop Testing") {
+            model.stopExerciseSession()
+            progressModel.reload()
+            path = NavigationPath()
+        }
+        .buttonStyle(ErrorButtonStyle(height: 52, fontSize: 17))
+    }
+
+    @ViewBuilder
+    private var currentAttemptRow: some View {
+        if !model.detectedNotes.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Current attempt")
+                    .font(.caption)
+                    .foregroundColor(.erMuted)
+                HStack(spacing: 10) {
+                    ForEach(Array(model.detectedNotes.enumerated()), id: \.offset) { _, note in
+                        Text(MusicTheory.midiToLabel(transpMidi(note.midi)))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(note.isCorrect ? .erSuccess : .erError)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: — Portrait layout (iPhone + iPad portrait)
+
+    private var portraitLayout: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Spacer().frame(height: 8)
+            staffView
+            Spacer().frame(height: 12)
+            metaText
+            Spacer().frame(height: 16)
+            HStack { Spacer(); pitchMeter; Spacer() }
+            Spacer().frame(height: 24)
+            stopButton
+            Spacer().frame(height: 20)
+            currentAttemptRow
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .background(Color(.systemBackground))
+    }
+
+    // MARK: — iPad landscape: staff+info left, meter+stop right
+
+    private var iPadLandscapeLayout: some View {
+        HStack(alignment: .top, spacing: 24) {
+            VStack(alignment: .leading, spacing: 0) {
+                Spacer().frame(height: 8)
+                staffView
+                Spacer().frame(height: 12)
+                metaText
+                Spacer().frame(height: 16)
+                currentAttemptRow
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
+
+            VStack(spacing: 24) {
+                Spacer()
+                pitchMeter
+                stopButton
+                Spacer()
+            }
+            .frame(width: meterSize + 48)
+        }
+        .padding(.horizontal, 24)
+        .background(Color(.systemBackground))
     }
 }

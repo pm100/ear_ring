@@ -17,13 +17,14 @@ struct PianoRangePickerView: View {
     let rangeStart: Int
     let rangeEnd: Int
     let onRangeChange: (Int, Int) -> Void
+    var keyScale: CGFloat = 1.0
 
-    private let whiteKeyW: CGFloat = 22
-    private let blackKeyW: CGFloat = 14
-    private let whiteKeyH: CGFloat = 80
-    private let blackKeyH: CGFloat = 52
-    private let handleR: CGFloat   = 9
-    private let handleArea: CGFloat = 22
+    private var whiteKeyW: CGFloat { 22 * keyScale }
+    private var blackKeyW: CGFloat { 14 * keyScale }
+    private var whiteKeyH: CGFloat { 80 * keyScale }
+    private var blackKeyH: CGFloat { 52 * keyScale }
+    private var handleR:   CGFloat {  9 * keyScale }
+    private var handleArea: CGFloat { 22 * keyScale }
 
     var body: some View {
         let totalW = whiteKeyW * CGFloat(TOTAL_WHITE_KEYS)
@@ -158,7 +159,7 @@ struct PianoRangePickerView: View {
             let inRange = midi >= rangeStart && midi <= rangeEnd
             let labelColor = inRange ? primary : Color(red: 0.467, green: 0.467, blue: 0.467)
             ctx.draw(
-                Text("C\(oct)").font(.system(size: 9)).foregroundColor(labelColor),
+                Text("C\(oct)").font(.system(size: 9 * keyScale)).foregroundColor(labelColor),
                 at: CGPoint(x: cx, y: keyTop + whiteKeyH - labelOffset),
                 anchor: .bottom
             )

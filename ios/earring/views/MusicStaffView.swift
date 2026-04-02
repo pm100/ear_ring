@@ -51,7 +51,9 @@ struct MusicStaffView: View {
 
     var body: some View {
         Canvas { ctx, size in
-            let lineSpacing: CGFloat = 12
+            // lineSpacing scales with the view height so the staff fills
+            // the frame correctly on both iPhone (160pt) and iPad (220pt).
+            let lineSpacing: CGFloat = size.height * 0.075
             let staffTop: CGFloat = size.height / 2 - 2 * lineSpacing
             let noteRadius: CGFloat = lineSpacing * 0.45
             let staffBottomY: CGFloat = staffTop + 4 * lineSpacing

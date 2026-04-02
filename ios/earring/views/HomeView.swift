@@ -117,6 +117,11 @@ extension View {
 struct HomeView: View {
     @EnvironmentObject var model: ExerciseModel
     @Binding var path: NavigationPath
+    @Environment(\.horizontalSizeClass) var hsc
+
+    private var isIPad: Bool { hsc == .regular }
+    private var keyScale: CGFloat { isIPad ? 1.35 : 1.0 }
+    private var pianoHeight: CGFloat { (22 * keyScale + 80 * keyScale) * 1.0 }  // handleArea + whiteKeyH
 
     var body: some View {
         ScrollView {
@@ -172,9 +177,10 @@ struct HomeView: View {
                 PianoRangePickerView(
                     rangeStart: model.rangeStart,
                     rangeEnd: model.rangeEnd,
-                    onRangeChange: { s, e in model.rangeStart = s; model.rangeEnd = e }
+                    onRangeChange: { s, e in model.rangeStart = s; model.rangeEnd = e },
+                    keyScale: keyScale
                 )
-                .frame(height: 102)
+                .frame(height: pianoHeight)
 
                 // ── Sequence Length ───────────────────────────────────────
                 sectionLabel("Sequence Length").padding(.top, 16)
@@ -219,6 +225,8 @@ struct HomeView: View {
                 .padding(.bottom, 16)
             }
             .padding(.horizontal, 16)
+            .frame(maxWidth: isIPad ? 680 : .infinity)
+            .frame(maxWidth: .infinity)  // centre on iPad
         }
         .background(Color(.systemBackground))
         .hideNavigationBar()

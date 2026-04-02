@@ -3,10 +3,15 @@ import SwiftUI
 struct SetupView: View {
     @EnvironmentObject var model: ExerciseModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) var hsc
 
     @State private var concertMidi: Int = -1
     @State private var concertHistory: [Int] = []
     @State private var transpSemitones: Int = 0
+
+    private var isIPad: Bool { hsc == .regular }
+    private var staffHeight: CGFloat { isIPad ? 220 : 160 }
+    private var meterSize: CGFloat { isIPad ? 130 : 90 }
 
     private var displayMidi: Int {
         concertMidi >= 0 ? min(127, max(0, concertMidi + transpSemitones)) : -1
@@ -50,7 +55,7 @@ struct SetupView: View {
                 rootChroma: model.rootNote,
                 keySignatureMode: model.keySignatureMode
             )
-            .frame(height: 160)
+            .frame(height: staffHeight)
 
             // ── Large note name + Hz ──────────────────────────────────────
             Spacer().frame(height: 8)
@@ -77,7 +82,7 @@ struct SetupView: View {
             HStack {
                 Spacer()
                 PitchMeterView(midi: model.liveMidi, isActive: model.isCapturing)
-                    .frame(width: 90, height: 90)
+                    .frame(width: meterSize, height: meterSize)
                 Spacer()
             }
 
