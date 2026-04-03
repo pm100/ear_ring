@@ -170,13 +170,20 @@ class ExerciseModel: ObservableObject {
         await audioPlayback.playNote(midi: midi)
     }
 
-    func startLivePitchDetection() async {
+    func startLivePitchDetection(warmup: Int? = nil) async {
         liveMidi = nil
         liveCents = 0
         confirmedLiveMidi = nil
         pitchTracker.setParams(silenceThreshold: silenceThreshold, requiredFrames: framesToConfirm)
         pitchTracker.applyInstrument(index: instrumentIndex)
-        pitchTracker.resetWithWarmup(frames: warmupFrames)
+        // Mic Setup passes warmup=0 (user-triggered, no settling needed).
+        // Exercise passes nil to use the configured warmupFrames setting.
+        let frames = warmup ?? warmupFrames
+        if frames > 0 {
+            pitchTracker.resetWithWarmup(frames: frames)
+        } else {
+            pitchTracker.reset()
+        }
         diagFrameCount = 0
 
         let capture = audioCapture

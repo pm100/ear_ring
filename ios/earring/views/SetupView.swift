@@ -93,7 +93,7 @@ struct SetupView: View {
         .onAppear {
             resetState()
             loadTransposition()
-            Task { await model.startLivePitchDetection() }
+            Task { await model.startLivePitchDetection(warmup: 0) }
         }
         .onDisappear {
             model.stopLivePitchDetection()
