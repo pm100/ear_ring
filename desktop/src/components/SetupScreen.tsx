@@ -30,7 +30,10 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
   const [hz, setHz] = useState(0);
   const [currentMidi, setCurrentMidi] = useState<number>(-1);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
-  const frameNotesRef = useRef<number[]>([]);
+  const stableCountRef = useRef(0);
+  const stableMidiRef = useRef(-1);
+  const pitchConsumedRef = useRef(false);
+  const silenceGraceRef = useRef(0);
   const lastConfirmedMidiRef = useRef<number>(-1);
   const warmupCountRef = useRef<number>(warmupFrames);
   const { start, stop, destroy } = useAudioCapture();
@@ -38,12 +41,19 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
   const NOTE_STEP = 44;
   const midiMin = rangeStart;
   const midiMax = rangeEnd;
+  const requiredFrames = framesToConfirm ?? 3;
 
   const handleHz = useCallback(async (detectedHz: number) => {
     setHz(detectedHz);
     if (detectedHz <= 0) {
-      frameNotesRef.current = [];
-      lastConfirmedMidiRef.current = -1;
+      // Grace period: allow 1 silent frame without resetting
+      silenceGraceRef.current++;
+      if (silenceGraceRef.current > 1) {
+        stableCountRef.current = 0;
+        stableMidiRef.current = -1;
+        pitchConsumedRef.current = false;
+        lastConfirmedMidiRef.current = -1;
+      }
       warmupCountRef.current = 0;
       return;
     }
@@ -51,31 +61,42 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
       warmupCountRef.current--;
       return;
     }
-    if (detectedHz > 0) {
-      const midi = freqToMidi(detectedHz);
-      if (midi >= 0) {
-        const pitchClass = midi % 12;
-        frameNotesRef.current.push(pitchClass);
-        if (frameNotesRef.current.length > (framesToConfirm ?? 3)) frameNotesRef.current.shift();
-        const last = frameNotesRef.current;
-        if (last.length === (framesToConfirm ?? 3) && last[0] === last[1] && last[1] === last[2]) {
-          if (midi < midiMin || midi > midiMax) return;
-          setCurrentMidi(midi);
-          // Only suppress re-confirm for a *sustained* note (same midi, no silence).
-          // lastConfirmedMidiRef resets to -1 on silence so replaying the same
-          // note after a break always appends again.
-          if (midi !== lastConfirmedMidiRef.current) {
-            lastConfirmedMidiRef.current = midi;
-            setNoteHistory(prev => {
-              const next = [...prev, midi];
-              if (next.length > 8) next.shift();
-              return next;
-            });
-          }
-        }
+    const midi = freqToMidi(detectedHz);
+    if (midi < 0) {
+      silenceGraceRef.current++;
+      if (silenceGraceRef.current > 1) {
+        stableCountRef.current = 0;
+        stableMidiRef.current = -1;
+        pitchConsumedRef.current = false;
+      }
+      return;
+    }
+
+    silenceGraceRef.current = 0;
+
+    // Track full MIDI note (exact match, no jitter tolerance)
+    if (midi === stableMidiRef.current) {
+      stableCountRef.current++;
+    } else {
+      stableCountRef.current = 1;
+      stableMidiRef.current = midi;
+      pitchConsumedRef.current = false;
+    }
+
+    if (!pitchConsumedRef.current && stableCountRef.current >= requiredFrames) {
+      pitchConsumedRef.current = true;
+      if (midi < midiMin || midi > midiMax) return;
+      setCurrentMidi(midi);
+      if (midi !== lastConfirmedMidiRef.current) {
+        lastConfirmedMidiRef.current = midi;
+        setNoteHistory(prev => {
+          const next = [...prev, midi];
+          if (next.length > 8) next.shift();
+          return next;
+        });
       }
     }
-  }, [midiMin, midiMax]);
+  }, [midiMin, midiMax, requiredFrames]);
 
   // Load instrument transposition semitones once
   const [transpSemitones, setTranspSemitones] = useState(0);

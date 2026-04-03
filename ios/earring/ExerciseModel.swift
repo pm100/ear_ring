@@ -124,12 +124,14 @@ class ExerciseModel: ObservableObject {
     private let audioPlayback = AudioPlayback()
 
     private var cumulativeScore: Int = 0
-    private var stabilityPitchClass: Int = -1
+    private var stableMidi: Int = -1
     private var stabilityCount: Int = 0
     private var pitchConsumed: Bool = false
     private var warmupFramesRemaining: Int = 0
     private var sessionPersisted = false
     private var diagFrameCount: Int = 0
+    // Grace period: allow 1 silent/no-pitch frame without resetting stability.
+    private var silenceGrace: Int = 0
 
     // Gap between the last note of the sequence ending and mic start.
     // Piano sustain continues after playSequence returns; this silence lets it fade so
@@ -285,28 +287,31 @@ class ExerciseModel: ObservableObject {
         guard rms >= silenceThreshold else {
             liveMidi = nil
             liveCents = 0
-            resetStability()
+            handleNoDetection()
             return nil
         }
         guard let hz = EarRingCore.detectPitch(samples: samples, sampleRate: sampleRate),
               let (midi, cents) = EarRingCore.freqToNote(hz: hz) else {
+            handleNoDetection()
             return nil
         }
+        silenceGrace = 0
         liveMidi = midi
         liveCents = cents
         return (midi, cents)
     }
 
-    /// 3-frame stability check shared by both Exercise and Mic Setup.
-    private func checkStability(pitchClass: Int) -> Bool {
-        if pitchClass == stabilityPitchClass {
+    /// Stability check — track full MIDI note (exact match, no jitter tolerance)
+    /// to catch octave errors without confusing adjacent semitones.
+    private func checkStability(midi: Int) -> Bool {
+        if midi == stableMidi {
             stabilityCount += 1
             if !pitchConsumed && stabilityCount >= framesToConfirm {
                 pitchConsumed = true
                 return true
             }
         } else {
-            stabilityPitchClass = pitchClass
+            stableMidi = midi
             stabilityCount = 1
             pitchConsumed = false
         }
@@ -328,7 +333,7 @@ class ExerciseModel: ObservableObject {
             return
         }
         guard let (midi, _) = detectRawNote(samples: samples, sampleRate: sampleRate) else { return }
-        guard checkStability(pitchClass: midi % 12) else { return }
+        guard checkStability(midi: midi) else { return }
         print("[EAR] confirmed midi=\(midi) (\(MusicTheory.midiToLabel(midi))) status=\(status)")
         confirmedNoteSeq += 1
         confirmedLiveMidi = midi
@@ -448,9 +453,20 @@ class ExerciseModel: ObservableObject {
     }
 
     private func resetStability() {
-        stabilityPitchClass = -1
+        stableMidi = -1
         stabilityCount = 0
         pitchConsumed = false
+        silenceGrace = 0
+    }
+
+    /// Handle a silent or no-detection frame with a 1-frame grace period.
+    private func handleNoDetection() {
+        silenceGrace += 1
+        if silenceGrace > 1 {
+            stableMidi = -1
+            stabilityCount = 0
+            pitchConsumed = false
+        }
     }
 
     private func computeRMS(_ samples: [Float]) -> Float {

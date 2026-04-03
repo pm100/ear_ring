@@ -27,6 +27,9 @@ class AudioCapture: @unchecked Sendable {
             try session.setCategory(.playAndRecord,
                                     mode: .measurement,
                                     options: [.defaultToSpeaker, .allowBluetooth])
+            // Request 44100 Hz for consistency with Android/Desktop and the YIN
+            // algorithm's tuned parameters. iOS will use the closest supported rate.
+            try session.setPreferredSampleRate(44100)
             try session.setActive(true)
         } catch {
             print("[AudioCapture] AVAudioSession setup error: \(error)")

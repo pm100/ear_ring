@@ -16,17 +16,21 @@ class PitchStabilityTracker(
     private val silenceThreshold: Float = 0.003f,
     private val requiredFrames: Int = 3
 ) {
-    @Volatile private var stablePitchClass: Int = -1
+    @Volatile private var stableMidi: Int = -1
     @Volatile private var stableCount: Int = 0
     @Volatile private var pitchConsumed: Boolean = false
     @Volatile private var warmupRemaining: Int = 0
+    // Grace period: allow 1 silent/no-pitch frame without resetting stability.
+    // Real instruments have brief amplitude dips that shouldn't erase progress.
+    @Volatile private var silenceGrace: Int = 0
 
     /** Reset stability state (call between notes, on prompt start, or on stop). */
     fun reset() {
-        stablePitchClass = -1
+        stableMidi = -1
         stableCount = 0
         pitchConsumed = false
         warmupRemaining = 0
+        silenceGrace = 0
     }
 
     /**
@@ -44,7 +48,7 @@ class PitchStabilityTracker(
      * Process one audio frame.
      *
      * @return [PitchFrame] with the live Hz (−1 when silent/no pitch) and a non-null
-     *         [PitchFrame.confirmedMidi] the first time a pitch class stabilises over
+     *         [PitchFrame.confirmedMidi] the first time a MIDI note stabilises over
      *         [requiredFrames] consecutive frames.
      */
     fun process(samples: FloatArray): PitchFrame {
@@ -54,27 +58,27 @@ class PitchStabilityTracker(
         }
         val rms = computeRms(samples)
         if (rms < silenceThreshold) {
-            reset()
-            return PitchFrame.Silence
+            return handleNoDetection()
         }
 
         val hz = EarRingCore.detectPitch(samples, 44100)
         if (hz <= 0f) {
-            reset()
-            return PitchFrame.Silence
+            return handleNoDetection()
         }
 
         val midi = EarRingCore.freqToMidi(hz)
         if (midi < 0) {
-            reset()
-            return PitchFrame.Silence
+            return handleNoDetection()
         }
 
-        val pitchClass = midi % 12
-        if (pitchClass == stablePitchClass) {
+        // Reset grace counter — we have a valid detection
+        silenceGrace = 0
+
+        // Track full MIDI note (exact match, no jitter tolerance).
+        if (midi == stableMidi) {
             stableCount++
         } else {
-            stablePitchClass = pitchClass
+            stableMidi = midi
             stableCount = 1
             pitchConsumed = false
         }
@@ -85,6 +89,18 @@ class PitchStabilityTracker(
         } else null
 
         return PitchFrame.Active(hz = hz, midi = midi, confirmedMidi = confirmed)
+    }
+
+    /** Handle a silent or no-detection frame with a 1-frame grace period. */
+    private fun handleNoDetection(): PitchFrame {
+        silenceGrace++
+        if (silenceGrace > 1) {
+            // Two consecutive silent frames — full reset
+            stableMidi = -1
+            stableCount = 0
+            pitchConsumed = false
+        }
+        return PitchFrame.Silence
     }
 
     private fun computeRms(samples: FloatArray): Float {

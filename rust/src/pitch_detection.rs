@@ -19,6 +19,17 @@ pub fn detect_pitch(samples: &[f32], sample_rate: u32) -> Option<f32> {
     if n < 2 {
         return None;
     }
+
+    // Remove DC offset — some microphones inject a small bias that degrades
+    // YIN's difference function accuracy.
+    let dc: f32 = samples.iter().sum::<f32>() / n as f32;
+    let samples: Vec<f32> = if dc.abs() > 1e-6 {
+        samples.iter().map(|&s| s - dc).collect()
+    } else {
+        samples.to_vec()
+    };
+    let samples = &samples[..];
+
     // Maximum lag to check: lowest detectable pitch ~= sample_rate / max_lag.
     // We cap at 20 Hz (infrasound), so max_lag = sample_rate / 20.
     let max_lag = (sample_rate / 20).min(n as u32 / 2) as usize;
@@ -68,17 +79,11 @@ pub fn detect_pitch(samples: &[f32], sample_rate: u32) -> Option<f32> {
         tau += 1;
     }
 
-    // Fallback: pick global minimum if nothing below threshold.
-    let tau_opt = tau_opt.unwrap_or_else(|| {
-        (min_lag..=max_lag)
-            .min_by(|&a, &b| cmndf[a].partial_cmp(&cmndf[b]).unwrap())
-            .unwrap_or(min_lag)
-    });
-
-    if cmndf[tau_opt] > 0.5 {
-        // Very low confidence — bail out.
-        return None;
-    }
+    // No dip below threshold — no confident pitch detected.
+    let tau_opt = match tau_opt {
+        Some(t) => t,
+        None => return None,
+    };
 
     // Step 5: parabolic interpolation for sub-sample accuracy.
     let tau_f = parabolic_interpolation(&cmndf, tau_opt);
