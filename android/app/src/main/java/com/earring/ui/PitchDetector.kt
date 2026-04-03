@@ -50,6 +50,15 @@ fun rememberPitchDetector(
         EarRingCore.trackerApplyInstrument(trackerHandle, instrumentIndex)
     }
 
+    // Tracker lifetime is tied to the composable, NOT to active — freeing on every
+    // active toggle would cause a use-after-free when the tracker is reused.
+    DisposableEffect(Unit) {
+        onDispose {
+            audioCapture.stop()
+            EarRingCore.trackerFree(trackerHandle)
+        }
+    }
+
     DisposableEffect(active) {
         if (active) {
             if (warmupFrames > 0) EarRingCore.trackerResetWithWarmup(trackerHandle, warmupFrames)
@@ -77,7 +86,6 @@ fun rememberPitchDetector(
 
         onDispose {
             audioCapture.stop()
-            EarRingCore.trackerFree(trackerHandle)
         }
     }
 

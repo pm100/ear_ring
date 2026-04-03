@@ -50,7 +50,15 @@ export function useAudioCapture() {
       return;
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        noiseSuppression: false,
+        echoCancellation: false,
+        autoGainControl: false,
+        sampleRate: 44100,
+        channelCount: 1,
+      }
+    });
     streamRef.current = stream;
 
     const context = new AudioContext({ sampleRate: 44100 });
