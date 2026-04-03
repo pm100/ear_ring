@@ -107,6 +107,17 @@ struct ExerciseView: View {
         .frame(height: staffHeight)
     }
 
+    private var listeningBanner: some View {
+        HStack(spacing: 8) {
+            Text("👂").font(.system(size: 28))
+            Text("Listening…")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.erPrimary)
+        }
+        .frame(maxWidth: .infinity)
+        .opacity(model.status == .listening ? 1 : 0)
+    }
+
     private var metaText: some View {
         VStack(spacing: 4) {
             Text(statusMessage)
@@ -159,7 +170,9 @@ struct ExerciseView: View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer().frame(height: 8)
             staffView
-            Spacer().frame(height: 12)
+            Spacer().frame(height: 8)
+            listeningBanner
+            Spacer().frame(height: 4)
             metaText
             Spacer().frame(height: 16)
             HStack { Spacer(); pitchMeter; Spacer() }
@@ -180,7 +193,9 @@ struct ExerciseView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Spacer().frame(height: 8)
                 staffView
-                Spacer().frame(height: 12)
+                Spacer().frame(height: 8)
+                listeningBanner
+                Spacer().frame(height: 4)
                 metaText
                 Spacer().frame(height: 16)
                 currentAttemptRow

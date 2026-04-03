@@ -1,5 +1,7 @@
 package com.earring
 
+import com.earring.PitchFrame
+
 object EarRingCore {
 
     private var loaded = false
@@ -36,6 +38,49 @@ object EarRingCore {
     @JvmStatic external fun nativeHelpContent(): String
     @JvmStatic external fun nativeInstrumentList(): String
     @JvmStatic external fun nativeTransposeDisplayMidi(concertMidi: Int, instrumentIndex: Int): Int
+
+    // ── PitchTracker JNI ─────────────────────────────────────────────────────────
+    @JvmStatic external fun nativeTrackerNew(silenceThreshold: Float, requiredFrames: Int): Long
+    @JvmStatic external fun nativeTrackerFree(handle: Long)
+    @JvmStatic external fun nativeTrackerReset(handle: Long)
+    @JvmStatic external fun nativeTrackerResetWithWarmup(handle: Long, warmupFrames: Int)
+    @JvmStatic external fun nativeTrackerSetParams(handle: Long, silenceThreshold: Float, requiredFrames: Int)
+    @JvmStatic external fun nativeTrackerApplyInstrument(handle: Long, instrumentIndex: Int)
+    /** Returns FloatArray[3]: [live_hz, live_midi_f32, confirmed_midi_f32]. -1 means absent. */
+    @JvmStatic external fun nativeTrackerProcess(handle: Long, samples: FloatArray, sampleRate: Int): FloatArray
+
+    fun trackerNew(silenceThreshold: Float, requiredFrames: Int): Long =
+        if (loaded) nativeTrackerNew(silenceThreshold, requiredFrames) else 0L
+
+    fun trackerFree(handle: Long) { if (loaded && handle != 0L) nativeTrackerFree(handle) }
+
+    fun trackerReset(handle: Long) { if (loaded && handle != 0L) nativeTrackerReset(handle) }
+
+    fun trackerResetWithWarmup(handle: Long, warmupFrames: Int) {
+        if (loaded && handle != 0L) nativeTrackerResetWithWarmup(handle, warmupFrames)
+    }
+
+    fun trackerSetParams(handle: Long, silenceThreshold: Float, requiredFrames: Int) {
+        if (loaded && handle != 0L) nativeTrackerSetParams(handle, silenceThreshold, requiredFrames)
+    }
+
+    fun trackerApplyInstrument(handle: Long, instrumentIndex: Int) {
+        if (loaded && handle != 0L) nativeTrackerApplyInstrument(handle, instrumentIndex)
+    }
+
+    /** Process one audio buffer via the Rust tracker. Returns a [PitchFrame]. */
+    fun trackerProcess(handle: Long, samples: FloatArray, sampleRate: Int = 44100): PitchFrame {
+        if (!loaded || handle == 0L) return PitchFrame.Silence
+        val out = nativeTrackerProcess(handle, samples, sampleRate)
+        val liveHz = out.getOrElse(0) { -1f }
+        val liveMidi = out.getOrElse(1) { -1f }.toInt()
+        val confirmedMidi = out.getOrElse(2) { -1f }.toInt()
+        return if (liveHz <= 0f || liveMidi < 0) {
+            PitchFrame.Silence
+        } else {
+            PitchFrame.Active(hz = liveHz, midi = liveMidi, confirmedMidi = if (confirmedMidi >= 0) confirmedMidi else null)
+        }
+    }
 
     fun detectPitch(samples: FloatArray, sampleRate: Int): Float =
         if (loaded) nativeDetectPitch(samples, sampleRate) else -1f

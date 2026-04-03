@@ -21,6 +21,15 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 interface InstrumentInfo { id: number; name: string; semitones: number; rangeStart: number; rangeEnd: number; }
 
+function defaultRangeForKey(rootNote: number): [number, number] {
+  let best = 60 + rootNote;
+  for (let oct = 2; oct <= 6; oct++) {
+    const c = (oct + 1) * 12 + rootNote;
+    if (Math.abs(c - 60) < Math.abs(best - 60)) best = c;
+  }
+  return [best, best + 12];
+}
+
 export default function SettingsScreen({ settings, onUpdateSettings, onResetSettings, onBack }: Props) {
   const set = <K extends keyof ExerciseSettings>(key: K, value: ExerciseSettings[K]) =>
     onUpdateSettings(prev => ({ ...prev, [key]: value }));
@@ -47,11 +56,10 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
         onChange={e => {
           const idx = parseInt(e.target.value);
           const inst = instruments[idx];
-          onUpdateSettings(prev => ({
-            ...prev,
-            instrumentIndex: idx,
-            ...(inst ? { rangeStart: inst.rangeStart, rangeEnd: inst.rangeEnd } : {}),
-          }));
+          onUpdateSettings(prev => {
+            const [rangeStart, rangeEnd] = defaultRangeForKey(prev.rootNote);
+            return { ...prev, instrumentIndex: idx, rangeStart, rangeEnd };
+          });
         }}
         style={{ width: '100%', padding: '8px 12px', fontSize: 14, borderRadius: 4, border: '1px solid #bdbdbd', marginBottom: 4 }}
       >

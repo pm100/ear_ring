@@ -139,4 +139,53 @@ struct EarRingCore {
     static func transposeDisplayMidi(_ concertMidi: Int, instrumentIndex: Int) -> Int {
         Int(ear_ring_transpose_display_midi(Int32(concertMidi), Int32(instrumentIndex)))
     }
+
+    // MARK: - PitchTracker
+
+    /// Result from processing one audio buffer through the Rust pitch tracker.
+    struct TrackerFrame {
+        /// Detected frequency in Hz. 0 when silent or no confident pitch.
+        var liveHz: Float
+        /// Detected MIDI note. -1 when silent or no confident pitch.
+        var liveMidi: Int
+        /// The confirmed MIDI note, emitted exactly once when stability is reached. -1 means absent.
+        var confirmedMidi: Int
+    }
+
+    /// Rust-backed pitch detector with built-in stability tracking, silence gating,
+    /// warmup frame discard, and a 1-frame silence grace period.
+    ///
+    /// Create once when audio capture starts; call `process()` per buffer from a
+    /// single thread; `reset()` between attempts; `deinit` frees the Rust allocation.
+    final class PitchTracker {
+        private let handle: OpaquePointer
+
+        init(silenceThreshold: Float, requiredFrames: Int) {
+            handle = ear_ring_tracker_new(silenceThreshold, UInt32(requiredFrames))
+        }
+
+        deinit { ear_ring_tracker_free(handle) }
+
+        func reset() { ear_ring_tracker_reset(handle) }
+
+        func resetWithWarmup(frames: Int) { ear_ring_tracker_reset_with_warmup(handle, UInt32(frames)) }
+
+        func setParams(silenceThreshold: Float, requiredFrames: Int) {
+            ear_ring_tracker_set_params(handle, silenceThreshold, UInt32(requiredFrames))
+        }
+
+        /// Apply per-instrument detection parameters (grace frames, octave correction).
+        /// Call whenever the instrument selection changes.
+        func applyInstrument(index: Int) {
+            ear_ring_tracker_apply_instrument(handle, Int32(index))
+        }
+
+        func process(samples: [Float], sampleRate: UInt32) -> TrackerFrame {
+            var floats = samples
+            var outHz: Float = 0
+            var outMidi: Int32 = -1
+            let confirmed = Int(ear_ring_tracker_process(handle, &floats, UInt32(floats.count), sampleRate, &outHz, &outMidi))
+            return TrackerFrame(liveHz: outHz, liveMidi: Int(outMidi), confirmedMidi: confirmed)
+        }
+    }
 }

@@ -1,5 +1,6 @@
 pub mod music_theory;
 pub mod pitch_detection;
+pub mod tracker;
 
 pub use music_theory::{
     accidental_in_key, effective_key_chroma, freq_to_note, generate_sequence, intro_chord,
@@ -10,6 +11,7 @@ pub use music_theory::{
     FLAT_ORDER, FLAT_STAFF_POSITIONS, SHARP_ORDER, SHARP_STAFF_POSITIONS,
 };
 pub use pitch_detection::detect_pitch;
+pub use tracker::{FrameResult, PitchTracker};
 
 // ── Help content ──────────────────────────────────────────────────────────────
 
@@ -74,12 +76,14 @@ pub fn instrument_list_json() -> String {
     for (i, inst) in INSTRUMENTS.iter().enumerate() {
         if i > 0 { json.push(','); }
         json.push_str(&format!(
-            "{{\"id\":{},\"name\":{},\"semitones\":{},\"rangeStart\":{},\"rangeEnd\":{}}}",
+            "{{\"id\":{},\"name\":{},\"semitones\":{},\"rangeStart\":{},\"rangeEnd\":{},\"graceFrames\":{},\"octaveCorrection\":{}}}",
             i,
             json_string(inst.name),
             inst.semitones,
             inst.range_start,
-            inst.range_end
+            inst.range_end,
+            inst.grace_frames,
+            inst.octave_correction
         ));
     }
     json.push(']');
@@ -482,8 +486,87 @@ pub extern "C" fn ear_ring_staff_position_in_key(
     staff_position_in_key(midi, root_chroma) as c_int
 }
 
+// ── PitchTracker C FFI ────────────────────────────────────────────────────────
+// Opaque-pointer API used by iOS (and any other C-FFI consumer).
+// Android uses the JNI variants below.
+
+/// Create a new `PitchTracker` on the heap. Must be freed with `ear_ring_tracker_free`.
+#[no_mangle]
+pub extern "C" fn ear_ring_tracker_new(silence_threshold: c_float, required_frames: c_uint) -> *mut PitchTracker {
+    Box::into_raw(Box::new(PitchTracker::new(silence_threshold, required_frames)))
+}
+
+/// Free a `PitchTracker` created by `ear_ring_tracker_new`. Null-safe.
+#[no_mangle]
+pub extern "C" fn ear_ring_tracker_free(tracker: *mut PitchTracker) {
+    if !tracker.is_null() {
+        unsafe { drop(Box::from_raw(tracker)); }
+    }
+}
+
+/// Reset all stability state. Call between attempts or when stopping.
+#[no_mangle]
+pub extern "C" fn ear_ring_tracker_reset(tracker: *mut PitchTracker) {
+    if !tracker.is_null() {
+        unsafe { (*tracker).reset(); }
+    }
+}
+
+/// Reset and discard the next `warmup_frames` buffers before processing.
+#[no_mangle]
+pub extern "C" fn ear_ring_tracker_reset_with_warmup(tracker: *mut PitchTracker, warmup_frames: c_uint) {
+    if !tracker.is_null() {
+        unsafe { (*tracker).reset_with_warmup(warmup_frames); }
+    }
+}
+
+/// Update silence threshold and required frames without resetting state.
+#[no_mangle]
+pub extern "C" fn ear_ring_tracker_set_params(tracker: *mut PitchTracker, silence_threshold: c_float, required_frames: c_uint) {
+    if !tracker.is_null() {
+        unsafe { (*tracker).set_params(silence_threshold, required_frames); }
+    }
+}
+
+/// Apply per-instrument detection parameters (grace frames and octave correction) from the
+/// built-in INSTRUMENTS table. Call whenever the instrument selection changes.
+#[no_mangle]
+pub extern "C" fn ear_ring_tracker_apply_instrument(tracker: *mut PitchTracker, instrument_index: c_int) {
+    if !tracker.is_null() {
+        unsafe { (*tracker).apply_instrument(instrument_index.max(0) as usize); }
+    }
+}
+
+/// Process one audio buffer.
+///
+/// * `out_live_hz`  – set to the detected frequency (0.0 if silent/undetected)
+/// * `out_live_midi` – set to the detected MIDI note (-1 if silent/undetected)
+///
+/// Returns the confirmed MIDI note the first time a note stabilises, or -1.
+#[no_mangle]
+pub extern "C" fn ear_ring_tracker_process(
+    tracker: *mut PitchTracker,
+    samples: *const c_float,
+    num_samples: c_uint,
+    sample_rate: c_uint,
+    out_live_hz: *mut c_float,
+    out_live_midi: *mut c_int,
+) -> c_int {
+    if tracker.is_null() || samples.is_null() {
+        return -1;
+    }
+    let slice = unsafe { std::slice::from_raw_parts(samples, num_samples as usize) };
+    let result = unsafe { (*tracker).process(slice, sample_rate) };
+    if !out_live_hz.is_null() {
+        unsafe { *out_live_hz = result.live_hz; }
+    }
+    if !out_live_midi.is_null() {
+        unsafe { *out_live_midi = result.live_midi; }
+    }
+    result.confirmed_midi
+}
+
 // ── Android JNI exports ───────────────────────────────────────────────────────
-// Exported with the exact symbol names the Kotlin EarRingCoreModule expects.
 #[cfg(target_os = "android")]
 mod android_jni {
     use jni::objects::{JClass, JFloatArray, JIntArray};
@@ -815,5 +898,119 @@ mod android_jni {
         instrument_index: jint,
     ) -> jint {
         super::transpose_display_midi(concert_midi, instrument_index.max(0) as usize) as jint
+    }
+
+    // ── PitchTracker JNI wrappers ────────────────────────────────────────────────
+    // The tracker is heap-allocated and the handle (raw pointer as i64) is stored
+    // in Kotlin. Each call passes the handle back so Rust can recover the reference.
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeTrackerNew(
+        _env: JNIEnv,
+        _class: JClass,
+        silence_threshold: jfloat,
+        required_frames: jint,
+    ) -> jlong {
+        let tracker = Box::new(super::PitchTracker::new(silence_threshold, required_frames as u32));
+        Box::into_raw(tracker) as jlong
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeTrackerFree(
+        _env: JNIEnv,
+        _class: JClass,
+        handle: jlong,
+    ) {
+        if handle != 0 {
+            unsafe { drop(Box::from_raw(handle as *mut super::PitchTracker)); }
+        }
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeTrackerReset(
+        _env: JNIEnv,
+        _class: JClass,
+        handle: jlong,
+    ) {
+        if handle != 0 {
+            unsafe { (*(handle as *mut super::PitchTracker)).reset(); }
+        }
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeTrackerResetWithWarmup(
+        _env: JNIEnv,
+        _class: JClass,
+        handle: jlong,
+        warmup_frames: jint,
+    ) {
+        if handle != 0 {
+            unsafe { (*(handle as *mut super::PitchTracker)).reset_with_warmup(warmup_frames as u32); }
+        }
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeTrackerSetParams(
+        _env: JNIEnv,
+        _class: JClass,
+        handle: jlong,
+        silence_threshold: jfloat,
+        required_frames: jint,
+    ) {
+        if handle != 0 {
+            unsafe { (*(handle as *mut super::PitchTracker)).set_params(silence_threshold, required_frames as u32); }
+        }
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeTrackerApplyInstrument(
+        _env: JNIEnv,
+        _class: JClass,
+        handle: jlong,
+        instrument_index: jint,
+    ) {
+        if handle != 0 {
+            unsafe { (*(handle as *mut super::PitchTracker)).apply_instrument(instrument_index.max(0) as usize); }
+        }
+    }
+
+    /// Process one audio buffer via the Rust tracker.
+    /// Returns a float array [live_hz, live_midi_f32, confirmed_midi_f32].
+    /// live_midi and confirmed_midi are -1.0 when absent.
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeTrackerProcess(
+        env: JNIEnv,
+        _class: JClass,
+        handle: jlong,
+        samples: jfloatArray,
+        sample_rate: jint,
+    ) -> jfloatArray {
+        let make_empty = || -> jfloatArray {
+            let a = env.new_float_array(3).unwrap();
+            let _ = env.set_float_array_region(&a, 0, &[0.0f32, -1.0f32, -1.0f32]);
+            a.into_raw()
+        };
+
+        if handle == 0 { return make_empty(); }
+
+        let arr = unsafe { JFloatArray::from_raw(samples) };
+        let len = match env.get_array_length(&arr) {
+            Ok(l) => l as usize,
+            Err(_) => return make_empty(),
+        };
+        let mut buf = vec![0f32; len];
+        if env.get_float_array_region(&arr, 0, &mut buf).is_err() {
+            return make_empty();
+        }
+
+        let result = unsafe { (*(handle as *mut super::PitchTracker)).process(&buf, sample_rate as u32) };
+        let out_vals = [result.live_hz, result.live_midi as f32, result.confirmed_midi as f32];
+
+        let out = match env.new_float_array(3) {
+            Ok(a) => a,
+            Err(_) => return make_empty(),
+        };
+        let _ = env.set_float_array_region(&out, 0, &out_vals);
+        out.into_raw()
     }
 }

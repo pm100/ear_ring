@@ -1,9 +1,9 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import PitchMeter from './PitchMeter';
 import MusicStaff from './MusicStaff';
-import { useAudioCapture } from '../hooks/useAudioCapture';
-import { freqToMidi, preferredMidiLabel } from '../music';
+import { useAudioCapture, TrackerFrame } from '../hooks/useAudioCapture';
+import { preferredMidiLabel } from '../music';
 
 interface InstrumentInfo { id: number; name: string; semitones: number; }
 
@@ -26,94 +26,57 @@ interface Props {
 }
 
 
-export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma = 0, scaleId = 0, keySignatureMode = 0, silenceThreshold, framesToConfirm, warmupFrames = 4, instrumentIndex = 0 }: Props) {
+export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma = 0, scaleId = 0, keySignatureMode = 0, silenceThreshold = 0.003, framesToConfirm = 3, warmupFrames = 4, instrumentIndex = 0 }: Props) {
   const [hz, setHz] = useState(0);
   const [currentMidi, setCurrentMidi] = useState<number>(-1);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
-  const stableCountRef = useRef(0);
-  const stableMidiRef = useRef(-1);
-  const pitchConsumedRef = useRef(false);
-  const silenceGraceRef = useRef(0);
-  const lastConfirmedMidiRef = useRef<number>(-1);
-  const warmupCountRef = useRef<number>(warmupFrames);
   const { start, stop, destroy } = useAudioCapture();
 
   const NOTE_STEP = 44;
   const midiMin = rangeStart;
   const midiMax = rangeEnd;
-  const requiredFrames = framesToConfirm ?? 3;
 
-  const handleHz = useCallback(async (detectedHz: number) => {
-    setHz(detectedHz);
-    if (detectedHz <= 0) {
-      // Grace period: allow 1 silent frame without resetting
-      silenceGraceRef.current++;
-      if (silenceGraceRef.current > 1) {
-        stableCountRef.current = 0;
-        stableMidiRef.current = -1;
-        pitchConsumedRef.current = false;
-        lastConfirmedMidiRef.current = -1;
-      }
-      warmupCountRef.current = 0;
-      return;
-    }
-    if (warmupCountRef.current > 0) {
-      warmupCountRef.current--;
-      return;
-    }
-    const midi = freqToMidi(detectedHz);
-    if (midi < 0) {
-      silenceGraceRef.current++;
-      if (silenceGraceRef.current > 1) {
-        stableCountRef.current = 0;
-        stableMidiRef.current = -1;
-        pitchConsumedRef.current = false;
-      }
-      return;
-    }
-
-    silenceGraceRef.current = 0;
-
-    // Track full MIDI note (exact match, no jitter tolerance)
-    if (midi === stableMidiRef.current) {
-      stableCountRef.current++;
-    } else {
-      stableCountRef.current = 1;
-      stableMidiRef.current = midi;
-      pitchConsumedRef.current = false;
-    }
-
-    if (!pitchConsumedRef.current && stableCountRef.current >= requiredFrames) {
-      pitchConsumedRef.current = true;
-      if (midi < midiMin || midi > midiMax) return;
-      setCurrentMidi(midi);
-      if (midi !== lastConfirmedMidiRef.current) {
-        lastConfirmedMidiRef.current = midi;
+  const handleFrame = useCallback(async (frame: TrackerFrame) => {
+    setHz(frame.liveHz);
+    if (frame.confirmedMidi >= 0) {
+      const midi = frame.confirmedMidi;
+      if (midi >= midiMin && midi <= midiMax) {
+        setCurrentMidi(midi);
         setNoteHistory(prev => {
           const next = [...prev, midi];
           if (next.length > 8) next.shift();
           return next;
         });
       }
+    } else if (frame.liveMidi < 0) {
+      // Silent frame: clear the live display only (history remains)
+      setCurrentMidi(-1);
     }
-  }, [midiMin, midiMax, requiredFrames]);
+  }, [midiMin, midiMax]);
 
-  // Load instrument transposition semitones once
+  // Load instrument transposition semitones and apply instrument-specific tracker params.
   const [transpSemitones, setTranspSemitones] = useState(0);
   useEffect(() => {
     invoke<string>('cmd_instrument_list')
       .then(json => {
         const list = JSON.parse(json) as InstrumentInfo[];
         setTranspSemitones(list[instrumentIndex]?.semitones ?? 0);
+        void invoke('cmd_tracker_apply_instrument', { instrumentIndex });
       })
       .catch(() => {});
   }, [instrumentIndex]);
 
-  // Auto-start on entry, full cleanup on unmount
+  // Configure tracker on entry, then auto-start.  Full cleanup on unmount.
   useEffect(() => {
-    start(handleHz, silenceThreshold);
-    return () => destroy();
-  }, [start, destroy, handleHz]);
+    void invoke('cmd_tracker_set_params', { silenceThreshold, requiredFrames: framesToConfirm });
+    void invoke('cmd_tracker_reset_with_warmup', { warmupFrames });
+    start(handleFrame);
+    return () => {
+      stop();
+      void invoke('cmd_tracker_reset');
+      destroy();
+    };
+  }, [start, stop, destroy, handleFrame]);
 
   const transpMidi = (midi: number) => Math.max(0, Math.min(127, midi + transpSemitones));
   const displayMidi = currentMidi >= 0 ? transpMidi(currentMidi) : -1;

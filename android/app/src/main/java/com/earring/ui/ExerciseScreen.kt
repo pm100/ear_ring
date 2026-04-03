@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import android.app.Activity
 import androidx.compose.ui.Modifier
@@ -67,6 +68,7 @@ fun ExerciseScreen(
         midiMax = midiMax,
         silenceThreshold = state.silenceThreshold,
         framesToConfirm = state.framesToConfirm,
+        instrumentIndex = state.instrumentIndex,
         warmupFrames = state.warmupFrames,
         onConfirmed = { midi, hz ->
             val cents = EarRingCore.freqToCents(hz)
@@ -114,23 +116,23 @@ fun ExerciseScreen(
 
         Spacer(Modifier.height(8.dp))
 
-        if (state.status == ExerciseStatus.LISTENING) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("👂", fontSize = 28.sp)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "Listening…",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            Spacer(Modifier.height(8.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .alpha(if (state.status == ExerciseStatus.LISTENING) 1f else 0f)
+        ) {
+            Text("👂", fontSize = 28.sp)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "Listening…",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
         }
+        Spacer(Modifier.height(8.dp))
 
         MusicStaff(
             notes = staffNotes,

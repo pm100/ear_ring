@@ -3,9 +3,9 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { ExerciseState, DetectedNote, StaffDisplayNote, TestRecord } from '../types';
 import MusicStaff from './MusicStaff';
 import PitchMeter from './PitchMeter';
-import { useAudioCapture } from '../hooks/useAudioCapture';
+import { useAudioCapture, TrackerFrame } from '../hooks/useAudioCapture';
 import { useAudioPlayback } from '../hooks/useAudioPlayback';
-import { freqToCents, freqToMidi, midiToLabel, preferredMidiLabel, NOTE_NAMES } from '../music';
+import { freqToCents, midiToLabel, preferredMidiLabel, NOTE_NAMES } from '../music';
 
 interface Props {
   exercise: ExerciseState;
@@ -55,18 +55,13 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   const [sessionSaved, setSessionSaved] = useState(false);
   const noteStep = 44;
 
-  const stableCountRef = useRef(0);
-  const stableMidiRef = useRef(-1);
-  const pitchConsumedRef = useRef(false);
-  const warmupCountRef = useRef(0);
-  const silenceGraceRef = useRef(0);
   const currentNoteIndexRef = useRef(0);
   const detectedRef = useRef<DetectedNote[]>([]);
   const currentAttemptRef = useRef(1);
   const sequenceRef = useRef<number[]>(exercise.sequence);
   const sessionRunningRef = useRef(true);
   const timersRef = useRef<number[]>([]);
-  const handleHzDetectedRef = useRef<(hz: number) => void>(() => {});
+  const handleFrameRef = useRef<(frame: TrackerFrame) => void>(() => {});
 
   const { start: startCapture, stop: stopCapture, destroy: destroyCapture } = useAudioCapture();
   const { playChord, playSequence, cancelPlayback } = useAudioPlayback();
@@ -76,13 +71,15 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   useEffect(() => { currentAttemptRef.current = currentAttempt; }, [currentAttempt]);
   useEffect(() => { sequenceRef.current = sequence; }, [sequence]);
 
-  // Load transposition semitones for the selected instrument
+  // Load transposition semitones and apply instrument-specific tracker params.
   const [transpSemitones, setTranspSemitones] = useState(0);
   useEffect(() => {
+    const instrIdx = exercise.instrumentIndex ?? 0;
     invoke<string>('cmd_instrument_list')
       .then(json => {
         const list = JSON.parse(json) as { id: number; semitones: number }[];
-        setTranspSemitones(list[exercise.instrumentIndex ?? 0]?.semitones ?? 0);
+        setTranspSemitones(list[instrIdx]?.semitones ?? 0);
+        void invoke('cmd_tracker_apply_instrument', { instrumentIndex: instrIdx });
       })
       .catch(() => {});
   }, [exercise.instrumentIndex]);
@@ -125,10 +122,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     setCurrentNoteIndex(0);
     currentNoteIndexRef.current = 0;
     setLiveHz(0);
-    stableCountRef.current = 0;
-    stableMidiRef.current = -1;
-    pitchConsumedRef.current = false;
-    silenceGraceRef.current = 0;
+    await invoke('cmd_tracker_reset');
     await playChord(await fetchIntroTriad());
     if (!sessionRunningRef.current) return;
     await new Promise(resolve => {
@@ -140,19 +134,17 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       () => {},
       () => {
         if (!sessionRunningRef.current) return;
-        // Let notes ring through a short settling gap before opening the mic,
-        // matching the Android/iOS POST_SEQUENCE_GAP behaviour.
         window.setTimeout(() => {
           if (!sessionRunningRef.current) return;
           cancelPlayback();
           setStatus('listening');
-          warmupCountRef.current = exercise.warmupFrames;
-          startCapture(handleHzDetectedRef.current, exercise.silenceThreshold);
+          void invoke('cmd_tracker_reset_with_warmup', { warmupFrames: exercise.warmupFrames });
+          startCapture(handleFrameRef.current);
         }, 700);
       },
       exercise.tempoBpm
     );
-  }, [exercise.tempoBpm, fetchIntroTriad, playChord, playSequence, startCapture]);
+  }, [exercise.tempoBpm, exercise.postChordGapMs, exercise.warmupFrames, fetchIntroTriad, playChord, playSequence, startCapture]);
 
   const startFreshTest = useCallback(async () => {
     const nextSequence = await generateFreshSequence();
@@ -199,84 +191,50 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     });
   }, [exercise.scaleId, exercise.rootNote, exercise.sequenceLength, exercise.maxRetries, exercise.wrongNotePauseMs, schedule, startFreshTest]);
 
-  handleHzDetectedRef.current = async (hz: number) => {
-    setLiveHz(hz);
-    if (hz <= 0 || !sessionRunningRef.current) {
-      // Grace period: allow 1 silent frame without resetting stability
-      silenceGraceRef.current++;
-      if (silenceGraceRef.current > 1) {
-        stableCountRef.current = 0;
-        stableMidiRef.current = -1;
-        pitchConsumedRef.current = false;
-      }
-      warmupCountRef.current = 0;
-      return;
-    }
-    if (warmupCountRef.current > 0) {
-      warmupCountRef.current--;
-      return;
-    }
+  // The audio frame handler — confirmed MIDI comes from the Rust tracker.
+  handleFrameRef.current = async (frame: TrackerFrame) => {
+    setLiveHz(frame.liveHz);
+    if (!sessionRunningRef.current) return;
+    if (frame.confirmedMidi < 0) return;
 
-     const midiResult = freqToMidi(hz);
-     const centsResult = freqToCents(hz);
-      if (midiResult < 0) {
-        silenceGraceRef.current++;
-        if (silenceGraceRef.current > 1) {
-          stableCountRef.current = 0;
-          stableMidiRef.current = -1;
-          pitchConsumedRef.current = false;
-        }
-        return;
-      }
+    const midi = frame.confirmedMidi;
+    if (midi < exercise.rangeStart - 6 || midi > exercise.rangeEnd + 6) return;
 
-     silenceGraceRef.current = 0;
-     const idx = currentNoteIndexRef.current;
+    const idx = currentNoteIndexRef.current;
+    const expected = sequenceRef.current[idx];
+    // Derive cents from liveHz for the is_correct_note check
+    const centsResult = frame.liveHz > 0 ? freqToCents(frame.liveHz) : 0;
+    const correct = await invoke<boolean>('cmd_is_correct_note', {
+      detectedMidi: midi,
+      cents: centsResult,
+      expectedMidi: expected,
+    });
+    const newDetected = [...detectedRef.current, { midi, cents: centsResult, correct }];
+    setDetected(newDetected);
+    setDisplayedNotes(newDetected);
+    detectedRef.current = newDetected;
 
-     // Track full MIDI note (exact match, no jitter tolerance)
-     if (midiResult === stableMidiRef.current) {
-       stableCountRef.current++;
-     } else {
-       stableCountRef.current = 1;
-       stableMidiRef.current = midiResult;
-       pitchConsumedRef.current = false;
-     }
-
-     if (!pitchConsumedRef.current && stableCountRef.current >= exercise.framesToConfirm) {
-       pitchConsumedRef.current = true;
-       if (midiResult < exercise.rangeStart - 6 || midiResult > exercise.rangeEnd + 6) return;
-       const expected = sequenceRef.current[idx];
-       const correct = await invoke<boolean>('cmd_is_correct_note', {
-         detectedMidi: midiResult,
-        cents: centsResult,
-        expectedMidi: expected,
-      });
-      const newDetected = [...detectedRef.current, { midi: midiResult, cents: centsResult, correct }];
-      setDetected(newDetected);
-      setDisplayedNotes(newDetected);
-      detectedRef.current = newDetected;
-
-      if (correct) {
-        const nextIdx = idx + 1;
-        if (nextIdx >= sequenceRef.current.length) {
-          stopCapture();
-          setStatus('retry_delay');
-          completeTest(true, newDetected, currentAttemptRef.current);
-        } else {
-          setCurrentNoteIndex(nextIdx);
-          currentNoteIndexRef.current = nextIdx;
-        }
-      } else {
+    if (correct) {
+      const nextIdx = idx + 1;
+      if (nextIdx >= sequenceRef.current.length) {
         stopCapture();
         setStatus('retry_delay');
-        if (currentAttemptRef.current >= exercise.maxRetries) {
-          completeTest(false, newDetected, currentAttemptRef.current);
-        } else {
-          schedule(() => {
-            if (sessionRunningRef.current) {
-              void retryCurrentTest(currentAttemptRef.current + 1);
-            }
-          }, exercise.wrongNotePauseMs);
-        }
+        completeTest(true, newDetected, currentAttemptRef.current);
+      } else {
+        setCurrentNoteIndex(nextIdx);
+        currentNoteIndexRef.current = nextIdx;
+      }
+    } else {
+      stopCapture();
+      setStatus('retry_delay');
+      if (currentAttemptRef.current >= exercise.maxRetries) {
+        completeTest(false, newDetected, currentAttemptRef.current);
+      } else {
+        schedule(() => {
+          if (sessionRunningRef.current) {
+            void retryCurrentTest(currentAttemptRef.current + 1);
+          }
+        }, exercise.wrongNotePauseMs);
       }
     }
   };
@@ -293,10 +251,15 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     clearTimers();
     destroyCapture();
     cancelPlayback();
+    void invoke('cmd_tracker_reset');
     onStop();
   }, [cancelPlayback, clearTimers, cumulativeScorePercent, destroyCapture, exercise, onStop, sessionSaved, testsCompleted]);
 
   useEffect(() => {
+    void invoke('cmd_tracker_set_params', {
+      silenceThreshold: exercise.silenceThreshold,
+      requiredFrames: exercise.framesToConfirm,
+    });
     sessionRunningRef.current = true;
     void playPromptForSequence(sequenceRef.current);
     return () => {
@@ -304,6 +267,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       clearTimers();
       destroyCapture();
       cancelPlayback();
+      void invoke('cmd_tracker_reset');
     };
   }, [cancelPlayback, clearTimers, destroyCapture, playPromptForSequence]);
 
@@ -343,13 +307,11 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         <button className="btn-back" onClick={stopSession}>{'\u2190'} Back</button>
         <span className="screen-title">{rootLabel} {scaleLabel}</span>
       </div>
-
-      {status === 'listening' && (
-        <div className="listening-indicator" style={{ marginBottom: 8 }}>
-          <span className="listening-ear">👂</span>
-          <span className="listening-label" style={{ marginLeft: 8 }}>Listening…</span>
-        </div>
-      )}
+
+      <div className="listening-indicator" style={{ marginBottom: 8, visibility: status === 'listening' ? 'visible' : 'hidden' }}>
+        <span className="listening-ear">👂</span>
+        <span className="listening-label" style={{ marginLeft: 8 }}>Listening…</span>
+      </div>
 
       <MusicStaff
         notes={staffNotes}
@@ -382,3 +344,4 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     </div>
   );
 }
+

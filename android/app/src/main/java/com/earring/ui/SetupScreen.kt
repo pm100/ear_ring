@@ -33,6 +33,7 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, ro
         midiMax = midiMax,
         silenceThreshold = silenceThreshold,
         framesToConfirm = framesToConfirm,
+        instrumentIndex = instrumentIndex,
         warmupFrames = warmupFrames,
         onConfirmed = { midi, _ ->
             concertMidi = midi

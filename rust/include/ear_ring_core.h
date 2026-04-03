@@ -135,6 +135,47 @@ const char *ear_ring_instrument_list(void);
 /// Clamps the result to 0–127. Returns the unchanged MIDI if index is out of range.
 int32_t ear_ring_transpose_display_midi(int32_t concert_midi, int32_t instrument_index);
 
+// ── PitchTracker ─────────────────────────────────────────────────────────────
+// Opaque stateful tracker. Create once, feed audio buffers, react to the
+// confirmed MIDI return value. Thread-safety: not thread-safe; use one tracker
+// per capture session from a single thread.
+
+typedef struct EarRingTracker EarRingTracker;
+
+/// Create a new PitchTracker. Must be freed with `ear_ring_tracker_free`.
+/// silence_threshold: RMS level below which a frame is considered silent (e.g. 0.003).
+/// required_frames: consecutive identical MIDI frames needed to confirm a note (e.g. 3).
+EarRingTracker *ear_ring_tracker_new(float silence_threshold, uint32_t required_frames);
+
+/// Free a tracker created by `ear_ring_tracker_new`. Null-safe.
+void ear_ring_tracker_free(EarRingTracker *tracker);
+
+/// Reset all stability state. Call between attempts or when stopping.
+void ear_ring_tracker_reset(EarRingTracker *tracker);
+
+/// Reset and discard the next warmup_frames buffers before processing begins.
+void ear_ring_tracker_reset_with_warmup(EarRingTracker *tracker, uint32_t warmup_frames);
+
+/// Update silence threshold and required frames without resetting state.
+void ear_ring_tracker_set_params(EarRingTracker *tracker, float silence_threshold, uint32_t required_frames);
+
+/// Apply per-instrument detection parameters (grace frames and octave correction) from the
+/// built-in INSTRUMENTS table. Call whenever the instrument selection changes.
+void ear_ring_tracker_apply_instrument(EarRingTracker *tracker, int32_t instrument_index);
+
+/// Process one audio buffer.
+/// Writes the detected frequency (0.0 if silent) into *out_live_hz.
+/// Writes the detected MIDI note (-1 if silent) into *out_live_midi.
+/// Returns the confirmed MIDI note the first time a note stabilises, or -1.
+int32_t ear_ring_tracker_process(
+    EarRingTracker *tracker,
+    const float *samples,
+    uint32_t num_samples,
+    uint32_t sample_rate,
+    float *out_live_hz,
+    int32_t *out_live_midi
+);
+
 #ifdef __cplusplus
 }
 #endif

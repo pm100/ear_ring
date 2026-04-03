@@ -3,8 +3,49 @@
 use ear_ring_core::{
     accidental_in_key, detect_pitch, freq_to_note, generate_sequence, help_sections_json,
     intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
-    preferred_midi_label, staff_position, test_score, Note, ScaleType,
+    preferred_midi_label, staff_position, test_score, Note, PitchTracker, ScaleType,
 };
+use std::sync::Mutex;
+use tauri::State;
+
+struct TrackerState(Mutex<PitchTracker>);
+
+// ── PitchTracker commands ────────────────────────────────────────────────────
+
+/// Reset the tracker. Call between attempts or when stopping.
+#[tauri::command]
+fn cmd_tracker_reset(state: State<TrackerState>) {
+    state.0.lock().unwrap().reset();
+}
+
+/// Reset the tracker and discard the next `warmup_frames` buffers.
+#[tauri::command]
+fn cmd_tracker_reset_with_warmup(state: State<TrackerState>, warmup_frames: u32) {
+    state.0.lock().unwrap().reset_with_warmup(warmup_frames);
+}
+
+/// Update silence threshold and required frames without resetting state.
+#[tauri::command]
+fn cmd_tracker_set_params(state: State<TrackerState>, silence_threshold: f32, required_frames: u32) {
+    state.0.lock().unwrap().set_params(silence_threshold, required_frames);
+}
+
+/// Apply per-instrument detection parameters (grace frames, octave correction).
+/// Call whenever the instrument selection changes.
+#[tauri::command]
+fn cmd_tracker_apply_instrument(state: State<TrackerState>, instrument_index: usize) {
+    state.0.lock().unwrap().apply_instrument(instrument_index);
+}
+
+/// Process one audio buffer.
+/// Returns `[live_hz, live_midi, confirmed_midi]` as floats; -1.0 means absent.
+#[tauri::command]
+fn cmd_tracker_process(state: State<TrackerState>, samples: Vec<f32>, sample_rate: u32) -> (f32, i32, i32) {
+    let result = state.0.lock().unwrap().process(&samples, sample_rate);
+    (result.live_hz, result.live_midi, result.confirmed_midi)
+}
+
+// ── Other commands ───────────────────────────────────────────────────────────
 
 #[tauri::command]
 fn cmd_detect_pitch(samples: Vec<f32>, sample_rate: u32, silence_threshold: f32) -> f32 {
@@ -128,7 +169,13 @@ fn cmd_transpose_display_midi(concert_midi: i32, instrument_index: i32) -> i32 {
 
 fn main() {
     tauri::Builder::default()
+        .manage(TrackerState(Mutex::new(PitchTracker::new(0.003, 3))))
         .invoke_handler(tauri::generate_handler![
+            cmd_tracker_reset,
+            cmd_tracker_reset_with_warmup,
+            cmd_tracker_set_params,
+            cmd_tracker_apply_instrument,
+            cmd_tracker_process,
             cmd_detect_pitch,
             cmd_freq_to_midi,
             cmd_freq_to_cents,

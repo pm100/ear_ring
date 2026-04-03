@@ -1,28 +1,32 @@
 import { useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 
+export interface TrackerFrame {
+  liveHz: number;
+  liveMidi: number;
+  confirmedMidi: number; // -1 means absent
+}
+
 export function useAudioCapture() {
   const streamRef = useRef<MediaStream | null>(null);
   const contextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const callbackRef = useRef<((hz: number) => void) | null>(null);
+  const callbackRef = useRef<((frame: TrackerFrame) => void) | null>(null);
   const activeRef = useRef(false);
   const detectInFlightRef = useRef(false);
-  const silenceThresholdRef = useRef(0.003);
   // Queue the latest buffer when detection is in-flight instead of dropping it.
   // This prevents missed notes under CPU load.
   const pendingBufferRef = useRef<Float32Array | null>(null);
 
   const processBuffer = async (samples: Float32Array) => {
     try {
-      const hz = await invoke<number>('cmd_detect_pitch', {
+      const [liveHz, liveMidi, confirmedMidi] = await invoke<[number, number, number]>('cmd_tracker_process', {
         samples: Array.from(samples),
         sampleRate: 44100,
-        silenceThreshold: silenceThresholdRef.current,
       });
       if (activeRef.current && callbackRef.current) {
-        callbackRef.current(hz);
+        callbackRef.current({ liveHz, liveMidi, confirmedMidi });
       }
     } catch (_e) {
       // ignore
@@ -38,9 +42,7 @@ export function useAudioCapture() {
   // Create the AudioContext, MediaStream, and ScriptProcessor once.
   // Subsequent start/stop cycles reuse them to avoid expensive hardware
   // release/reacquire that causes transient noise and detection glitches.
-  const ensureAudioPipeline = async (silenceThreshold: number) => {
-    silenceThresholdRef.current = silenceThreshold;
-
+  const ensureAudioPipeline = async () => {
     if (contextRef.current && contextRef.current.state !== 'closed' && streamRef.current) {
       if (contextRef.current.state === 'suspended') {
         await contextRef.current.resume();
@@ -82,11 +84,11 @@ export function useAudioCapture() {
     processor.connect(context.destination);
   };
 
-  const start = useCallback(async (onHz: (hz: number) => void, silenceThreshold?: number) => {
+  const start = useCallback(async (onFrame: (frame: TrackerFrame) => void) => {
     try {
-      callbackRef.current = onHz;
+      callbackRef.current = onFrame;
       detectInFlightRef.current = false;
-      await ensureAudioPipeline(silenceThreshold ?? 0.003);
+      await ensureAudioPipeline();
       activeRef.current = true;
     } catch (e) {
       console.error('useAudioCapture start error', e);

@@ -512,17 +512,23 @@ pub struct InstrumentInfo {
     pub range_start: i32,
     /// Natural concert MIDI range end (inclusive) for this instrument.
     pub range_end: i32,
+    /// Consecutive silent frames allowed before stability resets.
+    /// Higher values prevent re-triggering on sustained notes with amplitude dips (e.g. guitar).
+    pub grace_frames: u32,
+    /// When true, detections exactly ±12 semitones from the current stable note are absorbed
+    /// rather than resetting stability. Prevents octave-harmonic glitches on guitar.
+    pub octave_correction: bool,
 }
 
 pub const INSTRUMENTS: &[InstrumentInfo] = &[
-    InstrumentInfo { name: "Piano",             semitones:  0, range_start: 60, range_end: 72 },
-    InstrumentInfo { name: "Guitar",            semitones:  0, range_start: 52, range_end: 64 },
-    InstrumentInfo { name: "Transposed Guitar", semitones: 12, range_start: 52, range_end: 64 },
-    InstrumentInfo { name: "Soprano Sax",       semitones:  2, range_start: 58, range_end: 70 },
-    InstrumentInfo { name: "Alto Sax",          semitones:  9, range_start: 51, range_end: 63 },
-    InstrumentInfo { name: "Tenor Sax",         semitones:  2, range_start: 46, range_end: 58 },
-    InstrumentInfo { name: "Trumpet",           semitones:  2, range_start: 55, range_end: 67 },
-    InstrumentInfo { name: "Clarinet",          semitones:  2, range_start: 55, range_end: 67 },
+    InstrumentInfo { name: "Piano",             semitones:  0, range_start: 60, range_end: 72, grace_frames: 1, octave_correction: false },
+    InstrumentInfo { name: "Guitar",            semitones:  0, range_start: 52, range_end: 64, grace_frames: 5, octave_correction: true  },
+    InstrumentInfo { name: "Transposed Guitar", semitones: 12, range_start: 52, range_end: 64, grace_frames: 5, octave_correction: true  },
+    InstrumentInfo { name: "Soprano Sax",       semitones:  2, range_start: 58, range_end: 70, grace_frames: 3, octave_correction: false },
+    InstrumentInfo { name: "Alto Sax",          semitones:  9, range_start: 51, range_end: 63, grace_frames: 3, octave_correction: false },
+    InstrumentInfo { name: "Tenor Sax",         semitones:  2, range_start: 46, range_end: 58, grace_frames: 3, octave_correction: false },
+    InstrumentInfo { name: "Trumpet",           semitones:  2, range_start: 55, range_end: 67, grace_frames: 3, octave_correction: false },
+    InstrumentInfo { name: "Clarinet",          semitones:  2, range_start: 55, range_end: 67, grace_frames: 3, octave_correction: false },
 ];
 
 /// Convert a concert MIDI number to the written/display MIDI for a given instrument.

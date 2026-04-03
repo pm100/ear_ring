@@ -7,6 +7,14 @@ It contains the canonical UI spec, platform rules, build commands, and debugging
 procedures. Do not rely on memory alone — this file is the source of truth and is
 kept up to date as the project evolves.
 
+**Before making any changes, check for unsynced remote commits:**
+```
+git fetch origin
+git status
+```
+If the remote is ahead of local, **stop and warn the user** before proceeding.
+Do not pull or rebase automatically — let the user decide.
+
 Key things you will find here:
 - All UI changes must be applied to **all three platforms** (Android, iOS, Tauri) simultaneously
 - Build and run commands for each platform (see **UI Debugging Guide** at the bottom)
@@ -184,7 +192,14 @@ MusicStaff            — full width, 160dp tall (see Staff spec below)
                         Correct notes: green
                         Wrong notes: red
 
-[12dp space]
+[8dp space]
+👂 Listening…           — ear emoji (28sp) + "Listening…" label (subheadline semibold, primary colour)
+                          ALWAYS occupies space in the layout (never causes reflow).
+                          Visible only when status = LISTENING; invisible (opacity 0 / visibility:hidden)
+                          at all other times. Do NOT use conditional rendering (if/else) — use
+                          alpha/visibility so the reserved height stays constant.
+
+[4dp space]
 Status text           — bodyLarge, muted colour, centred
   PLAYING:     "Listen carefully…"
   LISTENING:   "Play note N of M"
@@ -413,8 +428,8 @@ Dropdown (outlined, full width): Piano | Guitar | Transposed Guitar | Soprano Sa
   — Default: Piano (index 0)
   — Selecting a transposing instrument causes Mic Setup and Exercise screens to display
     written pitch instead of concert pitch (display only — detection stays in concert pitch)
-  — Selecting a new instrument resets rangeStart/rangeEnd to that instrument's natural octave range
-    (defined in the Rust INSTRUMENTS array as range_start/range_end MIDI values)
+  — Selecting a new instrument resets rangeStart/rangeEnd to one octave from the current root note
+    closest to middle C (same rule as changing the Key on the Home screen)
 
 [16dp space]
 Section label: "Tempo (BPM)"
@@ -774,9 +789,11 @@ rendering note labels and staff notes in Mic Setup and Exercise screens.
 The instrument index (0 = Piano) is persisted across restarts on all platforms.
 
 Each instrument has a `range_start` and `range_end` (concert MIDI) in the Rust `InstrumentInfo`
-struct. These are the default 12-semitone span for that instrument. When the user selects a new
-instrument, all platforms reset `rangeStart`/`rangeEnd` to these values. The JSON from
-`instrument_list_json()` includes these fields.
+struct, used as a reference. When the user selects a new instrument, all platforms reset
+`rangeStart`/`rangeEnd` to **one octave from the current root note closest to middle C**
+(same rule as changing the Key on the Home screen — NOT the instrument's hardcoded range).
+The JSON from `instrument_list_json()` includes `rangeStart`/`rangeEnd` fields for other purposes
+(e.g. initial defaults on first launch), but instrument changes use the key-based formula.
 
 | Instrument         | range_start (MIDI) | range_end (MIDI) |
 |--------------------|--------------------|-----------------|

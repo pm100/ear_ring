@@ -205,11 +205,8 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     fun setPostChordGapMs(ms: Long) { _state.value = _state.value.copy(postChordGapMs = ms); saveSettings(_state.value) }
     fun setWrongNotePauseMs(ms: Long) { _state.value = _state.value.copy(wrongNotePauseMs = ms); saveSettings(_state.value) }
     fun setInstrumentIndex(idx: Int) {
-        val json = EarRingCore.instrumentList()
-        val arr = try { org.json.JSONArray(json) } catch (_: Exception) { null }
-        val rangeStart = arr?.optJSONObject(idx)?.optInt("rangeStart", _state.value.rangeStart) ?: _state.value.rangeStart
-        val rangeEnd   = arr?.optJSONObject(idx)?.optInt("rangeEnd",   _state.value.rangeEnd)   ?: _state.value.rangeEnd
-        _state.value = _state.value.copy(instrumentIndex = idx, rangeStart = rangeStart, rangeEnd = rangeEnd)
+        val (start, end) = ExerciseState.defaultRange(_state.value.rootNote)
+        _state.value = _state.value.copy(instrumentIndex = idx, rangeStart = start, rangeEnd = end)
         saveSettings(_state.value)
     }
 
