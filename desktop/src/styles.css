@@ -229,6 +229,15 @@ body {
   margin-bottom: 16px;
 }
 
+.melody-title {
+  text-align: center;
+  color: var(--primary);
+  font-size: 15px;
+  font-weight: 600;
+  margin: 4px 0 8px;
+  letter-spacing: 0.02em;
+}
+
 /* Pitch Meter */
 .pitch-meter-circle {
   display: flex;

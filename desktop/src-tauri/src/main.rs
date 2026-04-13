@@ -3,7 +3,8 @@
 use ear_ring_core::{
     accidental_in_key, detect_pitch, freq_to_note, generate_sequence, help_sections_json,
     intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
-    preferred_midi_label, staff_position, test_score, Note, PitchTracker, ScaleType,
+    melody_count, melody_range_midi, melody_title, melody_to_midi_by_index, note_timing, preferred_midi_label,
+    shuffle_melody_indices, staff_position, test_score, Note, PitchTracker, ScaleType,
 };
 use std::sync::Mutex;
 use tauri::State;
@@ -167,6 +168,42 @@ fn cmd_transpose_display_midi(concert_midi: i32, instrument_index: i32) -> i32 {
     ear_ring_core::transpose_display_midi(concert_midi, instrument_index.max(0) as usize)
 }
 
+#[tauri::command]
+fn cmd_melody_count() -> u32 {
+    melody_count() as u32
+}
+
+#[tauri::command]
+fn cmd_shuffle_melody_indices(seed: u64) -> Vec<u8> {
+    shuffle_melody_indices(seed)
+}
+
+#[derive(serde::Serialize)]
+struct MelodyResult {
+    midi_notes: Vec<u8>,
+    durations: Vec<f32>,
+    title: String,
+}
+
+#[tauri::command]
+fn cmd_pick_melody_by_index(index: u8, root_chroma: u8) -> Option<MelodyResult> {
+    let (midi_notes, durations) = melody_to_midi_by_index(index, root_chroma)?;
+    let title = melody_title(index).unwrap_or("").to_string();
+    Some(MelodyResult { midi_notes, durations, title })
+}
+
+#[tauri::command]
+fn cmd_melody_range_midi(index: u8, root_chroma: u8) -> Option<(u8, u8)> {
+    melody_range_midi(index, root_chroma)
+}
+
+/// Returns `[[hold_ms, step_ms], ...]` for each note in a sequence.
+/// One IPC call per sequence — call before starting playback.
+#[tauri::command]
+fn cmd_sequence_timings(bpm: f32, durations: Vec<f32>) -> Vec<(u32, u32)> {
+    durations.iter().map(|&d| note_timing(bpm, d)).collect()
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(TrackerState(Mutex::new(PitchTracker::new(0.003, 3))))
@@ -192,6 +229,11 @@ fn main() {
             cmd_help_content,
             cmd_instrument_list,
             cmd_transpose_display_midi,
+            cmd_melody_count,
+            cmd_shuffle_melody_indices,
+            cmd_pick_melody_by_index,
+            cmd_melody_range_midi,
+            cmd_sequence_timings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

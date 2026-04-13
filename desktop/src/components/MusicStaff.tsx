@@ -117,6 +117,20 @@ export default function MusicStaff({ notes, fixedSpacing, rootChroma = 0, keySig
     }
   };
 
+  type DurationType = 'whole' | 'dottedHalf' | 'half' | 'dottedQuarter' | 'quarter' | 'dottedEighth' | 'eighth' | 'sixteenth';
+
+  function classifyDuration(beats: number | undefined): DurationType {
+    if (beats === undefined) return 'quarter';
+    if (beats >= 3.5)   return 'whole';
+    if (beats >= 2.5)   return 'dottedHalf';
+    if (beats >= 1.75)  return 'half';
+    if (beats >= 1.25)  return 'dottedQuarter';
+    if (beats >= 0.875) return 'quarter';
+    if (beats >= 0.625) return 'dottedEighth';
+    if (beats >= 0.375) return 'eighth';
+    return 'sixteenth';
+  }
+
   return (
     <svg width="100%" viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ display: 'block' }}>
       {/* Staff lines */}
@@ -158,6 +172,24 @@ export default function MusicStaff({ notes, fixedSpacing, rootChroma = 0, keySig
         const isSharpAcc = accidentalIsSharp(note.midi);
         const suffix = accSuffix(note.state);
 
+        const durType = classifyDuration(note.duration);
+        const openHead  = durType === 'whole' || durType === 'dottedHalf' || durType === 'half';
+        const hasStem   = durType !== 'whole';
+        const hasDot    = durType === 'dottedHalf' || durType === 'dottedQuarter' || durType === 'dottedEighth';
+        const flagCount = durType === 'eighth' || durType === 'dottedEighth' ? 1
+                        : durType === 'sixteenth' ? 2 : 0;
+
+        const flags = flagCount > 0 ? Array.from({ length: flagCount }).map((_, fi) => {
+          const fDir = stemUp ? 1 : -1;
+          const fy0  = stemY2 + fi * fDir * lineSpacing * 0.75;
+          const fw   = lineSpacing * 1.6;
+          const fh1  = fDir * lineSpacing * 1.0;
+          const fh2  = fDir * lineSpacing * 1.6;
+          const fh3  = fDir * lineSpacing * 1.2;
+          const d = `M ${stemX},${fy0} C ${stemX + fw},${fy0 + fh1} ${stemX + fw * 0.7},${fy0 + fh2} ${stemX},${fy0 + fh3}`;
+          return <path key={`flag-${fi}`} d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" />;
+        }) : null;
+
         return (
           <g key={`${note.midi}-${i}`}>
             {ledgers}
@@ -176,13 +208,24 @@ export default function MusicStaff({ notes, fixedSpacing, rootChroma = 0, keySig
                 />
               );
             })()}
+            {/* Notehead: open (white fill) for whole/half/dotted-half, filled otherwise */}
             <ellipse
               cx={cx} cy={cy} rx={noteHeadRx} ry={noteHeadRy}
-              fill={color} stroke={color} strokeWidth="1.5"
+              fill={openHead ? 'white' : color}
+              stroke={color} strokeWidth="1.5"
               transform={`rotate(-20 ${cx} ${cy})`}
             />
-            <line x1={stemX} y1={cy} x2={stemX} y2={stemY2}
-              stroke={color} strokeWidth="1.7" strokeLinecap="round" />
+            {/* Stem */}
+            {hasStem && (
+              <line x1={stemX} y1={cy} x2={stemX} y2={stemY2}
+                stroke={color} strokeWidth="1.7" strokeLinecap="round" />
+            )}
+            {/* Augmentation dot */}
+            {hasDot && (
+              <circle cx={cx + noteHeadRx * 1.6} cy={cy} r={noteRadius * 0.3} fill={color} />
+            )}
+            {/* Flags (eighth / sixteenth) */}
+            {flags}
           </g>
         );
       })}

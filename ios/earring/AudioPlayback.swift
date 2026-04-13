@@ -167,11 +167,12 @@ class AudioPlayback {
         }
     }
 
-    func playSequence(notes: [Int], bpm: Int = 100, onNoteStart: @escaping (Int) -> Void) async {
-        let stepNanoseconds = UInt64(max(150, 60_000 / max(1, bpm))) * 1_000_000
-        for midi in notes {
+    func playSequence(notes: [Int], bpm: Int = 100, durations: [Float]? = nil, onNoteStart: @escaping (Int) -> Void) async {
+        for (i, midi) in notes.enumerated() {
             guard !isCancelled else { return }
             onNoteStart(midi)
+            let beatDuration = durations?.indices.contains(i) == true ? durations![i] : 1.0
+            let stepNanoseconds = UInt64(max(150.0, 60_000.0 / Double(max(1, bpm)) * Double(beatDuration))) * 1_000_000
             await playNote(midi: midi, holdNanoseconds: stepNanoseconds)
         }
     }

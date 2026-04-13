@@ -7,6 +7,7 @@ interface Props {
   onUpdateSettings: React.Dispatch<React.SetStateAction<ExerciseSettings>>;
   onResetSettings: () => void;
   onBack: () => void;
+  onVetMelodies: () => void;
 }
 
 const BPM_OPTIONS = [60, 80, 100, 120, 140];
@@ -30,7 +31,7 @@ function defaultRangeForKey(rootNote: number): [number, number] {
   return [best, best + 12];
 }
 
-export default function SettingsScreen({ settings, onUpdateSettings, onResetSettings, onBack }: Props) {
+export default function SettingsScreen({ settings, onUpdateSettings, onResetSettings, onBack, onVetMelodies }: Props) {
   const set = <K extends keyof ExerciseSettings>(key: K, value: ExerciseSettings[K]) =>
     onUpdateSettings(prev => ({ ...prev, [key]: value }));
 
@@ -141,6 +142,13 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
 
       <div style={{ marginTop: 32, paddingBottom: 16 }}>
         <ResetButton onReset={onResetSettings} />
+        <div style={{ marginTop: 20, borderTop: '1px solid #e0e0e0', paddingTop: 16 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, color: '#757575', textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 8px' }}>Dev Tools</h2>
+          <button
+            onClick={onVetMelodies}
+            style={{ padding: '10px 16px', borderRadius: 6, border: '1px solid #1976D2', background: 'transparent', color: '#1976D2', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
+          >🎵 Vet Melody Library</button>
+        </div>
       </div>
     </div>
   );

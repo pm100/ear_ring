@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
-import { ExerciseState, DetectedNote, StaffDisplayNote, TestRecord } from '../types';
+import { ExerciseState, DetectedNote, StaffDisplayNote, StaffNoteState, TestRecord } from '../types';
 import MusicStaff from './MusicStaff';
 import PitchMeter from './PitchMeter';
 import { useAudioCapture, TrackerFrame } from '../hooks/useAudioCapture';
@@ -53,6 +53,8 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   const [detected, setDetected] = useState<DetectedNote[]>([]);
   const [displayedNotes, setDisplayedNotes] = useState<DetectedNote[]>([]);
   const [sessionSaved, setSessionSaved] = useState(false);
+  const [melodyDurations, setMelodyDurations] = useState<number[]>([]);
+  const [melodyTitle, setMelodyTitle] = useState('');
   const noteStep = 44;
 
   const currentNoteIndexRef = useRef(0);
@@ -62,6 +64,14 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   const sessionRunningRef = useRef(true);
   const timersRef = useRef<number[]>([]);
   const handleFrameRef = useRef<(frame: TrackerFrame) => void>(() => {});
+  const melodyDeckRef = useRef<number[]>([]);
+  const melodyDeckCursorRef = useRef(0);
+  const melodyDurationsRef = useRef<number[]>([]);
+  const melodyTimingsRef = useRef<[number, number][]>([]);
+  const rangeRef = useRef({ start: exercise.rangeStart, end: exercise.rangeEnd });
+  // Generation counter: incremented on each effect mount AND each cleanup.
+  // Lets startFreshTest detect it was launched by a stale effect run (e.g. React StrictMode double-invoke).
+  const startFreshGenRef = useRef(0);
 
   const { start: startCapture, stop: stopCapture, destroy: destroyCapture } = useAudioCapture();
   const { playChord, playSequence, cancelPlayback } = useAudioPlayback();
@@ -103,18 +113,62 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     });
   }, [exercise.rangeStart, exercise.rootNote, exercise.scaleId]);
 
-  const generateFreshSequence = useCallback(async () => {
-    return invoke<number[]>('cmd_generate_sequence', {
-      rootChroma: exercise.rootNote,
-      scaleId: exercise.scaleId,
-      length: exercise.sequenceLength,
-      rangeStart: exercise.rangeStart,
-      rangeEnd: exercise.rangeEnd,
-      seed: Date.now(),
-    });
-  }, [exercise.rangeStart, exercise.rangeEnd, exercise.rootNote, exercise.scaleId, exercise.sequenceLength]);
+  const generateFreshSequence = useCallback(async (): Promise<{ sequence: number[], durations?: number[], newRangeStart?: number, newRangeEnd?: number, title?: string }> => {
+    if (exercise.testType === 1) {
+      // Melody mode with shuffle deck
+      if (melodyDeckRef.current.length === 0 || melodyDeckCursorRef.current >= melodyDeckRef.current.length) {
+        const newDeck = await invoke<number[]>('cmd_shuffle_melody_indices', { seed: Date.now() });
+        melodyDeckRef.current = newDeck;
+        melodyDeckCursorRef.current = 0;
+      }
+      const idx = melodyDeckRef.current[melodyDeckCursorRef.current];
+      melodyDeckCursorRef.current += 1;
+      const result = await invoke<{ midi_notes: number[], durations: number[], title: string } | null>('cmd_pick_melody_by_index', {
+        index: idx,
+        rootChroma: exercise.rootNote,
+      });
+      if (!result || result.midi_notes.length === 0) {
+        // Fallback to random
+        const seq = await invoke<number[]>('cmd_generate_sequence', {
+          rootChroma: exercise.rootNote, scaleId: exercise.scaleId, length: exercise.sequenceLength,
+          rangeStart: exercise.rangeStart, rangeEnd: exercise.rangeEnd, seed: Date.now(),
+        });
+        return { sequence: seq };
+      }
+      const minMidi = Math.min(...result.midi_notes) - 6;
+      const maxMidi = Math.max(...result.midi_notes) + 6;
+      melodyDurationsRef.current = result.durations;
+      setMelodyDurations(result.durations);
+      // Pre-compute articulation timings (one IPC call per test)
+      const timings = await invoke<[number, number][]>('cmd_sequence_timings', {
+        bpm: exercise.tempoBpm,
+        durations: result.durations,
+      });
+      melodyTimingsRef.current = timings;
+      return {
+        sequence: result.midi_notes,
+        durations: result.durations,
+        newRangeStart: Math.max(21, minMidi),
+        newRangeEnd: Math.min(108, maxMidi),
+        title: result.title,
+      };
+    } else {
+      melodyDurationsRef.current = [];
+      melodyTimingsRef.current = [];
+      setMelodyDurations([]);
+      const seq = await invoke<number[]>('cmd_generate_sequence', {
+        rootChroma: exercise.rootNote,
+        scaleId: exercise.scaleId,
+        length: exercise.sequenceLength,
+        rangeStart: exercise.rangeStart,
+        rangeEnd: exercise.rangeEnd,
+        seed: Date.now(),
+      });
+      return { sequence: seq };
+    }
+  }, [exercise.testType, exercise.rootNote, exercise.scaleId, exercise.sequenceLength, exercise.rangeStart, exercise.rangeEnd]);
 
-  const playPromptForSequence = useCallback(async (nextSequence: number[]) => {
+  const playPromptForSequence = useCallback(async (nextSequence: number[], durations?: number[], timings?: [number, number][]) => {
     setStatus('playing');
     setDetected([]);
     detectedRef.current = [];
@@ -142,24 +196,34 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
           startCapture(handleFrameRef.current);
         }, 700);
       },
-      exercise.tempoBpm
+      exercise.tempoBpm,
+      durations,
+      timings
     );
   }, [exercise.tempoBpm, exercise.postChordGapMs, exercise.warmupFrames, fetchIntroTriad, playChord, playSequence, startCapture]);
 
   const startFreshTest = useCallback(async () => {
-    const nextSequence = await generateFreshSequence();
-    if (!sessionRunningRef.current) return;
-    setSequence(nextSequence);
-    sequenceRef.current = nextSequence;
+    // Capture the generation at call time. If the main effect is re-run (e.g. React StrictMode
+    // double-invoke), the generation will have changed by the time we resume from the async work,
+    // and we can bail out before starting audio playback.
+    const myGen = startFreshGenRef.current;
+    const result = await generateFreshSequence();
+    if (startFreshGenRef.current !== myGen || !sessionRunningRef.current) return;
+    setSequence(result.sequence);
+    sequenceRef.current = result.sequence;
+    if (result.newRangeStart !== undefined && result.newRangeEnd !== undefined) {
+      rangeRef.current = { start: result.newRangeStart, end: result.newRangeEnd };
+    }
+    if (result.title !== undefined) setMelodyTitle(result.title);
     setCurrentAttempt(1);
     currentAttemptRef.current = 1;
-    await playPromptForSequence(nextSequence);
+    await playPromptForSequence(result.sequence, result.durations, melodyTimingsRef.current);
   }, [generateFreshSequence, playPromptForSequence]);
 
   const retryCurrentTest = useCallback(async (nextAttempt: number) => {
     setCurrentAttempt(nextAttempt);
     currentAttemptRef.current = nextAttempt;
-    await playPromptForSequence(sequenceRef.current);
+    await playPromptForSequence(sequenceRef.current, melodyDurationsRef.current.length > 0 ? melodyDurationsRef.current : undefined, melodyTimingsRef.current.length > 0 ? melodyTimingsRef.current : undefined);
   }, [playPromptForSequence]);
 
   const completeTest = useCallback((passed: boolean, attemptNotes: DetectedNote[], attemptsUsed: number) => {
@@ -198,7 +262,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     if (frame.confirmedMidi < 0) return;
 
     const midi = frame.confirmedMidi;
-    if (midi < exercise.rangeStart - 6 || midi > exercise.rangeEnd + 6) return;
+    if (midi < rangeRef.current.start - 6 || midi > rangeRef.current.end + 6) return;
 
     const idx = currentNoteIndexRef.current;
     const expected = sequenceRef.current[idx];
@@ -261,15 +325,22 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       requiredFrames: exercise.framesToConfirm,
     });
     sessionRunningRef.current = true;
-    void playPromptForSequence(sequenceRef.current);
+    startFreshGenRef.current++; // new generation: invalidates any prior startFreshTest invocation
+    if (exercise.sequence.length === 0) {
+      // Melody mode starts with empty sequence — generate first test
+      void startFreshTest();
+    } else {
+      void playPromptForSequence(sequenceRef.current);
+    }
     return () => {
+      startFreshGenRef.current++; // invalidate any in-flight startFreshTest before cleanup
       sessionRunningRef.current = false;
       clearTimers();
       destroyCapture();
       cancelPlayback();
       void invoke('cmd_tracker_reset');
     };
-  }, [cancelPlayback, clearTimers, destroyCapture, playPromptForSequence]);
+  }, [cancelPlayback, clearTimers, destroyCapture, playPromptForSequence, startFreshTest]);
 
   const statusText = () => {
     switch (status) {
@@ -289,16 +360,18 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   const staffNotes: StaffDisplayNote[] = exercise.showTestNotes
     ? sequence.map((expectedMidi, index) => {
         const attemptNote = displayedNotes[index];
+        const dur = melodyDurations[index];
         if (!attemptNote) {
-          return { midi: transpMidi(expectedMidi), state: 'expected' };
+          return { midi: transpMidi(expectedMidi), state: 'expected' as StaffNoteState, duration: dur };
         }
         return attemptNote.correct
-          ? { midi: transpMidi(expectedMidi), state: 'correct' }
-          : { midi: transpMidi(attemptNote.midi), state: 'incorrect' };
+          ? { midi: transpMidi(expectedMidi), state: 'correct' as StaffNoteState, duration: dur }
+          : { midi: transpMidi(attemptNote.midi), state: 'incorrect' as StaffNoteState };
       })
-    : displayedNotes.map(note => ({
+    : displayedNotes.map((note, index) => ({
         midi: transpMidi(note.midi),
-        state: note.correct ? 'correct' : 'incorrect',
+        state: (note.correct ? 'correct' : 'incorrect') as StaffNoteState,
+        duration: note.correct ? melodyDurations[index] : undefined,
       }));
 
   return (
@@ -312,6 +385,10 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         <span className="listening-ear">👂</span>
         <span className="listening-label" style={{ marginLeft: 8 }}>Listening…</span>
       </div>
+
+      {melodyTitle && (
+        <div className="melody-title">♫ {melodyTitle}</div>
+      )}
 
       <MusicStaff
         notes={staffNotes}

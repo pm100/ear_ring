@@ -125,7 +125,16 @@ Layout: vertically scrollable column, 16dp/px padding, centred.
 [Icon row: 48dp app icon (rounded 10dp corners) + "Ear Ring" 32sp bold primary — centred, 12dp gap]
 "Ear Training"         — 16sp, muted/secondary colour
 
-[28dp space]
+[16dp space]
+Section label: "Test Type"
+Dropdown (outlined, full width): Random Notes | Melody Snippets | Diatonic Triads (coming soon, disabled)
+  — testType IDs: 0=Random Notes, 1=Melody Snippets, 2=Diatonic Triads (stub)
+  — Default: Random Notes (0)
+  — In Melody Snippets mode: Scale dropdown and Sequence Length chips are disabled (opacity 0.38)
+  — In Melody Snippets mode: Piano range picker is read-only (taps/drags are no-ops)
+  — In Melody Snippets mode: range is auto-set by ExerciseScreen to snippet MIDI ± 6 semitones
+
+[12dp space]
 Row (equal width, 8dp gap):
   Left half — Section label: "Key"
               Dropdown (outlined, full width of column): C  C#  D  D#  E  F  F#  G  G#  A  A#  B
@@ -135,6 +144,7 @@ Row (equal width, 8dp gap):
                  — Scale IDs: 0=Major, 1=Natural Minor, 2=Dorian, 3=Mixolydian (Harmonic Minor removed)
                  — Non-major scales show the implied major key in parentheses, e.g. "Natural Minor (Eb)"
                    when key=C. The label updates dynamically as the Key dropdown changes.
+                 — **Disabled (opacity 0.38)** when Test Type = Melody Snippets
 
 [16dp space]
 Section label: "Range  (RangeLow – RangeHigh)"   — label updates dynamically with current range
@@ -152,6 +162,7 @@ PianoRangePicker
 [16dp space]
 Section label: "Sequence Length"
 Chip row: 2  3  4  5  6  7  8   (single row, equal width)
+  — **Disabled (opacity 0.38)** when Test Type = Melody Snippets
 
 [16dp space]
 Row (same line): ☐ Display Test Notes    ☐ Use Key Signature

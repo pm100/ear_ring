@@ -541,6 +541,153 @@ pub fn transpose_display_midi(concert_midi: i32, instrument_index: usize) -> i32
     (concert_midi + semitones).clamp(0, 127)
 }
 
+// ── Melody snippet library ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy)]
+pub struct MelodyNote {
+    pub semitones: i8,       // offset from tonic: 0=root, 7=fifth, 12=octave up
+    pub duration_beats: f32, // 1.0=quarter, 0.5=eighth, 2.0=half, 1.5=dotted quarter
+}
+
+pub struct MelodySnippet {
+    pub title: &'static str,
+    pub notes: &'static [MelodyNote],
+}
+
+macro_rules! mn {
+    ($s:expr, $d:expr) => { MelodyNote { semitones: $s, duration_beats: $d } };
+}
+
+static MELODY_LIBRARY: &[MelodySnippet] = &[
+    // Major tunes
+    MelodySnippet { title: "Twinkle Twinkle Little Star", notes: &[mn!(0,1.0),mn!(0,1.0),mn!(7,1.0),mn!(7,1.0),mn!(9,1.0),mn!(9,1.0),mn!(7,2.0)] },
+    MelodySnippet { title: "Mary Had a Little Lamb", notes: &[mn!(4,1.0),mn!(2,1.0),mn!(0,1.0),mn!(2,1.0),mn!(4,1.0),mn!(4,1.0),mn!(4,2.0)] },
+    MelodySnippet { title: "Ode to Joy", notes: &[mn!(4,1.0),mn!(4,1.0),mn!(5,1.0),mn!(7,1.0),mn!(7,1.0),mn!(5,1.0),mn!(4,1.0),mn!(2,1.0)] },
+    MelodySnippet { title: "Happy Birthday", notes: &[mn!(0,0.75),mn!(0,0.25),mn!(2,1.0),mn!(0,1.0),mn!(5,1.0),mn!(4,2.0)] },
+    MelodySnippet { title: "Frere Jacques", notes: &[mn!(0,1.0),mn!(2,1.0),mn!(4,1.0),mn!(0,1.0),mn!(0,1.0),mn!(2,1.0),mn!(4,1.0),mn!(0,1.0)] },
+    MelodySnippet { title: "Jingle Bells", notes: &[mn!(4,0.5),mn!(4,0.5),mn!(4,1.0),mn!(4,0.5),mn!(4,0.5),mn!(4,1.0),mn!(4,0.5),mn!(7,0.5),mn!(0,1.0),mn!(2,1.0),mn!(4,2.0)] },
+    MelodySnippet { title: "Yankee Doodle", notes: &[mn!(0,1.0),mn!(0,1.0),mn!(2,1.0),mn!(4,1.0),mn!(0,1.0),mn!(4,1.0),mn!(2,1.0)] },
+    MelodySnippet { title: "Oh Susanna", notes: &[mn!(0,1.0),mn!(2,1.0),mn!(4,1.0),mn!(7,1.0),mn!(9,1.5),mn!(7,0.5),mn!(4,1.0),mn!(0,1.0)] },
+    MelodySnippet { title: "Row Your Boat", notes: &[mn!(0,1.0),mn!(0,1.0),mn!(0,0.75),mn!(2,0.25),mn!(4,1.0),mn!(4,0.75),mn!(2,0.25),mn!(4,0.5),mn!(5,0.5),mn!(7,2.0)] },
+    MelodySnippet { title: "Amazing Grace", notes: &[mn!(0,1.0),mn!(5,2.0),mn!(9,1.0),mn!(5,1.0),mn!(9,1.0),mn!(7,1.0),mn!(5,2.0)] },
+    MelodySnippet { title: "Camptown Races", notes: &[mn!(4,0.5),mn!(4,0.5),mn!(2,0.5),mn!(4,0.5),mn!(7,1.0),mn!(7,1.0),mn!(4,1.0),mn!(7,1.0)] },
+    MelodySnippet { title: "Clementine", notes: &[mn!(0,1.0),mn!(0,0.5),mn!(0,0.5),mn!(4,1.0),mn!(4,0.5),mn!(4,0.5),mn!(7,1.5),mn!(5,0.5)] },
+    MelodySnippet { title: "London Bridge", notes: &[mn!(7,0.5),mn!(9,0.5),mn!(7,0.5),mn!(5,0.5),mn!(4,0.5),mn!(5,0.5),mn!(7,1.0)] },
+    MelodySnippet { title: "Skip to My Lou", notes: &[mn!(4,0.5),mn!(4,0.5),mn!(4,0.5),mn!(2,0.5),mn!(0,0.5),mn!(0,0.5),mn!(0,0.5),mn!(2,0.5)] },
+    MelodySnippet { title: "Old MacDonald", notes: &[mn!(7,1.0),mn!(7,1.0),mn!(7,1.0),mn!(2,1.0),mn!(4,1.5),mn!(4,0.5),mn!(2,2.0)] },
+    MelodySnippet { title: "Auld Lang Syne", notes: &[mn!(7,1.0),mn!(12,1.5),mn!(12,0.5),mn!(12,1.0),mn!(16,1.0),mn!(14,1.5),mn!(12,0.5),mn!(14,1.0)] },
+    MelodySnippet { title: "Oh Christmas Tree", notes: &[mn!(0,1.0),mn!(5,1.0),mn!(5,1.0),mn!(5,1.5),mn!(7,0.5),mn!(5,1.0),mn!(4,1.0)] },
+    MelodySnippet { title: "Silent Night", notes: &[mn!(7,1.5),mn!(9,0.5),mn!(7,1.0),mn!(4,2.0),mn!(7,1.5),mn!(9,0.5),mn!(7,1.0),mn!(4,2.0)] },
+    MelodySnippet { title: "We Wish You a Merry Christmas", notes: &[mn!(0,1.0),mn!(5,1.0),mn!(5,0.5),mn!(7,0.5),mn!(5,0.5),mn!(4,0.5),mn!(2,1.0),mn!(2,1.0)] },
+    MelodySnippet { title: "Good King Wenceslas", notes: &[mn!(0,1.0),mn!(0,1.0),mn!(0,1.0),mn!(2,1.0),mn!(4,2.0),mn!(4,1.0),mn!(2,1.0)] },
+    MelodySnippet { title: "When the Saints Go Marching In", notes: &[mn!(0,0.5),mn!(2,0.5),mn!(4,0.5),mn!(7,2.0),mn!(0,0.5),mn!(2,0.5),mn!(4,0.5),mn!(9,2.0)] },
+    MelodySnippet { title: "Pop Goes the Weasel", notes: &[mn!(0,0.5),mn!(4,0.5),mn!(7,0.5),mn!(4,0.5),mn!(7,0.5),mn!(9,0.5),mn!(7,1.0)] },
+    MelodySnippet { title: "She'll Be Coming Round the Mountain", notes: &[mn!(7,0.5),mn!(7,1.0),mn!(7,0.5),mn!(5,1.0),mn!(5,0.5),mn!(4,0.5),mn!(4,1.0)] },
+    MelodySnippet { title: "For He's a Jolly Good Fellow", notes: &[mn!(4,1.0),mn!(4,1.0),mn!(4,1.0),mn!(2,1.0),mn!(4,2.0),mn!(5,1.0),mn!(4,1.0)] },
+    MelodySnippet { title: "Hickory Dickory Dock", notes: &[mn!(0,0.5),mn!(2,0.5),mn!(4,0.5),mn!(5,0.5),mn!(7,1.0),mn!(9,0.5),mn!(7,0.5)] },
+    MelodySnippet { title: "Jack and Jill", notes: &[mn!(0,1.0),mn!(2,1.0),mn!(4,1.0),mn!(7,1.0),mn!(9,1.0),mn!(7,2.0)] },
+    MelodySnippet { title: "Humpty Dumpty", notes: &[mn!(7,1.0),mn!(9,1.0),mn!(7,0.5),mn!(5,0.5),mn!(4,1.0),mn!(2,1.0),mn!(0,2.0)] },
+    MelodySnippet { title: "Hot Cross Buns", notes: &[mn!(4,1.0),mn!(2,1.0),mn!(0,2.0),mn!(4,1.0),mn!(2,1.0),mn!(0,2.0)] },
+    MelodySnippet { title: "Three Blind Mice", notes: &[mn!(4,1.0),mn!(2,1.0),mn!(0,2.0),mn!(5,1.0),mn!(5,1.0),mn!(4,2.0)] },
+    MelodySnippet { title: "Baa Baa Black Sheep", notes: &[mn!(0,1.0),mn!(0,1.0),mn!(7,1.0),mn!(7,1.0),mn!(9,0.5),mn!(9,0.5),mn!(9,0.5),mn!(9,0.5),mn!(7,2.0)] },
+    MelodySnippet { title: "Little Bo Peep", notes: &[mn!(0,1.0),mn!(4,1.0),mn!(7,1.0),mn!(9,1.0),mn!(7,2.0),mn!(5,1.0),mn!(4,1.0)] },
+    MelodySnippet { title: "Oranges and Lemons", notes: &[mn!(7,1.0),mn!(7,1.0),mn!(7,1.0),mn!(9,1.0),mn!(7,1.0),mn!(5,1.0),mn!(4,2.0)] },
+    MelodySnippet { title: "Lavender's Blue", notes: &[mn!(0,1.0),mn!(0,0.5),mn!(2,0.5),mn!(4,1.0),mn!(4,0.5),mn!(2,0.5),mn!(4,1.0),mn!(5,1.0)] },
+    MelodySnippet { title: "Bobby Shafto", notes: &[mn!(0,1.0),mn!(2,1.0),mn!(4,1.0),mn!(5,1.0),mn!(4,2.0),mn!(2,1.0),mn!(0,1.0)] },
+    MelodySnippet { title: "Early One Morning", notes: &[mn!(7,1.0),mn!(9,1.0),mn!(12,1.5),mn!(11,0.5),mn!(9,1.0),mn!(7,1.0),mn!(5,2.0)] },
+    MelodySnippet { title: "The Keel Row", notes: &[mn!(0,0.5),mn!(0,0.5),mn!(0,1.0),mn!(2,0.5),mn!(4,0.5),mn!(4,0.5),mn!(2,0.5),mn!(4,0.5),mn!(5,0.5),mn!(7,2.0)] },
+    // Classical (public domain)
+    MelodySnippet { title: "Beethoven Fifth", notes: &[mn!(7,0.5),mn!(7,0.5),mn!(7,0.5),mn!(3,2.0),mn!(6,0.5),mn!(6,0.5),mn!(6,0.5),mn!(2,2.0)] },
+    MelodySnippet { title: "Eine Kleine Nachtmusik", notes: &[mn!(7,0.5),mn!(7,0.5),mn!(7,0.5),mn!(7,0.5),mn!(7,2.0),mn!(5,1.0),mn!(4,1.0),mn!(2,1.0)] },
+    MelodySnippet { title: "Turkish March", notes: &[mn!(0,0.5),mn!(2,0.5),mn!(3,1.0),mn!(3,0.5),mn!(5,0.5),mn!(7,1.0)] },
+    MelodySnippet { title: "Canon in D", notes: &[mn!(9,1.0),mn!(7,1.0),mn!(5,1.0),mn!(4,1.0),mn!(2,1.0),mn!(0,1.0),mn!(2,1.0),mn!(4,1.0)] },
+    MelodySnippet { title: "Air on G String", notes: &[mn!(7,2.0),mn!(9,0.5),mn!(8,0.5),mn!(6,1.0),mn!(4,2.0),mn!(5,1.0),mn!(4,0.5),mn!(3,0.5)] },
+    MelodySnippet { title: "Swan Lake", notes: &[mn!(4,1.0),mn!(7,1.5),mn!(6,0.5),mn!(4,1.0),mn!(2,2.0),mn!(4,0.5),mn!(2,0.5),mn!(0,1.0)] },
+    MelodySnippet { title: "Blue Danube", notes: &[mn!(4,1.5),mn!(5,0.5),mn!(4,0.5),mn!(2,0.5),mn!(0,0.5),mn!(2,0.5),mn!(4,2.0)] },
+    MelodySnippet { title: "Habanera", notes: &[mn!(0,1.0),mn!(0,0.5),mn!(3,0.5),mn!(2,1.0),mn!(2,0.5),mn!(1,0.5),mn!(0,1.0),mn!(0,1.0)] },
+    MelodySnippet { title: "La Marseillaise", notes: &[mn!(4,0.5),mn!(4,0.5),mn!(4,1.0),mn!(0,1.0),mn!(4,1.0),mn!(7,2.0)] },
+    MelodySnippet { title: "William Tell Overture", notes: &[mn!(0,0.5),mn!(4,0.5),mn!(7,0.5),mn!(0,0.5),mn!(4,0.5),mn!(7,0.5),mn!(0,0.5),mn!(4,0.5),mn!(7,2.0)] },
+    MelodySnippet { title: "Spring Vivaldi", notes: &[mn!(7,1.0),mn!(9,1.0),mn!(7,0.5),mn!(5,0.5),mn!(7,0.5),mn!(5,0.5),mn!(4,1.0),mn!(2,1.0)] },
+    // Minor / modal
+    MelodySnippet { title: "Greensleeves", notes: &[mn!(0,1.0),mn!(3,2.0),mn!(5,1.0),mn!(7,1.5),mn!(8,0.5),mn!(7,1.0),mn!(5,2.0)] },
+    MelodySnippet { title: "Fur Elise", notes: &[mn!(11,0.5),mn!(10,0.5),mn!(11,0.5),mn!(10,0.5),mn!(11,0.5),mn!(7,0.5),mn!(10,0.5),mn!(8,0.5)] },
+    MelodySnippet { title: "Hall of the Mountain King", notes: &[mn!(0,0.5),mn!(2,0.5),mn!(3,0.5),mn!(5,0.5),mn!(7,0.5),mn!(3,0.5),mn!(7,0.5),mn!(6,1.0)] },
+    MelodySnippet { title: "Danny Boy", notes: &[mn!(4,1.0),mn!(7,1.5),mn!(9,0.5),mn!(7,1.0),mn!(4,1.0),mn!(2,1.0),mn!(0,2.0)] },
+    MelodySnippet { title: "Scarborough Fair", notes: &[mn!(0,1.0),mn!(3,2.0),mn!(-2,1.0),mn!(0,1.0),mn!(3,2.0),mn!(5,1.0),mn!(3,1.0)] },
+    MelodySnippet { title: "Drunken Sailor", notes: &[mn!(0,1.0),mn!(0,1.0),mn!(0,1.0),mn!(3,1.0),mn!(2,1.0),mn!(2,1.0),mn!(2,1.0),mn!(0,2.0)] },
+    MelodySnippet { title: "What Shall We Do with the Drunken Sailor", notes: &[mn!(0,0.5),mn!(2,0.5),mn!(3,0.5),mn!(5,0.5),mn!(7,1.0),mn!(5,1.0),mn!(3,1.0),mn!(2,2.0)] },
+    MelodySnippet { title: "Shule Agra", notes: &[mn!(0,1.0),mn!(2,1.0),mn!(3,1.0),mn!(5,1.0),mn!(7,2.0),mn!(5,1.0),mn!(3,2.0)] },
+    MelodySnippet { title: "St James Infirmary", notes: &[mn!(0,1.0),mn!(2,1.0),mn!(3,1.0),mn!(2,1.0),mn!(0,2.0),mn!(-2,1.0),mn!(0,1.0)] },
+];
+
+pub fn melody_count() -> usize {
+    MELODY_LIBRARY.len()
+}
+
+/// Fisher-Yates shuffle returning all indices 0..melody_count() in random order.
+pub fn shuffle_melody_indices(seed: u64) -> Vec<u8> {
+    let n = MELODY_LIBRARY.len();
+    let mut indices: Vec<u8> = (0..n as u8).collect();
+    let mut rng = seed;
+    for i in (1..n).rev() {
+        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let j = ((rng >> 33) as usize) % (i + 1);
+        indices.swap(i, j);
+    }
+    indices
+}
+
+/// Convert a melody snippet (by index) to absolute MIDI notes and durations.
+/// Picks the octave whose centre of gravity is nearest MIDI 60.
+/// Returns None if index is out of range.
+pub fn melody_to_midi_by_index(index: u8, root_chroma: u8) -> Option<(Vec<u8>, Vec<f32>)> {
+    let snippet = MELODY_LIBRARY.get(index as usize)?;
+    let notes = snippet.notes;
+    if notes.is_empty() { return None; }
+
+    let avg_semitones: f32 = notes.iter().map(|n| n.semitones as f32).sum::<f32>() / notes.len() as f32;
+    let root_chroma = root_chroma % 12;
+
+    let best_root: i16 = (2..=7i16)
+        .map(|oct| (oct + 1) * 12 + root_chroma as i16)
+        .min_by_key(|&root_midi| {
+            let centroid = root_midi as f32 + avg_semitones;
+            (centroid - 60.0).abs() as i32
+        })
+        .unwrap_or(60);
+
+    let midi_notes: Vec<u8> = notes.iter()
+        .map(|n| (best_root + n.semitones as i16).clamp(0, 127) as u8)
+        .collect();
+    let durations: Vec<f32> = notes.iter().map(|n| n.duration_beats).collect();
+
+    Some((midi_notes, durations))
+}
+
+/// Returns the title of a melody snippet by index, or None if out of range.
+pub fn melody_title(index: u8) -> Option<&'static str> {
+    MELODY_LIBRARY.get(index as usize).map(|s| s.title)
+}
+
+/// Returns the MIDI range (min, max) of a melody snippet transposed to root_chroma.
+pub fn melody_range_midi(index: u8, root_chroma: u8) -> Option<(u8, u8)> {
+    let (midi_notes, _) = melody_to_midi_by_index(index, root_chroma)?;
+    let min = *midi_notes.iter().min()?;
+    let max = *midi_notes.iter().max()?;
+    Some((min, max))
+}
+
+/// Returns `(hold_ms, step_ms)` for a single note at the given tempo and duration.
+///
+/// - `step_ms`: full notated duration in milliseconds
+/// - `hold_ms`: how long to actually sound the note (~88% of step), leaving a small
+///   articulation gap so notes don't blur together
+pub fn note_timing(bpm: f32, duration_beats: f32) -> (u32, u32) {
+    let step_ms = ((60_000.0 / bpm.max(1.0)) * duration_beats).max(50.0) as u32;
+    let hold_ms = ((step_ms as f32) * 0.88) as u32;
+    (hold_ms, step_ms)
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

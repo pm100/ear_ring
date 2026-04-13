@@ -69,6 +69,9 @@ class ExerciseModel: ObservableObject {
             rangeEnd = e
         }
     }
+    @Published var testType: Int = ud.object(forKey: "testType") != nil ? ud.integer(forKey: "testType") : 0 {
+        didSet { UserDefaults.standard.set(testType, forKey: "testType") }
+    }
     @Published var sequence: [Int] = []
     @Published var detectedNotes: [DetectedNote] = []
     @Published var status: ExerciseStatus = .stopped
@@ -118,6 +121,10 @@ class ExerciseModel: ObservableObject {
     private var sessionPersisted = false
     private var diagFrameCount: Int = 0
 
+    private var melodyDeck: [Int] = []
+    private var melodyDeckCursor: Int = 0
+    private var melodyDurations: [Float] = []
+
     // Rust-backed pitch tracker — owns stability, silence gating, warmup, and grace period.
     private var pitchTracker: EarRingCore.PitchTracker = EarRingCore.PitchTracker(silenceThreshold: 0.003, requiredFrames: 3)
 
@@ -137,6 +144,10 @@ class ExerciseModel: ObservableObject {
         score = 0
         currentAttempt = 1
         maxAttempts = maxRetries
+        if testType == 1 {
+            melodyDeck = EarRingCore.shuffleMelodyIndices(seed: UInt64(Date().timeIntervalSince1970 * 1000))
+            melodyDeckCursor = 0
+        }
         Task { await startFreshTest() }
     }
 
@@ -205,15 +216,38 @@ class ExerciseModel: ObservableObject {
 
     private func startFreshTest() async {
         audioPlayback.prepareForPlayback()
-        let seed = UInt64(Date().timeIntervalSince1970 * 1000)
-        sequence = EarRingCore.generateSequence(
-            rootChroma: rootNote,
-            scaleId: scaleId,
-            length: sequenceLength,
-            rangeStart: rangeStart,
-            rangeEnd: rangeEnd,
-            seed: seed
-        )
+
+        if testType == 1 {
+            // Melody mode
+            if melodyDeckCursor >= melodyDeck.count {
+                melodyDeck = EarRingCore.shuffleMelodyIndices(seed: UInt64(Date().timeIntervalSince1970 * 1000))
+                melodyDeckCursor = 0
+            }
+            let melodyIndex = melodyDeck[melodyDeckCursor]
+            melodyDeckCursor += 1
+            guard let (midiNotes, durations) = EarRingCore.pickMelodyByIndex(index: melodyIndex, rootChroma: rootNote) else {
+                await startFreshTest(); return
+            }
+            melodyDurations = durations
+            // Auto-set range ±6 semitones
+            let minMidi = (midiNotes.min() ?? 60) - 6
+            let maxMidi = (midiNotes.max() ?? 72) + 6
+            rangeStart = max(21, minMidi)
+            rangeEnd = min(108, maxMidi)
+            sequence = midiNotes
+        } else {
+            melodyDurations = []
+            let seed = UInt64(Date().timeIntervalSince1970 * 1000)
+            sequence = EarRingCore.generateSequence(
+                rootChroma: rootNote,
+                scaleId: scaleId,
+                length: sequenceLength,
+                rangeStart: rangeStart,
+                rangeEnd: rangeEnd,
+                seed: seed
+            )
+        }
+
         let chord = EarRingCore.introChord(rootMidi: rootMidi, scaleId: scaleId)
         print("[EAR] rootNote=\(rootNote) scaleId=\(scaleId) rangeStart=\(rangeStart) rangeEnd=\(rangeEnd) rootMidi=\(rootMidi)")
         print("[EAR] sequence=\(sequence.map { MusicTheory.midiToLabel($0) })")
@@ -244,7 +278,7 @@ class ExerciseModel: ObservableObject {
         guard status == .playing else { return }
         try? await Task.sleep(nanoseconds: self.postChordGapNanoseconds)
         guard status == .playing else { return }
-        await audioPlayback.playSequence(notes: sequence, bpm: tempoBpm) { _ in }
+        await audioPlayback.playSequence(notes: sequence, bpm: tempoBpm, durations: melodyDurations.isEmpty ? nil : melodyDurations) { _ in }
         guard status == .playing else { return }
         // Let all notes ring through the settling gap, then stop the playback engine
         // entirely so it doesn't compete with the capture engine for audio routes.
@@ -387,8 +421,8 @@ class ExerciseModel: ObservableObject {
         let ud = UserDefaults.standard
         let keys = ["rootNote","rangeStart","rangeEnd","scaleId","sequenceLength","tempoBpm",
                     "showTestNotes","keySignatureMode","maxRetries","silenceThreshold",
-                    "framesToConfirm","warmupFrames","postChordGapNs","wrongNotePauseNs","instrumentIndex",
-                    "hasLaunched"]
+                    "framesToConfirm","warmupFrames","postChordGapNs","wrongNotePauseNs",
+                    "instrumentIndex","testType","hasLaunched"]
         keys.forEach { ud.removeObject(forKey: $0) }
         rootNote = 0
         rangeStart = 60
@@ -405,5 +439,6 @@ class ExerciseModel: ObservableObject {
         postChordGapNanoseconds = 800_000_000
         wrongNotePauseNanoseconds = 3_000_000_000
         instrumentIndex = 0
+        testType = 0
     }
 }

@@ -124,6 +124,7 @@ class AudioPlayback(private val context: Context) {
     fun playSequence(
         midiNotes: List<Int>,
         bpm: Int = 100,
+        durations: List<Float>? = null,
         onEach: (Int) -> Unit = {},
         onDone: () -> Unit = {}
     ) {
@@ -132,9 +133,9 @@ class AudioPlayback(private val context: Context) {
         sequenceJob?.cancel()
         sequenceJob = null
         sequenceJob = scope.launch {
-            val stepMs = (60_000L / bpm.coerceAtLeast(1)).coerceAtLeast(150L)
             for ((index, midi) in midiNotes.withIndex()) {
                 if (!isActive) break
+                val stepMs = ((60_000.0 / bpm.coerceAtLeast(1)) * (durations?.getOrNull(index) ?: 1.0f)).toLong().coerceAtLeast(150L)
                 withContext(Dispatchers.Main) { onEach(index) }
                 val nearestMidi = nearestSampleMidi(midi)
                 val sampleFile = getCachedSample(nearestMidi)

@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -64,6 +65,43 @@ fun HomeScreen(
         )
         Spacer(Modifier.height(28.dp))
 
+        // Test Type dropdown
+        val testTypeLabels = listOf("Random Notes", "Melody Snippets", "Diatonic Triads (coming soon)")
+        var testTypeExpanded by remember { mutableStateOf(false) }
+        SectionLabel("Test Type")
+        ExposedDropdownMenuBox(
+            expanded = testTypeExpanded,
+            onExpandedChange = { testTypeExpanded = it },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            OutlinedTextField(
+                value = testTypeLabels[state.testType.coerceIn(0, 2)],
+                onValueChange = {},
+                readOnly = true,
+                singleLine = true,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = testTypeExpanded) },
+                modifier = Modifier.menuAnchor().fillMaxWidth()
+            )
+            ExposedDropdownMenu(
+                expanded = testTypeExpanded,
+                onDismissRequest = { testTypeExpanded = false }
+            ) {
+                testTypeLabels.forEachIndexed { index, label ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        enabled = index != 2,
+                        onClick = {
+                            if (index != 2) {
+                                viewModel.setTestType(index)
+                                testTypeExpanded = false
+                            }
+                        }
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+
         // Key + Scale selections side by side
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -101,12 +139,12 @@ fun HomeScreen(
                     }
                 }
             }
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f).alpha(if (state.testType != 0) 0.38f else 1f)) {
                 SectionLabel("Scale")
                 var scaleExpanded by remember { mutableStateOf(false) }
                 ExposedDropdownMenuBox(
                     expanded = scaleExpanded,
-                    onExpandedChange = { scaleExpanded = it },
+                    onExpandedChange = { if (state.testType == 0) scaleExpanded = it },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedTextField(
@@ -114,6 +152,7 @@ fun HomeScreen(
                         onValueChange = {},
                         readOnly = true,
                         singleLine = true,
+                        enabled = state.testType == 0,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = scaleExpanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth()
                     )
@@ -141,7 +180,7 @@ fun HomeScreen(
         PianoRangePicker(
             rangeStart = state.rangeStart,
             rangeEnd = state.rangeEnd,
-            onRangeChange = { s, e -> viewModel.setRange(s, e) },
+            onRangeChange = if (state.testType != 1) { s, e -> viewModel.setRange(s, e) } else { _, _ -> },
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(16.dp))
@@ -151,7 +190,8 @@ fun HomeScreen(
         ChipRow(
             items = (2..8).map { it.toString() },
             selected = state.sequenceLength - 2,
-            onSelect = { viewModel.setSequenceLength(it + 2) }
+            onSelect = { viewModel.setSequenceLength(it + 2) },
+            enabled = state.testType == 0
         )
         Spacer(Modifier.height(16.dp))
 
@@ -208,21 +248,22 @@ internal fun SectionLabel(text: String) {
 internal fun ChipRow(
     items: List<String>,
     selected: Int,
-    onSelect: (Int) -> Unit
+    onSelect: (Int) -> Unit,
+    enabled: Boolean = true
 ) {
     val chipColors = FilterChipDefaults.filterChipColors(
         selectedContainerColor = MaterialTheme.colorScheme.primary,
         selectedLabelColor = MaterialTheme.colorScheme.onPrimary
     )
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.38f),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         items.forEachIndexed { index, label ->
             val isSelected = index == selected
             FilterChip(
                 selected = isSelected,
-                onClick = { onSelect(index) },
+                onClick = { if (enabled) onSelect(index) },
                 label = { Text(label, fontSize = 13.sp) },
                 modifier = Modifier.weight(1f),
                 colors = chipColors

@@ -139,6 +139,19 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 24)
 
+                // ── Test Type ─────────────────────────────────────────────
+                sectionLabel("Test Type").padding(.top, 28)
+                Picker("Test Type", selection: Binding(
+                    get: { model.testType },
+                    set: { if $0 != 2 { model.testType = $0 } }
+                )) {
+                    Text("Random Notes").tag(0)
+                    Text("Melody Snippets").tag(1)
+                    Text("Diatonic Triads (coming soon)").tag(2)
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
                 // ── Key + Scale (side by side) ────────────────────────────
                 HStack(alignment: .top, spacing: 8) {
                     VStack(alignment: .leading, spacing: 0) {
@@ -168,6 +181,8 @@ struct HomeView: View {
                         }
                         .pickerStyle(.menu)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .disabled(model.testType != 0)
+                        .opacity(model.testType != 0 ? 0.38 : 1.0)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -177,7 +192,7 @@ struct HomeView: View {
                 PianoRangePickerView(
                     rangeStart: model.rangeStart,
                     rangeEnd: model.rangeEnd,
-                    onRangeChange: { s, e in model.rangeStart = s; model.rangeEnd = e },
+                    onRangeChange: model.testType == 0 ? { s, e in model.rangeStart = s; model.rangeEnd = e } : { _, _ in },
                     keyScale: keyScale
                 )
                 .frame(height: pianoHeight)
@@ -195,6 +210,8 @@ struct HomeView: View {
                         .buttonStyle(ChipButtonStyle(selected: model.sequenceLength == len))
                     }
                 }
+                .disabled(model.testType != 0)
+                .opacity(model.testType != 0 ? 0.38 : 1.0)
 
                 HStack(spacing: 8) {
                     Toggle(isOn: Binding(
