@@ -915,6 +915,24 @@ the icon+text row. All other screens and elements must match the spec.
 
 ---
 
+## Melody Manager (Developer Tool)
+
+The Melody Manager is a **standalone Tauri app** at `melody-manager/` used to vet,
+edit, and import melodies into the shared `rust/src/melodies.txt` library.
+It is **not** part of the shipping app — it is a developer-only tool.
+
+**Full documentation:** `docs/melody-manager.md`
+
+Key facts:
+- Run with: `cd melody-manager && cargo tauri dev`
+- Exports directly to `rust/src/melodies.txt` (relative path from `melody-manager/`)
+- After export, run `cargo test` to verify the library compiles correctly
+- Decisions (keep/discard/later) and octave shifts persist in `localStorage` between sessions
+- The `✏ Edit ABC` button allows editing any tune's notes via inline ABC notation
+- The `🎤 Record` import tab transcribes melodies played into the microphone using the shared Rust YIN pitch detector
+
+---
+
 ## UI Debugging Guide
 
 ### Debugging the Android App (Emulator)
