@@ -343,6 +343,10 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             midiNotes = triad,
             onDone = {
                 if (_state.value.sessionRunning) {
+                    // Fade chord sustain so it doesn't bleed into the sequence.
+                    // Cap at 75% of the gap so the fade always finishes before the sequence starts.
+                    val chordFadeMs = (_state.value.postChordGapMs * 3 / 4).coerceIn(100L, 400L)
+                    audioPlayback.fadeOutActive(chordFadeMs)
                     viewModelScope.launch {
                         delay(_state.value.postChordGapMs)
                         if (_state.value.sessionRunning) {
@@ -353,6 +357,8 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
                                 onEach = {},
                                 onDone = {
                                     if (_state.value.sessionRunning) {
+                                        // Fade sequence sustain before the mic opens
+                                        audioPlayback.fadeOutActive(400L)
                                         viewModelScope.launch {
                                             delay(POST_SEQUENCE_GAP_MS)
                                             if (_state.value.sessionRunning) {

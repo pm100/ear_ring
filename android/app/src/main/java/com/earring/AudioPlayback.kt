@@ -121,6 +121,31 @@ class AudioPlayback(private val context: Context) {
         }
     }
 
+    /**
+     * Gradually fades out all currently-ringing notes over [durationMs], then stops and
+     * releases them. Call this when playback phases end so piano sustain doesn't bleed
+     * into the mic-listening phase.
+     */
+    fun fadeOutActive(durationMs: Long = 400L) {
+        val targets = synchronized(activePlayers) { activePlayers.toList() }
+        if (targets.isEmpty()) return
+        scope.launch {
+            val steps = 20
+            val stepMs = (durationMs / steps).coerceAtLeast(10L)
+            for (step in 1..steps) {
+                val vol = 1f - step.toFloat() / steps
+                withContext(Dispatchers.Main) {
+                    targets.forEach { runCatching { it.setVolume(vol, vol) } }
+                }
+                delay(stepMs)
+            }
+            withContext(Dispatchers.Main) {
+                targets.forEach { runCatching { it.stop(); it.release() } }
+                synchronized(activePlayers) { activePlayers.removeAll(targets.toSet()) }
+            }
+        }
+    }
+
     fun playSequence(
         midiNotes: List<Int>,
         bpm: Int = 100,

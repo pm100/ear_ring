@@ -273,16 +273,24 @@ class ExerciseModel: ObservableObject {
         audioPlayback.resetCancellation()
         let chord = EarRingCore.introChord(rootMidi: rootMidi, scaleId: scaleId)
         await audioPlayback.playChord(notes: chord)
-        // Let the chord ring freely through the intro gap and into the sequence —
-        // stopping it early creates an unnatural cutoff.
+        // Fade chord sustain concurrently with the post-chord gap so notes
+        // are silent before the sequence begins. Cap at 75% of the gap so
+        // the fade always finishes before the sequence starts.
+        let chordFadeDuration = min(0.3, Double(postChordGapNanoseconds) / 1_000_000_000.0 * 0.75)
+        Task { await self.audioPlayback.fadeOutActive(duration: chordFadeDuration) }
         guard status == .playing else { return }
         try? await Task.sleep(nanoseconds: self.postChordGapNanoseconds)
         guard status == .playing else { return }
         await audioPlayback.playSequence(notes: sequence, bpm: tempoBpm, durations: melodyDurations.isEmpty ? nil : melodyDurations) { _ in }
         guard status == .playing else { return }
-        // Let all notes ring through the settling gap, then stop the playback engine
-        // entirely so it doesn't compete with the capture engine for audio routes.
-        try? await Task.sleep(nanoseconds: postSequenceGapNanoseconds)
+        // Fade sequence sustain; then stop the engine before capture starts.
+        await audioPlayback.fadeOutActive(duration: 0.4)
+        let remainingGapNs = postSequenceGapNanoseconds > 400_000_000
+            ? postSequenceGapNanoseconds - 400_000_000
+            : 0
+        if remainingGapNs > 0 {
+            try? await Task.sleep(nanoseconds: remainingGapNs)
+        }
         audioPlayback.stopEngine()
         print("[EAR] playback engine stopped, starting capture")
         if status == .playing {

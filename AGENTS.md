@@ -453,10 +453,12 @@ Chip row: 1  2  3  4  5  6  7   (single row, equal width)
   — Default: 5
 
 [16dp space]
-Section label: "Mic Sensitivity (Silence Threshold)"
-Slider: 0.001 – 0.020, step 0.001, default 0.003
-  — Lower = more sensitive (picks up quieter sound)
-  — Current value shown as label (e.g. "0.003")
+Section label: "Mic Sensitivity"
+Slider: 1 – 10 (integer steps), default 8
+  — Right = more sensitive (picks up quieter sound)
+  — Internally maps to silence threshold: threshold = (0.011 − sensitivity × 0.001)
+    e.g. sensitivity 8 → threshold 0.003 (default), sensitivity 10 → threshold 0.001 (most sensitive)
+  — Current value shown as label (e.g. "8 / 10")
 
 [16dp space]
 Section label: "Note Stability (Frames to Confirm)"

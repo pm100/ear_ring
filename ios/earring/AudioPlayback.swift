@@ -53,6 +53,20 @@ class AudioPlayback {
         }
     }
 
+    /// Gradually fade all active notes to silence over [duration] seconds, then stop them.
+    /// Call this as soon as a playback phase ends so sustain doesn't bleed into mic capture.
+    func fadeOutActive(duration: Double = 0.4) async {
+        guard !activeNodes.isEmpty else { return }
+        let steps = 20
+        let stepDuration = duration / Double(steps)
+        for step in 1...steps {
+            let vol = Float(1.0 - Double(step) / Double(steps))
+            for (player, _) in activeNodes { player.volume = vol }
+            try? await Task.sleep(nanoseconds: UInt64(stepDuration * 1_000_000_000))
+        }
+        stopAllPlayers()
+    }
+
     /// Fully stop the playback engine so it doesn't compete with AudioCapture's
     /// engine for the shared AVAudioSession hardware routes.
     func stopEngine() {

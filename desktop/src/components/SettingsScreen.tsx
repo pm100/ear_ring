@@ -89,14 +89,13 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
       </div>
 
       <SectionTitle>Pitch Detection</SectionTitle>
-      <span className="section-label" style={{ marginTop: 0 }}>Mic Sensitivity (silence threshold)</span>
-      <p style={{ fontSize: 12, color: '#757575', marginBottom: 6 }}>Lower = picks up quieter sounds</p>
+      <span className="section-label" style={{ marginTop: 0 }}>Mic Sensitivity</span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <input type="range" min={0.001} max={0.010} step={0.001}
-          value={settings.silenceThreshold}
-          onChange={e => set('silenceThreshold', parseFloat(e.target.value))}
+        <input type="range" min={1} max={10} step={1}
+          value={Math.round((0.011 - settings.silenceThreshold) / 0.001)}
+          onChange={e => set('silenceThreshold', parseFloat((0.011 - parseInt(e.target.value) * 0.001).toFixed(3)))}
           style={{ flex: 1 }} />
-        <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{settings.silenceThreshold.toFixed(3)}</span>
+        <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{Math.round((0.011 - settings.silenceThreshold) / 0.001)} / 10</span>
       </div>
 
       <span className="section-label">Note Stability (frames to confirm)</span>

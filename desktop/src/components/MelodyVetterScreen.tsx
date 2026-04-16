@@ -14,7 +14,6 @@ type Decision = 'keep' | 'discard' | 'later';
 
 const DECISIONS_KEY = 'melody_vetter_decisions';
 const INDEX_KEY = 'melody_vetter_index';
-const TOTAL = 57; // melody_count()
 const VET_BPM = 80;
 const ROOT_CHROMA = 0; // C
 
@@ -33,7 +32,7 @@ function loadIndex(): number {
   try {
     const raw = localStorage.getItem(INDEX_KEY);
     const n = raw !== null ? parseInt(raw, 10) : 0;
-    return isNaN(n) ? 0 : Math.min(n, TOTAL - 1);
+    return isNaN(n) ? 0 : Math.max(0, n);
   } catch { return 0; }
 }
 
@@ -42,7 +41,8 @@ interface Props {
 }
 
 export default function MelodyVetterScreen({ onBack }: Props) {
-  const [currentIndex, setCurrentIndex] = useState<number>(loadIndex);
+  const [total, setTotal] = useState<number>(0);
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [decisions, setDecisions] = useState<Record<string, Decision>>(loadDecisions);
   const [melody, setMelody] = useState<MelodyInfo | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -51,6 +51,14 @@ export default function MelodyVetterScreen({ onBack }: Props) {
   const [copied, setCopied] = useState(false);
   const { playSequence, cancelPlayback } = useAudioPlayback();
   const playGenRef = useRef(0);
+
+  // Fetch total melody count on mount, then set initial index
+  useEffect(() => {
+    invoke<number>('cmd_melody_count').then(n => {
+      setTotal(n);
+      setCurrentIndex(Math.min(loadIndex(), Math.max(0, n - 1)));
+    }).catch(console.error);
+  }, []);
 
   // Persist index
   useEffect(() => {
@@ -106,23 +114,26 @@ export default function MelodyVetterScreen({ onBack }: Props) {
     setIsPlaying(false);
     playGenRef.current++;
     setAutoPlay(shouldAutoPlay);
-    setCurrentIndex(Math.max(0, Math.min(TOTAL - 1, newIndex)));
-  }, [cancelPlayback]);
+    setCurrentIndex(Math.max(0, Math.min(total - 1, newIndex)));
+  }, [cancelPlayback, total]);
 
   const decide = useCallback((verdict: Decision) => {
-    const updated = { ...decisions, [String(currentIndex)]: verdict };
-    setDecisions(updated);
-    saveDecisions(updated);
+    const idx = currentIndex; // capture before any async
+    setDecisions(prev => {
+      const updated = { ...prev, [String(idx)]: verdict };
+      saveDecisions(updated);
+      return updated;
+    });
     // Find next undecided tune
     let next = currentIndex + 1;
-    while (next < TOTAL && updated[String(next)] !== undefined) next++;
-    if (next >= TOTAL) {
+    while (next < total && decisions[String(next)] !== undefined) next++;
+    if (next >= total) {
       // All tunes reviewed — show summary
       setShowSummary(true);
     } else {
       navigate(next, true);
     }
-  }, [currentIndex, decisions, navigate]);
+  }, [currentIndex, decisions, navigate, total]);
 
   const reviewedCount = Object.keys(decisions).length;
   const keepList = Object.entries(decisions).filter(([,v]) => v === 'keep').map(([k]) => parseInt(k)).sort((a,b)=>a-b);
@@ -137,7 +148,7 @@ export default function MelodyVetterScreen({ onBack }: Props) {
 
   if (showSummary) {
     return <SummaryView
-      total={TOTAL}
+      total={total}
       keepList={keepList}
       discardList={discardList}
       laterList={laterList}
@@ -168,14 +179,14 @@ export default function MelodyVetterScreen({ onBack }: Props) {
 
       {/* Progress */}
       <div style={{ fontSize: 13, color: '#888', marginBottom: 4 }}>
-        Tune {currentIndex + 1} of {TOTAL} &nbsp;·&nbsp;
+        Tune {currentIndex + 1} of {total} &nbsp;·&nbsp;
         {reviewedCount} reviewed &nbsp;(
         <span style={{ color: '#4CAF50' }}>{keepList.length} keep</span>,&nbsp;
         <span style={{ color: '#f44336' }}>{discardList.length} discard</span>,&nbsp;
         <span style={{ color: '#FF9800' }}>{laterList.length} later</span>)
       </div>
       <div style={{ height: 4, background: '#eee', borderRadius: 2, marginBottom: 16 }}>
-        <div style={{ height: '100%', width: `${(reviewedCount / TOTAL) * 100}%`, background: '#2196F3', borderRadius: 2, transition: 'width 0.3s' }} />
+        <div style={{ height: '100%', width: `${(reviewedCount / total) * 100}%`, background: '#2196F3', borderRadius: 2, transition: 'width 0.3s' }} />
       </div>
 
       {/* Title + Play */}
@@ -231,14 +242,14 @@ export default function MelodyVetterScreen({ onBack }: Props) {
         >🕐 Later</button>
         <button
           onClick={() => navigate(currentIndex + 1, true)}
-          disabled={currentIndex >= TOTAL - 1}
+          disabled={currentIndex >= total - 1}
           style={{ ...btnStyle('secondary'), flex: 1 }}
         >Next ▶</button>
       </div>
 
       {/* Mini index jump */}
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        {Array.from({ length: TOTAL }, (_, i) => {
+        {Array.from({ length: total }, (_, i) => {
           const d = decisions[String(i)];
           return (
             <button
@@ -247,8 +258,8 @@ export default function MelodyVetterScreen({ onBack }: Props) {
               title={`Tune ${i + 1}`}
               style={{
                 width: 20, height: 20, border: 'none', borderRadius: 3, cursor: 'pointer', fontSize: 9,
-                background: i === currentIndex ? '#1976D2' : d === 'keep' ? '#C8E6C9' : d === 'discard' ? '#FFCDD2' : d === 'later' ? '#FFE0B2' : '#e0e0e0',
-                color: i === currentIndex ? '#fff' : '#333',
+                background: i === currentIndex ? '#1976D2' : d === 'keep' ? '#388E3C' : d === 'discard' ? '#C62828' : d === 'later' ? '#E65100' : '#e0e0e0',
+                color: i === currentIndex ? '#fff' : d ? '#fff' : '#333',
                 fontWeight: i === currentIndex ? 700 : 400,
               }}
             >{i + 1}</button>
@@ -293,8 +304,8 @@ function SummaryView({ total, keepList, discardList, laterList, onBack, onReset,
         <div style={{ marginTop: 24 }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: '#555' }}>Indices to remove from MELODY_LIBRARY</h3>
           <p style={{ fontSize: 12, color: '#888', margin: '4px 0 8px' }}>
-            These are 0-based array indices. Remove the corresponding lines from
-            <code style={{ background: '#f5f5f5', padding: '1px 4px', borderRadius: 3 }}>rust/src/music_theory.rs</code>.
+            These are 0-based indices. Remove the corresponding entries from
+            <code style={{ background: '#f5f5f5', padding: '1px 4px', borderRadius: 3 }}>rust/src/melodies.txt</code>.
           </p>
           <div style={{
             background: '#1e1e1e', color: '#d4d4d4', fontFamily: 'monospace', fontSize: 13,

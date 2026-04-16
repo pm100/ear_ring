@@ -188,7 +188,7 @@ struct MelodyResult {
 #[tauri::command]
 fn cmd_pick_melody_by_index(index: u8, root_chroma: u8) -> Option<MelodyResult> {
     let (midi_notes, durations) = melody_to_midi_by_index(index, root_chroma)?;
-    let title = melody_title(index).unwrap_or("").to_string();
+    let title = melody_title(index).unwrap_or_default();
     Some(MelodyResult { midi_notes, durations, title })
 }
 

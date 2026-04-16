@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.sp
 import com.earring.EarRingCore
 import com.earring.ExerciseViewModel
 import org.json.JSONArray
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,14 +96,15 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
         Spacer(Modifier.height(16.dp))
         Text("Pitch Detection", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 4.dp))
-        SectionLabel("Mic Sensitivity (silence threshold)")
-        Text("Lower = picks up quieter sounds (${String.format("%.3f", state.silenceThreshold)})",
+        SectionLabel("Mic Sensitivity")
+        val sensitivity = ((0.011f - state.silenceThreshold) / 0.001f).roundToInt().coerceIn(1, 10)
+        Text("${sensitivity} / 10",
             fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 4.dp))
         Slider(
-            value = state.silenceThreshold,
-            onValueChange = { viewModel.setSilenceThreshold(it) },
-            valueRange = 0.001f..0.010f,
+            value = sensitivity.toFloat(),
+            onValueChange = { viewModel.setSilenceThreshold((0.011f - it * 0.001f).coerceIn(0.001f, 0.010f)) },
+            valueRange = 1f..10f,
             steps = 8,
             modifier = Modifier.fillMaxWidth()
         )
