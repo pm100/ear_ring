@@ -5,12 +5,12 @@ pub mod tracker;
 pub use music_theory::{
     accidental_in_key, effective_key_chroma, freq_to_note, generate_sequence, intro_chord,
     is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
-    key_signature_pitch_classes, melody_count, melody_range_midi, melody_title, melody_to_midi_by_index,
-    midi_to_freq, midi_to_label, note_name, note_timing, preferred_midi_label,
-    preferred_note_label, scale_label, scale_name, scale_notes, shuffle_melody_indices,
-    staff_position, staff_position_in_key, test_score, transpose_display_midi, MelodyNote,
-    MelodySnippet, Note, NoteName, ScaleType, FLAT_ORDER, FLAT_STAFF_POSITIONS, SHARP_ORDER,
-    SHARP_STAFF_POSITIONS,
+    key_signature_pitch_classes, melody_count, melody_range_midi, melody_raw_notes, melody_title,
+    melody_to_midi_by_index, midi_to_freq, midi_to_label, note_name, note_timing,
+    preferred_midi_label, preferred_note_label, scale_label, scale_name, scale_notes,
+    shuffle_melody_indices, staff_position, staff_position_in_key, test_score,
+    transpose_display_midi, MelodyNote, MelodySnippet, Note, NoteName, ScaleType, FLAT_ORDER,
+    FLAT_STAFF_POSITIONS, SHARP_ORDER, SHARP_STAFF_POSITIONS,
 };
 pub use pitch_detection::detect_pitch;
 pub use tracker::{FrameResult, PitchTracker};

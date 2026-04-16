@@ -648,6 +648,15 @@ pub fn melody_title(index: u8) -> Option<String> {
     melody_library().get(index as usize).map(|s| s.title.clone())
 }
 
+/// Returns the raw (title, semitones, durations) for a melody snippet without
+/// MIDI conversion. Used by the Melody Manager tool.
+pub fn melody_raw_notes(index: u8) -> Option<(String, Vec<i8>, Vec<f32>)> {
+    let snippet = melody_library().get(index as usize)?;
+    let semitones: Vec<i8> = snippet.notes.iter().map(|n| n.semitones).collect();
+    let durations: Vec<f32> = snippet.notes.iter().map(|n| n.duration_beats).collect();
+    Some((snippet.title.clone(), semitones, durations))
+}
+
 /// Returns the MIDI range (min, max) of a melody snippet transposed to root_chroma.
 pub fn melody_range_midi(index: u8, root_chroma: u8) -> Option<(u8, u8)> {
     let (midi_notes, _) = melody_to_midi_by_index(index, root_chroma)?;

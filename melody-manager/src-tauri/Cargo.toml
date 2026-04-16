@@ -1,0 +1,19 @@
+[package]
+name = "melody-manager"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+tauri = { version = "1.6", features = ["http-all", "fs-all"] }
+tokio = { version = "1", features = ["rt", "macros"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ear_ring_core = { path = "../../rust" }
+reqwest = { version = "0.11", features = ["json"] }
+urlencoding = "2"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

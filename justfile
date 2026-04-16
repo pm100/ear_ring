@@ -11,6 +11,13 @@ android:
 android-check:
     Push-Location android; .\gradlew :app:compileDebugKotlin; Pop-Location
 
+# Build a signed release AAB for Google Play upload.
+# Prompts for KEYSTORE_PASSWORD if not already set in the environment.
+# Output: android/app/build/outputs/bundle/release/app-release.aab
+android-release:
+    @if (-not $env:KEYSTORE_PASSWORD) { $env:KEYSTORE_PASSWORD = Read-Host "Keystore password" }; \
+     Push-Location android; .\gradlew bundleRelease; Pop-Location
+
 # Take a screenshot from the emulator
 screenshot:
     & "{{adb}}" shell screencap -p /sdcard/screen.png

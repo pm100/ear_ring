@@ -8,7 +8,6 @@ import ResultsScreen from './components/ResultsScreen';
 import ProgressScreen from './components/ProgressScreen';
 import SettingsScreen from './components/SettingsScreen';
 import HelpScreen from './components/HelpScreen';
-import MelodyVetterScreen from './components/MelodyVetterScreen';
 import BottomNavBar from './components/BottomNavBar';
 
 const defaultSettings: ExerciseSettings = (() => {
@@ -221,11 +220,7 @@ export default function App() {
           onUpdateSettings={setSettings}
           onResetSettings={resetSettings}
           onBack={() => setScreen('home')}
-          onVetMelodies={() => setScreen('vetter')}
         />
-      )}
-      {screen === 'vetter' && (
-        <MelodyVetterScreen onBack={() => setScreen('settings')} />
       )}
       {screen === 'help' && (
         <HelpScreen onBack={() => setScreen('home')} />

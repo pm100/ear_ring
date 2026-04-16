@@ -1,4 +1,4 @@
-export type Screen = 'home' | 'exercise' | 'setup' | 'results' | 'progress' | 'settings' | 'help' | 'vetter';
+export type Screen = 'home' | 'exercise' | 'setup' | 'results' | 'progress' | 'settings' | 'help';
 export type ExerciseStatus = 'playing' | 'listening' | 'retry_delay' | 'stopped';
 export type StaffNoteState = 'expected' | 'correct' | 'incorrect' | 'active';
 

@@ -6,5 +6,6 @@ members = [
 ]
 exclude = [
     "desktop/src-tauri",
+    "melody-manager/src-tauri",
 ]
 resolver = "2"

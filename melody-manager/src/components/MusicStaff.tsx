@@ -1,0 +1,234 @@
+import React from 'react';
+import { StaffDisplayNote } from '../types';
+import { preferredMidiLabel, accidentalInKey, keySigPositions, staffPositionForMidi, keyAccidentalCount } from '../music';
+
+// Flat PNG: 141×435px, belly (anchor) at exactly 50% height.
+// Sharp PNG: 179×305px, bar-centre (anchor) at exactly 50% height.
+// Position formula on every platform: top = targetY - displayH / 2
+const FLAT_W  = 141;
+const FLAT_H  = 435;
+const SHARP_W = 179;
+const SHARP_H = 305;
+
+// Display height multipliers (same on all platforms).
+// Width is derived from aspect ratio so images are never distorted.
+const FLAT_H_MULT  = 3.0;
+const SHARP_H_MULT = 2.0;
+
+interface Props {
+  notes: StaffDisplayNote[];
+  fixedSpacing?: number;
+  rootChroma?: number;
+  keySignatureMode?: number;
+}
+
+// Map note state → colour-variant suffix used in PNG filenames.
+function accSuffix(state: StaffDisplayNote['state']): string {
+  switch (state) {
+    case 'correct':   return '_correct';
+    case 'incorrect': return '_wrong';
+    case 'active':    return '_active';
+    default:          return '';
+  }
+}
+
+export default function MusicStaff({ notes, fixedSpacing, rootChroma = 0, keySignatureMode = 0 }: Props) {
+  const svgWidth = 500;
+  const svgHeight = 160;
+  const lineSpacing = 12;
+  const staffTop = svgHeight / 2 - 2 * lineSpacing;
+  const noteRadius = lineSpacing * 0.45;
+  const staffBottomY = staffTop + 4 * lineSpacing;
+  const staffCenter = staffTop + 2 * lineSpacing;
+
+  const calcNoteY = (staffPos: number) => staffCenter - (staffPos - 6) * (lineSpacing / 2);
+
+  const clefH = lineSpacing * 8;
+  const clefW = clefH * (299 / 638);
+  const clefImgY = staffTop - lineSpacing * 2;
+
+  // Accidental display sizes
+  const flatDisplayH  = lineSpacing * FLAT_H_MULT;
+  const sharpDisplayH = lineSpacing * SHARP_H_MULT;
+  const flatDisplayW  = flatDisplayH  * (FLAT_W  / FLAT_H);
+  const sharpDisplayW = sharpDisplayH * (SHARP_W / SHARP_H);
+
+  // Key signature layout
+  const keySigStartX = 2 + clefW + 6;
+  const keySig = keySignatureMode === 1 ? keySigPositions(rootChroma) : null;
+  const keySigDisplayH = keySig?.isSharp ? sharpDisplayH : flatDisplayH;
+  const keySigDisplayW = keySig?.isSharp ? sharpDisplayW : flatDisplayW;
+  const keySigCount = keySignatureMode === 1 ? Math.abs(keyAccidentalCount(rootChroma)) : 0;
+  const keySigEndX = keySigStartX + keySigCount * keySigDisplayW + 8;
+  const dynamicNoteAreaStart = Math.max(keySigStartX + 20, keySigEndX);
+  const noteAreaWidth = svgWidth - dynamicNoteAreaStart - 20;
+  const noteStep = fixedSpacing ?? noteAreaWidth / Math.max(notes.length, 1);
+  const calcNoteX = (i: number) => dynamicNoteAreaStart + i * noteStep + noteStep / 2;
+
+  const ledgerLineHalfWidth = noteRadius * 1.65;
+  const noteHeadRx = noteRadius * 1.15;
+  const noteHeadRy = noteRadius * 0.85;
+  const stemLength = lineSpacing * 3.2;
+
+  // Returns true=sharp, false=flat, null=none
+  const accidentalIsSharp = (midi: number): boolean | null => {
+    if (keySignatureMode === 1) {
+      const acc = accidentalInKey(midi, rootChroma);
+      if (acc === 1) return true;
+      if (acc === 2) return false;
+      return null;
+    }
+    const label = preferredMidiLabel(midi, rootChroma);
+    if (label.includes('#')) return true;
+    if (label.includes('b') || label.includes('\u266d')) return false;
+    return null;
+  };
+
+  const getLedgerLines = (staffPos: number, cx: number): React.ReactNode[] => {
+    const lines: React.ReactNode[] = [];
+    const noteY = calcNoteY(staffPos);
+    for (let n = 1; ; n++) {
+      const ly = staffTop - n * lineSpacing;
+      if (noteY > ly) break;
+      lines.push(
+        <line key={`above-${n}`} x1={cx - ledgerLineHalfWidth} y1={ly}
+          x2={cx + ledgerLineHalfWidth} y2={ly} stroke="#555555" strokeWidth="1.5" />
+      );
+      if (n > 10) break;
+    }
+    for (let n = 1; ; n++) {
+      const ly = staffBottomY + n * lineSpacing;
+      if (noteY < ly) break;
+      lines.push(
+        <line key={`below-${n}`} x1={cx - ledgerLineHalfWidth} y1={ly}
+          x2={cx + ledgerLineHalfWidth} y2={ly} stroke="#555555" strokeWidth="1.5" />
+      );
+      if (n > 10) break;
+    }
+    return lines;
+  };
+
+  const colorForState = (state: StaffDisplayNote['state']) => {
+    switch (state) {
+      case 'correct':   return '#4CAF50';
+      case 'incorrect': return '#F44336';
+      case 'active':    return '#3F51B5';
+      default:          return '#333333';
+    }
+  };
+
+  type DurationType = 'whole' | 'dottedHalf' | 'half' | 'dottedQuarter' | 'quarter' | 'dottedEighth' | 'eighth' | 'sixteenth';
+
+  function classifyDuration(beats: number | undefined): DurationType {
+    if (beats === undefined) return 'quarter';
+    if (beats >= 3.5)   return 'whole';
+    if (beats >= 2.5)   return 'dottedHalf';
+    if (beats >= 1.75)  return 'half';
+    if (beats >= 1.25)  return 'dottedQuarter';
+    if (beats >= 0.875) return 'quarter';
+    if (beats >= 0.625) return 'dottedEighth';
+    if (beats >= 0.375) return 'eighth';
+    return 'sixteenth';
+  }
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ display: 'block' }}>
+      {/* Staff lines */}
+      {[0, 1, 2, 3, 4].map(lineIdx => {
+        const y = staffTop + lineIdx * lineSpacing;
+        return <line key={lineIdx} x1={5} y1={y} x2={svgWidth - 10} y2={y} stroke="#333333" strokeWidth="1.5" />;
+      })}
+
+      {/* Treble clef */}
+      <image href="/treble_clef.png" x={2} y={clefImgY} width={clefW} height={clefH} />
+
+      {/* Key signature — PNG images, anchor@50% → top = targetY - displayH/2 */}
+      {keySig && keySig.positions.map((staffPos, i) => {
+        const cy = calcNoteY(staffPos);
+        const x = keySigStartX + i * keySigDisplayW;
+        const href = keySig.isSharp ? '/sharp.png' : '/flat.png';
+        return (
+          <image
+            key={`ks-${i}`}
+            href={href}
+            x={x}
+            y={cy - keySigDisplayH / 2}
+            width={keySigDisplayW}
+            height={keySigDisplayH}
+          />
+        );
+      })}
+
+      {/* Notes */}
+      {notes.map((note, i) => {
+        const sp = staffPositionForMidi(note.midi, rootChroma);
+        const cx = calcNoteX(i);
+        const cy = calcNoteY(sp);
+        const color = colorForState(note.state);
+        const ledgers = getLedgerLines(sp, cx);
+        const stemUp = sp < 6;
+        const stemX = stemUp ? cx + noteHeadRx * 0.9 : cx - noteHeadRx * 0.9;
+        const stemY2 = stemUp ? cy - stemLength : cy + stemLength;
+        const isSharpAcc = accidentalIsSharp(note.midi);
+        const suffix = accSuffix(note.state);
+
+        const durType = classifyDuration(note.duration);
+        const openHead  = durType === 'whole' || durType === 'dottedHalf' || durType === 'half';
+        const hasStem   = durType !== 'whole';
+        const hasDot    = durType === 'dottedHalf' || durType === 'dottedQuarter' || durType === 'dottedEighth';
+        const flagCount = durType === 'eighth' || durType === 'dottedEighth' ? 1
+                        : durType === 'sixteenth' ? 2 : 0;
+
+        const flags = flagCount > 0 ? Array.from({ length: flagCount }).map((_, fi) => {
+          const fDir = stemUp ? 1 : -1;
+          const fy0  = stemY2 + fi * fDir * lineSpacing * 0.75;
+          const fw   = lineSpacing * 1.6;
+          const fh1  = fDir * lineSpacing * 1.0;
+          const fh2  = fDir * lineSpacing * 1.6;
+          const fh3  = fDir * lineSpacing * 1.2;
+          const d = `M ${stemX},${fy0} C ${stemX + fw},${fy0 + fh1} ${stemX + fw * 0.7},${fy0 + fh2} ${stemX},${fy0 + fh3}`;
+          return <path key={`flag-${fi}`} d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" />;
+        }) : null;
+
+        return (
+          <g key={`${note.midi}-${i}`}>
+            {ledgers}
+            {/* Per-note accidental PNG — anchor@50% → top = noteY - displayH/2 */}
+            {isSharpAcc !== null && (() => {
+              const dh = isSharpAcc ? sharpDisplayH : flatDisplayH;
+              const dw = isSharpAcc ? sharpDisplayW : flatDisplayW;
+              const href = isSharpAcc ? `/sharp${suffix}.png` : `/flat${suffix}.png`;
+              return (
+                <image
+                  href={href}
+                  x={cx - noteHeadRx * 2.4 - dw / 2}
+                  y={cy - dh / 2}
+                  width={dw}
+                  height={dh}
+                />
+              );
+            })()}
+            {/* Notehead: open (white fill) for whole/half/dotted-half, filled otherwise */}
+            <ellipse
+              cx={cx} cy={cy} rx={noteHeadRx} ry={noteHeadRy}
+              fill={openHead ? 'white' : color}
+              stroke={color} strokeWidth="1.5"
+              transform={`rotate(-20 ${cx} ${cy})`}
+            />
+            {/* Stem */}
+            {hasStem && (
+              <line x1={stemX} y1={cy} x2={stemX} y2={stemY2}
+                stroke={color} strokeWidth="1.7" strokeLinecap="round" />
+            )}
+            {/* Augmentation dot */}
+            {hasDot && (
+              <circle cx={cx + noteHeadRx * 1.6} cy={cy} r={noteRadius * 0.3} fill={color} />
+            )}
+            {/* Flags (eighth / sixteenth) */}
+            {flags}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
