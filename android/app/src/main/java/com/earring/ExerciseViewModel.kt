@@ -35,6 +35,7 @@ data class ExerciseState(
     val postChordGapMs: Long = DEFAULT_POST_CHORD_GAP_MS,
     val wrongNotePauseMs: Long = DEFAULT_WRONG_NOTE_PAUSE_MS,
     val instrumentIndex: Int = 0,
+    val testType: Int = 0,               // 0=Random, 1=Melody, 2=DiatonicTriads(stub)
     val sequence: List<Int> = emptyList(),
     val detected: List<DetectedNote> = emptyList(),
     val status: ExerciseStatus = ExerciseStatus.STOPPED,
@@ -45,7 +46,10 @@ data class ExerciseState(
     val maxAttempts: Int = DEFAULT_MAX_ATTEMPTS,
     val testsCompleted: Int = 0,
     val cumulativeScorePercent: Int = 0,
-    val sessionRunning: Boolean = false
+    val sessionRunning: Boolean = false,
+    val melodyDurations: List<Float> = emptyList(),
+    val melodyDeck: List<Int> = emptyList(),
+    val melodyDeckCursor: Int = 0,
 ) {
     /** MIDI of the root note at or just below rangeStart (used for intro chord). */
     val rootMidi: Int get() = rangeStart - ((rangeStart - rootNote + 12) % 12)
@@ -92,6 +96,7 @@ private const val PREF_WARMUP_FRAMES = "warmupFrames"
 private const val PREF_POST_CHORD_GAP_MS = "postChordGapMs"
 private const val PREF_WRONG_NOTE_PAUSE_MS = "wrongNotePauseMs"
 private const val PREF_INSTRUMENT_INDEX = "instrumentIndex"
+private const val PREF_TEST_TYPE = "testType"
 private const val PREF_HAS_LAUNCHED = "hasLaunched"
 
 class ExerciseViewModel(application: Application) : AndroidViewModel(application) {
@@ -124,6 +129,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             postChordGapMs = prefs.getLong(PREF_POST_CHORD_GAP_MS, DEFAULT_POST_CHORD_GAP_MS),
             wrongNotePauseMs = prefs.getLong(PREF_WRONG_NOTE_PAUSE_MS, DEFAULT_WRONG_NOTE_PAUSE_MS),
             instrumentIndex = prefs.getInt(PREF_INSTRUMENT_INDEX, 0),
+            testType = prefs.getInt(PREF_TEST_TYPE, 0),
         )
     }
 
@@ -144,6 +150,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putLong(PREF_POST_CHORD_GAP_MS, state.postChordGapMs)
             .putLong(PREF_WRONG_NOTE_PAUSE_MS, state.wrongNotePauseMs)
             .putInt(PREF_INSTRUMENT_INDEX, state.instrumentIndex)
+            .putInt(PREF_TEST_TYPE, state.testType)
             .apply()
     }
 
@@ -167,6 +174,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putLong(PREF_POST_CHORD_GAP_MS, defaults.postChordGapMs)
             .putLong(PREF_WRONG_NOTE_PAUSE_MS, defaults.wrongNotePauseMs)
             .putInt(PREF_INSTRUMENT_INDEX, defaults.instrumentIndex)
+            .putInt(PREF_TEST_TYPE, defaults.testType)
             .remove(PREF_HAS_LAUNCHED)
             .apply()
         _state.value = defaults
@@ -209,6 +217,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         _state.value = _state.value.copy(instrumentIndex = idx, rangeStart = start, rangeEnd = end)
         saveSettings(_state.value)
     }
+    fun setTestType(type: Int) { _state.value = _state.value.copy(testType = type); saveSettings(_state.value) }
 
     fun startExercise() {
         audioPlayback.cancelPlayback()
@@ -226,6 +235,11 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             cumulativeScorePercent = 0,
             sessionRunning = true
         )
+        // If melody mode, initialise shuffle deck
+        if (_state.value.testType == 1) {
+            val deck = EarRingCore.shuffleMelodyIndices(System.currentTimeMillis()).toList()
+            _state.value = _state.value.copy(melodyDeck = deck, melodyDeckCursor = 0)
+        }
         startFreshTest()
     }
 
@@ -251,24 +265,60 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     private fun startFreshTest() {
         val state = _state.value
         if (!state.sessionRunning) return
-        val seed = System.currentTimeMillis()
-        val sequence = EarRingCore.generateSequence(
-            state.rootNote,
-            state.scaleId,
-            state.sequenceLength,
-            state.rangeStart,
-            state.rangeEnd,
-            seed
-        ).toList()
-        _state.value = state.copy(
-            sequence = sequence,
-            detected = emptyList(),
-            currentNoteIndex = 0,
-            currentAttempt = 1,
-            seed = seed,
-            status = ExerciseStatus.PLAYING,
-            highlightIndex = -1
-        )
+
+        if (state.testType == 1) {
+            // Melody mode — use shuffle deck
+            var deck = state.melodyDeck
+            var cursor = state.melodyDeckCursor
+            if (cursor >= deck.size) {
+                // Exhausted deck — reshuffle
+                deck = EarRingCore.shuffleMelodyIndices(System.currentTimeMillis()).toList()
+                cursor = 0
+            }
+            val melodyIndex = deck[cursor]
+            val (midiNotes, durations) = EarRingCore.pickMelodyByIndex(melodyIndex, state.rootNote)
+            if (midiNotes.isEmpty()) {
+                // Fallback: advance cursor and try again
+                _state.value = state.copy(melodyDeckCursor = cursor + 1)
+                startFreshTest()
+                return
+            }
+            // Auto-set range from melody MIDI span ±6 semitones
+            val minMidi = (midiNotes.minOrNull() ?: 60) - 6
+            val maxMidi = (midiNotes.maxOrNull() ?: 72) + 6
+            val rangeStart = minMidi.coerceIn(21, 108)
+            val rangeEnd = maxMidi.coerceIn(21, 108)
+            _state.value = state.copy(
+                sequence = midiNotes,
+                melodyDurations = durations,
+                melodyDeck = deck,
+                melodyDeckCursor = cursor + 1,
+                rangeStart = rangeStart,
+                rangeEnd = rangeEnd,
+                detected = emptyList(),
+                currentNoteIndex = 0,
+                currentAttempt = 1,
+                status = ExerciseStatus.PLAYING,
+                highlightIndex = -1
+            )
+        } else {
+            // Random mode (existing logic)
+            val seed = System.currentTimeMillis()
+            val sequence = EarRingCore.generateSequence(
+                state.rootNote, state.scaleId, state.sequenceLength,
+                state.rangeStart, state.rangeEnd, seed
+            ).toList()
+            _state.value = state.copy(
+                sequence = sequence,
+                melodyDurations = emptyList(),
+                detected = emptyList(),
+                currentNoteIndex = 0,
+                currentAttempt = 1,
+                seed = seed,
+                status = ExerciseStatus.PLAYING,
+                highlightIndex = -1
+            )
+        }
         playPrompt()
     }
 
@@ -293,15 +343,22 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             midiNotes = triad,
             onDone = {
                 if (_state.value.sessionRunning) {
+                    // Fade chord sustain so it doesn't bleed into the sequence.
+                    // Cap at 75% of the gap so the fade always finishes before the sequence starts.
+                    val chordFadeMs = (_state.value.postChordGapMs * 3 / 4).coerceIn(100L, 400L)
+                    audioPlayback.fadeOutActive(chordFadeMs)
                     viewModelScope.launch {
                         delay(_state.value.postChordGapMs)
                         if (_state.value.sessionRunning) {
                             audioPlayback.playSequence(
                                 midiNotes = state.sequence,
                                 bpm = state.tempoBpm,
+                                durations = if (state.melodyDurations.isNotEmpty()) state.melodyDurations else null,
                                 onEach = {},
                                 onDone = {
                                     if (_state.value.sessionRunning) {
+                                        // Fade sequence sustain before the mic opens
+                                        audioPlayback.fadeOutActive(400L)
                                         viewModelScope.launch {
                                             delay(POST_SEQUENCE_GAP_MS)
                                             if (_state.value.sessionRunning) {

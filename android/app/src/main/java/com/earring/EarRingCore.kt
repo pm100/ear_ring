@@ -38,6 +38,10 @@ object EarRingCore {
     @JvmStatic external fun nativeHelpContent(): String
     @JvmStatic external fun nativeInstrumentList(): String
     @JvmStatic external fun nativeTransposeDisplayMidi(concertMidi: Int, instrumentIndex: Int): Int
+    @JvmStatic external fun nativeMelodyCount(): Int
+    @JvmStatic external fun nativeShuffleMelodyIndices(seed: Long): IntArray
+    @JvmStatic external fun nativePickMelodyByIndex(index: Int, rootChroma: Int): FloatArray
+    @JvmStatic external fun nativeMelodyRangeMidi(index: Int, rootChroma: Int): IntArray
 
     // ── PitchTracker JNI ─────────────────────────────────────────────────────────
     @JvmStatic external fun nativeTrackerNew(silenceThreshold: Float, requiredFrames: Int): Long
@@ -178,4 +182,29 @@ object EarRingCore {
 
     fun transposeDisplayMidi(concertMidi: Int, instrumentIndex: Int): Int =
         if (loaded) nativeTransposeDisplayMidi(concertMidi, instrumentIndex) else concertMidi
+
+    fun melodyCount(): Int =
+        if (loaded) nativeMelodyCount() else 0
+
+    fun shuffleMelodyIndices(seed: Long): IntArray =
+        if (loaded) nativeShuffleMelodyIndices(seed) else IntArray(0)
+
+    /** Returns Pair(midiNotes, durations). Decodes the packed FloatArray from JNI. */
+    fun pickMelodyByIndex(index: Int, rootChroma: Int): Pair<List<Int>, List<Float>> {
+        if (!loaded) return Pair(emptyList(), emptyList())
+        val raw = nativePickMelodyByIndex(index, rootChroma)
+        if (raw.isEmpty()) return Pair(emptyList(), emptyList())
+        val n = raw[0].toInt()
+        if (n == 0 || raw.size < 1 + n * 2) return Pair(emptyList(), emptyList())
+        val midi = (1..n).map { raw[it].toInt() }
+        val dur = (1..n).map { raw[it + n] }
+        return Pair(midi, dur)
+    }
+
+    fun melodyRangeMidi(index: Int, rootChroma: Int): Pair<Int, Int>? {
+        if (!loaded) return null
+        val arr = nativeMelodyRangeMidi(index, rootChroma)
+        if (arr.size < 2) return null
+        return Pair(arr[0], arr[1])
+    }
 }

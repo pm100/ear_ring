@@ -54,12 +54,13 @@ struct SettingsView: View {
 
                 sectionHeader("Pitch Detection").padding(.top, 16)
                 sectionLabel("Mic Sensitivity").padding(.top, 8)
-                Text("Silence threshold: \(String(format: "%.3f", model.silenceThreshold)) — lower = picks up quieter sounds")
+                let sensitivity = min(10, max(1, Int(((0.011 - Double(model.silenceThreshold)) / 0.001).rounded())))
+                Text("Sensitivity: \(sensitivity) / 10")
                     .font(.caption).foregroundColor(.erMuted).padding(.bottom, 4)
                 Slider(value: Binding(
-                    get: { Double(model.silenceThreshold) },
-                    set: { model.silenceThreshold = Float($0) }
-                ), in: 0.001...0.010, step: 0.001)
+                    get: { Double(sensitivity) },
+                    set: { model.silenceThreshold = Float(max(0.001, min(0.010, 0.011 - $0 * 0.001))) }
+                ), in: 1...10, step: 1)
 
                 sectionLabel("Note Stability").padding(.top, 8)
                 Text("Consecutive stable frames before confirming a note")

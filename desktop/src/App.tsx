@@ -8,6 +8,7 @@ import ResultsScreen from './components/ResultsScreen';
 import ProgressScreen from './components/ProgressScreen';
 import SettingsScreen from './components/SettingsScreen';
 import HelpScreen from './components/HelpScreen';
+import MelodyVetterScreen from './components/MelodyVetterScreen';
 import BottomNavBar from './components/BottomNavBar';
 
 const defaultSettings: ExerciseSettings = (() => {
@@ -33,6 +34,7 @@ const defaultSettings: ExerciseSettings = (() => {
     postChordGapMs: 800,
     wrongNotePauseMs: 3000,
     instrumentIndex: 0,
+    testType: 0,
   };
 })();
 
@@ -99,47 +101,60 @@ export default function App() {
     localStorage.removeItem('ear_ring_tests');
   }, []);
 
-  const startExercise = useCallback(async (rootNote: number, rangeStart: number, rangeEnd: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean, keySignatureMode: number) => {
-    const seed = Date.now();
-    try {
-      const sequence = await invoke<number[]>('cmd_generate_sequence', {
-        rootChroma: rootNote,
-        scaleId,
-        length: sequenceLength,
-        rangeStart,
-        rangeEnd,
-        seed,
-      });
+  const startExercise = useCallback(async (rootNote: number, rangeStart: number, rangeEnd: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean, keySignatureMode: number, testType = 0) => {
+    const baseExercise = {
+      rootNote,
+      rangeStart,
+      rangeEnd,
+      scaleId,
+      sequenceLength,
+      tempoBpm,
+      showTestNotes,
+      keySignatureMode,
+      testType,
+      maxRetries: settings.maxRetries,
+      silenceThreshold: settings.silenceThreshold,
+      framesToConfirm: settings.framesToConfirm,
+      warmupFrames: settings.warmupFrames,
+      postChordGapMs: settings.postChordGapMs,
+      wrongNotePauseMs: settings.wrongNotePauseMs,
+      instrumentIndex: settings.instrumentIndex,
+      detected: [] as typeof defaultExercise.detected,
+      status: 'playing' as const,
+      currentNoteIndex: 0,
+      highlightIndex: -1,
+      currentAttempt: 1,
+      maxAttempts: settings.maxRetries,
+      testsCompleted: 0,
+      cumulativeScorePercent: 0,
+      sessionRunning: true,
+    };
+    if (testType === 1) {
+      // Melody mode: let ExerciseScreen manage the deck
       setExercise({
-        rootNote,
-        rangeStart,
-        rangeEnd,
-        scaleId,
-        sequenceLength,
-        tempoBpm,
-        showTestNotes,
-        keySignatureMode,
-        maxRetries: settings.maxRetries,
-        silenceThreshold: settings.silenceThreshold,
-        framesToConfirm: settings.framesToConfirm,
-        warmupFrames: settings.warmupFrames,
-        postChordGapMs: settings.postChordGapMs,
-        wrongNotePauseMs: settings.wrongNotePauseMs,
-        instrumentIndex: settings.instrumentIndex,
-        sequence,
-        detected: [],
-        status: 'playing',
-        currentNoteIndex: 0,
-        highlightIndex: -1,
-        currentAttempt: 1,
-        maxAttempts: settings.maxRetries,
-        testsCompleted: 0,
-        cumulativeScorePercent: 0,
-        sessionRunning: true,
+        ...baseExercise,
+        sequence: [],
       });
       setScreen('exercise');
-    } catch (e) {
-      console.error('generate_sequence failed', e);
+    } else {
+      const seed = Date.now();
+      try {
+        const sequence = await invoke<number[]>('cmd_generate_sequence', {
+          rootChroma: rootNote,
+          scaleId,
+          length: sequenceLength,
+          rangeStart,
+          rangeEnd,
+          seed,
+        });
+        setExercise({
+          ...baseExercise,
+          sequence,
+        });
+        setScreen('exercise');
+      } catch (e) {
+        console.error('generate_sequence failed', e);
+      }
     }
   }, [settings]);
 
@@ -206,7 +221,11 @@ export default function App() {
           onUpdateSettings={setSettings}
           onResetSettings={resetSettings}
           onBack={() => setScreen('home')}
+          onVetMelodies={() => setScreen('vetter')}
         />
+      )}
+      {screen === 'vetter' && (
+        <MelodyVetterScreen onBack={() => setScreen('settings')} />
       )}
       {screen === 'help' && (
         <HelpScreen onBack={() => setScreen('home')} />

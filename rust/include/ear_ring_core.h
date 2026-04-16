@@ -135,6 +135,22 @@ const char *ear_ring_instrument_list(void);
 /// Clamps the result to 0–127. Returns the unchanged MIDI if index is out of range.
 int32_t ear_ring_transpose_display_midi(int32_t concert_midi, int32_t instrument_index);
 
+// ── Melody snippet library ────────────────────────────────────────────────────
+
+/// Returns the number of melody snippets in the library.
+uint32_t ear_ring_melody_count(void);
+
+/// Fisher-Yates shuffle of [0..ear_ring_melody_count()).
+/// Writes indices into out_buf (must be at least ear_ring_melody_count() bytes).
+/// Returns count written, or -1 on error.
+int32_t ear_ring_shuffle_melody_indices(uint64_t seed, uint8_t *out_buf);
+
+/// Convert melody snippet at `index` to MIDI notes + durations for `root_chroma`.
+/// out_midi and out_dur must each be at least 32 bytes / floats.
+/// Returns note count written, or -1 on error.
+int32_t ear_ring_pick_melody_by_index(uint8_t index, uint8_t root_chroma,
+                                       uint8_t *out_midi, float *out_dur);
+
 // ── PitchTracker ─────────────────────────────────────────────────────────────
 // Opaque stateful tracker. Create once, feed audio buffers, react to the
 // confirmed MIDI return value. Thread-safety: not thread-safe; use one tracker

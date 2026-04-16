@@ -4,7 +4,7 @@ import { ExerciseSettings } from '../types';
 interface Props {
   settings: ExerciseSettings;
   onUpdateSettings: React.Dispatch<React.SetStateAction<ExerciseSettings>>;
-  onStart: (rootNote: number, rangeStart: number, rangeEnd: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean, keySignatureMode: number) => void;
+  onStart: (rootNote: number, rangeStart: number, rangeEnd: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean, keySignatureMode: number, testType: number) => void;
 }
 
 const NOTE_NAMES = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
@@ -203,9 +203,13 @@ function PianoRangePicker({ rangeStart: rangeStartProp, rangeEnd: rangeEndProp, 
   );
 }
 
+const TEST_TYPE_NAMES = ['Random Notes', 'Melody Snippets', 'Diatonic Triads'];
+
 function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
+  const isMelodyMode = settings.testType === 1;
+
   const handleStart = () => {
-    onStart(settings.rootNote, settings.rangeStart, settings.rangeEnd, settings.scaleId, settings.sequenceLength, settings.tempoBpm, settings.showTestNotes, settings.keySignatureMode);
+    onStart(settings.rootNote, settings.rangeStart, settings.rangeEnd, settings.scaleId, settings.sequenceLength, settings.tempoBpm, settings.showTestNotes, settings.keySignatureMode, settings.testType);
   };
 
   return (
@@ -215,6 +219,17 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
         <h1 className="app-title" style={{ margin: 0 }}>Ear Ring</h1>
       </div>
       <p className="app-subtitle">Ear Training</p>
+
+      <span className="section-label">Test Type</span>
+      <select
+        value={settings.testType}
+        onChange={e => onUpdateSettings(prev => ({ ...prev, testType: Number(e.target.value) }))}
+        style={{ width: '100%', padding: '8px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #ccc', marginBottom: 16 }}
+      >
+        {TEST_TYPE_NAMES.map((name, i) => (
+          <option key={i} value={i} disabled={i === 2}>{i === 2 ? `${name} (coming soon)` : name}</option>
+        ))}
+      </select>
 
       <div style={{ display: 'flex', gap: 8 }}>
         <div style={{ flex: 1 }}>
@@ -233,10 +248,11 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
             ))}
           </select>
         </div>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, opacity: isMelodyMode ? 0.38 : 1 }}>
           <span className="section-label">Scale</span>
           <select
             value={settings.scaleId}
+            disabled={isMelodyMode}
             onChange={e => onUpdateSettings(prev => ({ ...prev, scaleId: Number(e.target.value) }))}
             style={{ width: '100%', padding: '8px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #ccc', marginBottom: 4 }}
           >
@@ -251,23 +267,25 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
       <PianoRangePicker
         rangeStart={settings.rangeStart}
         rangeEnd={settings.rangeEnd}
-        onChange={(s, e) => onUpdateSettings(prev => ({ ...prev, rangeStart: s, rangeEnd: e }))}
+        onChange={isMelodyMode ? () => {} : (s, e) => onUpdateSettings(prev => ({ ...prev, rangeStart: s, rangeEnd: e }))}
       />
 
-      <span className="section-label">Sequence Length</span>
-      <div className="chip-row">
-        {[2, 3, 4, 5, 6, 7, 8].map(len => (
-          <button
-            key={len}
-            type="button"
-            className={`chip ${settings.sequenceLength === len ? 'chip-selected' : ''}`}
-            onClick={() => onUpdateSettings(prev => ({ ...prev, sequenceLength: len }))}
-          >
-            {len}
-          </button>
-        ))}
+      <div style={{ opacity: isMelodyMode ? 0.38 : 1 }}>
+        <span className="section-label">Sequence Length</span>
+        <div className="chip-row">
+          {[2, 3, 4, 5, 6, 7, 8].map(len => (
+            <button
+              key={len}
+              type="button"
+              disabled={isMelodyMode}
+              className={`chip ${settings.sequenceLength === len ? 'chip-selected' : ''}`}
+              onClick={() => onUpdateSettings(prev => ({ ...prev, sequenceLength: len }))}
+            >
+              {len}
+            </button>
+          ))}
+        </div>
       </div>
-
 
       <div style={{ display: 'flex', gap: 24, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>

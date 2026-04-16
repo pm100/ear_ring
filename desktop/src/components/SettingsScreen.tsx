@@ -7,6 +7,7 @@ interface Props {
   onUpdateSettings: React.Dispatch<React.SetStateAction<ExerciseSettings>>;
   onResetSettings: () => void;
   onBack: () => void;
+  onVetMelodies: () => void;
 }
 
 const BPM_OPTIONS = [60, 80, 100, 120, 140];
@@ -30,7 +31,7 @@ function defaultRangeForKey(rootNote: number): [number, number] {
   return [best, best + 12];
 }
 
-export default function SettingsScreen({ settings, onUpdateSettings, onResetSettings, onBack }: Props) {
+export default function SettingsScreen({ settings, onUpdateSettings, onResetSettings, onBack, onVetMelodies }: Props) {
   const set = <K extends keyof ExerciseSettings>(key: K, value: ExerciseSettings[K]) =>
     onUpdateSettings(prev => ({ ...prev, [key]: value }));
 
@@ -88,14 +89,13 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
       </div>
 
       <SectionTitle>Pitch Detection</SectionTitle>
-      <span className="section-label" style={{ marginTop: 0 }}>Mic Sensitivity (silence threshold)</span>
-      <p style={{ fontSize: 12, color: '#757575', marginBottom: 6 }}>Lower = picks up quieter sounds</p>
+      <span className="section-label" style={{ marginTop: 0 }}>Mic Sensitivity</span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <input type="range" min={0.001} max={0.010} step={0.001}
-          value={settings.silenceThreshold}
-          onChange={e => set('silenceThreshold', parseFloat(e.target.value))}
+        <input type="range" min={1} max={10} step={1}
+          value={Math.round((0.011 - settings.silenceThreshold) / 0.001)}
+          onChange={e => set('silenceThreshold', parseFloat((0.011 - parseInt(e.target.value) * 0.001).toFixed(3)))}
           style={{ flex: 1 }} />
-        <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{settings.silenceThreshold.toFixed(3)}</span>
+        <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{Math.round((0.011 - settings.silenceThreshold) / 0.001)} / 10</span>
       </div>
 
       <span className="section-label">Note Stability (frames to confirm)</span>
@@ -141,6 +141,13 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
 
       <div style={{ marginTop: 32, paddingBottom: 16 }}>
         <ResetButton onReset={onResetSettings} />
+        <div style={{ marginTop: 20, borderTop: '1px solid #e0e0e0', paddingTop: 16 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, color: '#757575', textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 8px' }}>Dev Tools</h2>
+          <button
+            onClick={onVetMelodies}
+            style={{ padding: '10px 16px', borderRadius: 6, border: '1px solid #1976D2', background: 'transparent', color: '#1976D2', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
+          >🎵 Vet Melody Library</button>
+        </div>
       </div>
     </div>
   );

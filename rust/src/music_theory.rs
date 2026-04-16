@@ -1,4 +1,5 @@
 use std::fmt;
+use std::sync::OnceLock;
 
 // ── Note ──────────────────────────────────────────────────────────────────────
 
@@ -539,6 +540,131 @@ pub fn transpose_display_midi(concert_midi: i32, instrument_index: usize) -> i32
         .map(|i| i.semitones)
         .unwrap_or(0);
     (concert_midi + semitones).clamp(0, 127)
+}
+
+// ── Melody snippet library ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy)]
+pub struct MelodyNote {
+    pub semitones: i8,       // offset from tonic: 0=root, 7=fifth, 12=octave up
+    pub duration_beats: f32, // 1.0=quarter, 0.5=eighth, 2.0=half, 1.5=dotted quarter
+}
+
+pub struct MelodySnippet {
+    pub title: String,
+    pub notes: Vec<MelodyNote>,
+}
+
+static MELODY_DATA: &str = include_str!("melodies.txt");
+static MELODY_LIBRARY: OnceLock<Vec<MelodySnippet>> = OnceLock::new();
+
+fn melody_library() -> &'static [MelodySnippet] {
+    MELODY_LIBRARY.get_or_init(|| parse_melodies(MELODY_DATA))
+}
+
+fn parse_melodies(data: &str) -> Vec<MelodySnippet> {
+    let mut result = Vec::new();
+    let mut pending_title: Option<String> = None;
+    for line in data.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        match pending_title.take() {
+            None => {
+                pending_title = Some(line.to_string());
+            }
+            Some(title) => {
+                let notes = parse_notes_line(line);
+                if !notes.is_empty() {
+                    result.push(MelodySnippet { title, notes });
+                }
+            }
+        }
+    }
+    result
+}
+
+fn parse_notes_line(line: &str) -> Vec<MelodyNote> {
+    let mut notes = Vec::new();
+    for token in line.split(',') {
+        let token = token.trim();
+        let mut parts = token.splitn(2, ':');
+        let s_str = parts.next().unwrap_or("").trim();
+        let d_str = parts.next().unwrap_or("").trim();
+        if let (Ok(semitones), Ok(duration_beats)) = (s_str.parse::<i8>(), d_str.parse::<f32>()) {
+            notes.push(MelodyNote { semitones, duration_beats });
+        }
+    }
+    notes
+}
+
+pub fn melody_count() -> usize {
+    melody_library().len()
+}
+
+/// Fisher-Yates shuffle returning all indices 0..melody_count() in random order.
+pub fn shuffle_melody_indices(seed: u64) -> Vec<u8> {
+    let n = melody_library().len();
+    let mut indices: Vec<u8> = (0..n as u8).collect();
+    let mut rng = seed;
+    for i in (1..n).rev() {
+        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let j = ((rng >> 33) as usize) % (i + 1);
+        indices.swap(i, j);
+    }
+    indices
+}
+
+/// Convert a melody snippet (by index) to absolute MIDI notes and durations.
+/// Picks the octave whose centre of gravity is nearest MIDI 60.
+/// Returns None if index is out of range.
+pub fn melody_to_midi_by_index(index: u8, root_chroma: u8) -> Option<(Vec<u8>, Vec<f32>)> {
+    let snippet = melody_library().get(index as usize)?;
+    let notes = &snippet.notes;
+    if notes.is_empty() { return None; }
+
+    let avg_semitones: f32 = notes.iter().map(|n| n.semitones as f32).sum::<f32>() / notes.len() as f32;
+    let root_chroma = root_chroma % 12;
+
+    let best_root: i16 = (2..=7i16)
+        .map(|oct| (oct + 1) * 12 + root_chroma as i16)
+        .min_by_key(|&root_midi| {
+            let centroid = root_midi as f32 + avg_semitones;
+            (centroid - 60.0).abs() as i32
+        })
+        .unwrap_or(60);
+
+    let midi_notes: Vec<u8> = notes.iter()
+        .map(|n| (best_root + n.semitones as i16).clamp(0, 127) as u8)
+        .collect();
+    let durations: Vec<f32> = notes.iter().map(|n| n.duration_beats).collect();
+
+    Some((midi_notes, durations))
+}
+
+/// Returns the title of a melody snippet by index, or None if out of range.
+pub fn melody_title(index: u8) -> Option<String> {
+    melody_library().get(index as usize).map(|s| s.title.clone())
+}
+
+/// Returns the MIDI range (min, max) of a melody snippet transposed to root_chroma.
+pub fn melody_range_midi(index: u8, root_chroma: u8) -> Option<(u8, u8)> {
+    let (midi_notes, _) = melody_to_midi_by_index(index, root_chroma)?;
+    let min = *midi_notes.iter().min()?;
+    let max = *midi_notes.iter().max()?;
+    Some((min, max))
+}
+
+/// Returns `(hold_ms, step_ms)` for a single note at the given tempo and duration.
+///
+/// - `step_ms`: full notated duration in milliseconds
+/// - `hold_ms`: how long to actually sound the note (~88% of step), leaving a small
+///   articulation gap so notes don't blur together
+pub fn note_timing(bpm: f32, duration_beats: f32) -> (u32, u32) {
+    let step_ms = ((60_000.0 / bpm.max(1.0)) * duration_beats).max(50.0) as u32;
+    let hold_ms = ((step_ms as f32) * 0.88) as u32;
+    (hold_ms, step_ms)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-export type Screen = 'home' | 'exercise' | 'setup' | 'results' | 'progress' | 'settings' | 'help';
+export type Screen = 'home' | 'exercise' | 'setup' | 'results' | 'progress' | 'settings' | 'help' | 'vetter';
 export type ExerciseStatus = 'playing' | 'listening' | 'retry_delay' | 'stopped';
 export type StaffNoteState = 'expected' | 'correct' | 'incorrect' | 'active';
 
@@ -11,6 +11,8 @@ export interface DetectedNote {
 export interface StaffDisplayNote {
   midi: number;
   state: StaffNoteState;
+  /** Duration in beats (1.0=quarter, 0.5=eighth, 2.0=half, etc.). Undefined → quarter. */
+  duration?: number;
 }
 
 export interface ExerciseSettings {
@@ -29,6 +31,7 @@ export interface ExerciseSettings {
   postChordGapMs: number;     // default 800
   wrongNotePauseMs: number;   // default 3000
   instrumentIndex: number;    // default 0 (Piano)
+  testType: number;           // 0=Random, 1=Melody, 2=DiatonicTriads(stub)
 }
 
 export interface ExerciseState {
@@ -47,6 +50,7 @@ export interface ExerciseState {
   postChordGapMs: number;
   wrongNotePauseMs: number;
   instrumentIndex: number;
+  testType: number;           // 0=Random, 1=Melody, 2=DiatonicTriads(stub)
   sequence: number[];// MIDI values
   detected: DetectedNote[];
   status: ExerciseStatus;

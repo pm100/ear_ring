@@ -119,11 +119,15 @@ export function useAudioPlayback() {
     midis: number[],
     onEach: (index: number) => void,
     onDone: () => void,
-    bpm = 100
+    bpm = 100,
+    durations?: number[],
+    timings?: [number, number][]   // [[hold_ms, step_ms], ...] from cmd_sequence_timings
   ) => {
     cancelRef.current = false;
     await Promise.all(midis.map(m => loadSample(m)));
-    const stepMs = Math.max(150, Math.round(60000 / Math.max(1, bpm)));
+
+    const ctx = getContext();
+    if (ctx.state === 'suspended') await ctx.resume();
 
     let i = 0;
     const playNext = async () => {
@@ -131,13 +135,37 @@ export function useAudioPlayback() {
         if (!cancelRef.current) onDone();
         return;
       }
+      const beatDuration = durations?.[i] ?? 1.0;
+      let stepMs: number;
+      let holdMs: number;
+      if (timings && timings[i]) {
+        [holdMs, stepMs] = timings[i];
+      } else {
+        stepMs = Math.max(150, Math.round(60000 / Math.max(1, bpm) * beatDuration));
+        holdMs = Math.round(stepMs * 0.88);
+      }
       onEach(i);
-      await playNote(midis[i]);
+
+      const sampleMidi = nearestSample(midis[i]);
+      const buffer = bufferCache.current.get(sampleMidi);
+      if (buffer && !cancelRef.current) {
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.playbackRate.value = Math.pow(2, (midis[i] - sampleMidi) / 12);
+        source.connect(ctx.destination);
+        activeSourcesRef.current.push(source);
+        source.onended = () => {
+          activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
+        };
+        source.start();
+        // Cut off at hold_ms using the Web Audio clock for sample-accurate articulation
+        source.stop(ctx.currentTime + holdMs / 1000);
+      }
       i++;
       timeoutRef.current = setTimeout(playNext, stepMs);
     };
     await playNext();
-  }, [loadSample, playNote]);
+  }, [loadSample, getContext]);
 
   return { playNote, playChord, playSequence, cancelPlayback };
 }

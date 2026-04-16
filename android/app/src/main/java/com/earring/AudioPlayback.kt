@@ -121,9 +121,35 @@ class AudioPlayback(private val context: Context) {
         }
     }
 
+    /**
+     * Gradually fades out all currently-ringing notes over [durationMs], then stops and
+     * releases them. Call this when playback phases end so piano sustain doesn't bleed
+     * into the mic-listening phase.
+     */
+    fun fadeOutActive(durationMs: Long = 400L) {
+        val targets = synchronized(activePlayers) { activePlayers.toList() }
+        if (targets.isEmpty()) return
+        scope.launch {
+            val steps = 20
+            val stepMs = (durationMs / steps).coerceAtLeast(10L)
+            for (step in 1..steps) {
+                val vol = 1f - step.toFloat() / steps
+                withContext(Dispatchers.Main) {
+                    targets.forEach { runCatching { it.setVolume(vol, vol) } }
+                }
+                delay(stepMs)
+            }
+            withContext(Dispatchers.Main) {
+                targets.forEach { runCatching { it.stop(); it.release() } }
+                synchronized(activePlayers) { activePlayers.removeAll(targets.toSet()) }
+            }
+        }
+    }
+
     fun playSequence(
         midiNotes: List<Int>,
         bpm: Int = 100,
+        durations: List<Float>? = null,
         onEach: (Int) -> Unit = {},
         onDone: () -> Unit = {}
     ) {
@@ -132,9 +158,9 @@ class AudioPlayback(private val context: Context) {
         sequenceJob?.cancel()
         sequenceJob = null
         sequenceJob = scope.launch {
-            val stepMs = (60_000L / bpm.coerceAtLeast(1)).coerceAtLeast(150L)
             for ((index, midi) in midiNotes.withIndex()) {
                 if (!isActive) break
+                val stepMs = ((60_000.0 / bpm.coerceAtLeast(1)) * (durations?.getOrNull(index) ?: 1.0f)).toLong().coerceAtLeast(150L)
                 withContext(Dispatchers.Main) { onEach(index) }
                 val nearestMidi = nearestSampleMidi(midi)
                 val sampleFile = getCachedSample(nearestMidi)

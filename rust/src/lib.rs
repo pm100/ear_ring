@@ -5,10 +5,12 @@ pub mod tracker;
 pub use music_theory::{
     accidental_in_key, effective_key_chroma, freq_to_note, generate_sequence, intro_chord,
     is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
-    key_signature_pitch_classes, midi_to_freq, midi_to_label, note_name, preferred_midi_label,
-    preferred_note_label, scale_label, scale_name, scale_notes, staff_position,
-    staff_position_in_key, test_score, transpose_display_midi, Note, NoteName, ScaleType,
-    FLAT_ORDER, FLAT_STAFF_POSITIONS, SHARP_ORDER, SHARP_STAFF_POSITIONS,
+    key_signature_pitch_classes, melody_count, melody_range_midi, melody_title, melody_to_midi_by_index,
+    midi_to_freq, midi_to_label, note_name, note_timing, preferred_midi_label,
+    preferred_note_label, scale_label, scale_name, scale_notes, shuffle_melody_indices,
+    staff_position, staff_position_in_key, test_score, transpose_display_midi, MelodyNote,
+    MelodySnippet, Note, NoteName, ScaleType, FLAT_ORDER, FLAT_STAFF_POSITIONS, SHARP_ORDER,
+    SHARP_STAFF_POSITIONS,
 };
 pub use pitch_detection::detect_pitch;
 pub use tracker::{FrameResult, PitchTracker};
@@ -236,6 +238,49 @@ pub extern "C" fn ear_ring_generate_sequence(
         out[i] = note.midi();
     }
     notes.len() as c_int
+}
+
+/// Returns the number of melody snippets in the library.
+#[no_mangle]
+pub extern "C" fn ear_ring_melody_count() -> c_uint {
+    melody_count() as c_uint
+}
+
+/// Fisher-Yates shuffle of [0..melody_count()). Writes indices into out_buf.
+/// out_buf must be at least melody_count() bytes. Returns count written, or -1 on error.
+#[no_mangle]
+pub extern "C" fn ear_ring_shuffle_melody_indices(seed: u64, out_buf: *mut c_uchar) -> c_int {
+    if out_buf.is_null() { return -1; }
+    let indices = shuffle_melody_indices(seed);
+    let out = unsafe { std::slice::from_raw_parts_mut(out_buf, indices.len()) };
+    for (i, &idx) in indices.iter().enumerate() { out[i] = idx; }
+    indices.len() as c_int
+}
+
+/// Convert melody snippet at `index` to MIDI notes + durations for `root_chroma`.
+/// out_midi and out_dur must each be at least melody_max_notes bytes / floats.
+/// Returns note count written, or -1 on error.
+#[no_mangle]
+pub extern "C" fn ear_ring_pick_melody_by_index(
+    index: c_uchar,
+    root_chroma: c_uchar,
+    out_midi: *mut c_uchar,
+    out_dur: *mut c_float,
+) -> c_int {
+    if out_midi.is_null() || out_dur.is_null() { return -1; }
+    match melody_to_midi_by_index(index, root_chroma) {
+        None => -1,
+        Some((midi_notes, durations)) => {
+            let n = midi_notes.len();
+            let midi_out = unsafe { std::slice::from_raw_parts_mut(out_midi, n) };
+            let dur_out = unsafe { std::slice::from_raw_parts_mut(out_dur, n) };
+            for i in 0..n {
+                midi_out[i] = midi_notes[i];
+                dur_out[i] = durations[i];
+            }
+            n as c_int
+        }
+    }
 }
 
 /// Build a 3-note intro chord as MIDI note numbers.
@@ -576,8 +621,9 @@ mod android_jni {
     use super::{
         accidental_in_key, detect_pitch, effective_key_chroma, freq_to_note, generate_sequence,
         intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
-        midi_to_label, note_name, preferred_midi_label, preferred_note_label, scale_label,
-        scale_name, staff_position, staff_position_in_key, test_score, Note, ScaleType,
+        melody_count, melody_range_midi, melody_to_midi_by_index, midi_to_label, note_name,
+        preferred_midi_label, preferred_note_label, scale_label, scale_name, shuffle_melody_indices,
+        staff_position, staff_position_in_key, test_score, Note, ScaleType,
     };
 
     #[no_mangle]
@@ -1012,5 +1058,62 @@ mod android_jni {
         };
         let _ = env.set_float_array_region(&out, 0, &out_vals);
         out.into_raw()
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeMelodyCount(
+        _env: JNIEnv, _class: JClass,
+    ) -> jint {
+        melody_count() as jint
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeShuffleMelodyIndices(
+        mut env: JNIEnv, _class: JClass,
+        seed: jlong,
+    ) -> jintArray {
+        let indices = shuffle_melody_indices(seed as u64);
+        let arr = env.new_int_array(indices.len() as i32).unwrap();
+        let ints: Vec<jint> = indices.iter().map(|&x| x as jint).collect();
+        env.set_int_array_region(&arr, 0, &ints).unwrap();
+        arr.into_raw()
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativePickMelodyByIndex(
+        mut env: JNIEnv, _class: JClass,
+        index: jint, root_chroma: jint,
+    ) -> jfloatArray {
+        match melody_to_midi_by_index(index as u8, root_chroma as u8) {
+            None => {
+                let arr = env.new_float_array(1).unwrap();
+                let data = [0f32];
+                env.set_float_array_region(&arr, 0, &data).unwrap();
+                arr.into_raw()
+            }
+            Some((midi_notes, durations)) => {
+                let n = midi_notes.len();
+                let total = 1 + n + n;
+                let arr = env.new_float_array(total as i32).unwrap();
+                let mut data = Vec::with_capacity(total);
+                data.push(n as f32);
+                for &m in &midi_notes { data.push(m as f32); }
+                for &d in &durations { data.push(d); }
+                env.set_float_array_region(&arr, 0, &data).unwrap();
+                arr.into_raw()
+            }
+        }
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeMelodyRangeMidi(
+        mut env: JNIEnv, _class: JClass,
+        index: jint, root_chroma: jint,
+    ) -> jintArray {
+        let arr = env.new_int_array(2).unwrap();
+        if let Some((min, max)) = melody_range_midi(index as u8, root_chroma as u8) {
+            env.set_int_array_region(&arr, 0, &[min as jint, max as jint]).unwrap();
+        }
+        arr.into_raw()
     }
 }

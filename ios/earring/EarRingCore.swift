@@ -140,6 +140,37 @@ struct EarRingCore {
         Int(ear_ring_transpose_display_midi(Int32(concertMidi), Int32(instrumentIndex)))
     }
 
+    // MARK: - Melody Library
+
+    static func melodyCount() -> Int {
+        Int(ear_ring_melody_count())
+    }
+
+    static func shuffleMelodyIndices(seed: UInt64) -> [Int] {
+        let count = Int(ear_ring_melody_count())
+        guard count > 0 else { return [] }
+        var buf = [UInt8](repeating: 0, count: count)
+        let written = ear_ring_shuffle_melody_indices(seed, &buf)
+        guard written > 0 else { return [] }
+        return buf.prefix(Int(written)).map { Int($0) }
+    }
+
+    static func pickMelodyByIndex(index: Int, rootChroma: Int) -> (midi: [Int], durations: [Float])? {
+        let maxNotes = 32
+        var midiBuf = [UInt8](repeating: 0, count: maxNotes)
+        var durBuf = [Float](repeating: 0, count: maxNotes)
+        let count = ear_ring_pick_melody_by_index(UInt8(index), UInt8(rootChroma), &midiBuf, &durBuf)
+        guard count > 0 else { return nil }
+        let n = Int(count)
+        return (midiBuf.prefix(n).map { Int($0) }, Array(durBuf.prefix(n)))
+    }
+
+    static func melodyRangeMidi(index: Int, rootChroma: Int) -> (min: Int, max: Int)? {
+        guard let (midi, _) = pickMelodyByIndex(index: index, rootChroma: rootChroma),
+              let minM = midi.min(), let maxM = midi.max() else { return nil }
+        return (minM, maxM)
+    }
+
     // MARK: - PitchTracker
 
     /// Result from processing one audio buffer through the Rust pitch tracker.
