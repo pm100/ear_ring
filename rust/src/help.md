@@ -47,3 +47,7 @@ Mic Sensitivity: raise this if the mic picks up background noise; lower it if it
 Note Stability: how many consistent pitch frames are needed before a note is confirmed.
 Post-Chord Gap: the pause between the intro chord and the test sequence.
 Wrong-Note Pause: how long to wait after a wrong note before replaying.
+
+## About
+
+Ear Ring © 2026 Jolly Good Software. All rights reserved.
