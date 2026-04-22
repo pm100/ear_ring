@@ -1,6 +1,7 @@
-set shell := ["powershell", "-Command"]
+set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
+set dotenv-load
 
-adb := env('LOCALAPPDATA') + '/Android/Sdk/platform-tools/adb.exe'
+adb := if os() == "windows" { env_var_or_default('LOCALAPPDATA', 'C:/Users/Default/AppData/Local') + '/Android/Sdk/platform-tools/adb.exe' } else { "adb" }
 
 # Build and install the Android debug APK, then launch the app
 android:
@@ -30,3 +31,69 @@ desktop:
 # Run cargo tests (shared Rust core)
 test:
     cargo test
+
+# Build the iOS app (debug) for a connected device
+ios:
+    #!/bin/sh
+    set -eu
+    cd "{{justfile_directory()}}/ios"
+    xcodebuild build \
+      -project earring.xcodeproj \
+      -scheme earring \
+      -configuration Debug \
+      -destination 'generic/platform=iOS' \
+      -allowProvisioningUpdates
+
+# Archive the iOS app and export a Release IPA.
+# Output: /tmp/earring_export/earring.ipa
+ios-archive:
+    #!/bin/sh
+    set -eu
+    cd "{{justfile_directory()}}/ios"
+    xcodebuild archive \
+      -project earring.xcodeproj \
+      -scheme earring \
+      -configuration Release \
+      -archivePath /tmp/earring.xcarchive \
+      -allowProvisioningUpdates
+    xcodebuild -exportArchive \
+      -archivePath /tmp/earring.xcarchive \
+      -exportOptionsPlist ExportOptions.plist \
+      -exportPath /tmp/earring_export \
+      -allowProvisioningUpdates
+    echo "IPA ready: /tmp/earring_export/earring.ipa"
+
+# Archive, export, and upload to TestFlight.
+# Requires APP_STORE_KEY_ID and APP_STORE_ISSUER_ID env vars,
+# and ~/.private_keys/AuthKey_<KeyID>.p8 (download from
+# App Store Connect → Users & Access → Integrations → App Store Connect API).
+# Example:
+#   APP_STORE_KEY_ID=ABCDEF1234 APP_STORE_ISSUER_ID=xxxx-xxxx just ios-testflight
+ios-testflight:
+    #!/bin/sh
+    set -eu
+    cd "{{justfile_directory()}}/ios"
+    xcodebuild archive \
+      -project earring.xcodeproj \
+      -scheme earring \
+      -configuration Release \
+      -archivePath /tmp/earring.xcarchive \
+      -allowProvisioningUpdates
+    xcodebuild -exportArchive \
+      -archivePath /tmp/earring.xcarchive \
+      -exportOptionsPlist ExportOptions.plist \
+      -exportPath /tmp/earring_export \
+      -allowProvisioningUpdates
+    if [ -z "${APP_STORE_KEY_ID:-}" ]; then
+      printf "App Store Connect Key ID: "; read -r APP_STORE_KEY_ID
+    fi
+    if [ -z "${APP_STORE_ISSUER_ID:-}" ]; then
+      printf "App Store Connect Issuer ID: "; read -r APP_STORE_ISSUER_ID
+    fi
+    xcrun altool --upload-app \
+      -f /tmp/earring_export/earring.ipa \
+      -t ios \
+      --apiKey "$APP_STORE_KEY_ID" \
+      --apiIssuer "$APP_STORE_ISSUER_ID" \
+      --output-format xml
+    echo "Upload to TestFlight complete."
