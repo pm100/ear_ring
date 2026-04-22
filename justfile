@@ -99,6 +99,24 @@ ios-testflight:
       --output-format xml
     echo "Upload to TestFlight complete."
 
+# Build signed release AAB and upload to Play Store internal testing.
+# Requires:
+#   KEYSTORE_PASSWORD                  — keystore password (prompted if not set)
+#   GOOGLE_PLAY_SERVICE_ACCOUNT_JSON   — path to service account key JSON file
+#     (Play Console → Setup → API access → Service accounts → download JSON key)
+# Optional:
+#   KEY_PASSWORD   — if different from KEYSTORE_PASSWORD
+#   PLAY_TRACK     — override track (default: internal)
+android-play:
+    @if (-not $env:KEYSTORE_PASSWORD) { $env:KEYSTORE_PASSWORD = Read-Host "Keystore password" }; \
+     Push-Location android; .\gradlew bundleRelease; Pop-Location
+    Push-Location scripts; node publish_android.js; Pop-Location
+
+# Upload a previously built AAB to Play Store without rebuilding.
+# Useful if you already ran android-release and just want to re-upload.
+android-play-upload:
+    Push-Location scripts; node publish_android.js; Pop-Location
+
 # Count lines of code
 wc:
     tokei

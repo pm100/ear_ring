@@ -988,6 +988,18 @@ cd C:\work\ear_ring\android
 .\gradlew installDebug 2>&1 | Select-String -Pattern "BUILD|error:|FAILED|Installing"
 ```
 
+**Publish to Play Store internal testing:**
+```powershell
+# One step: build signed AAB + upload
+just android-play
+
+# Or separately — build first, then upload
+just android-release
+just android-play-upload
+```
+Requires `KEYSTORE_PASSWORD` and `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` env vars.
+Service account JSON: Play Console → Setup → API access → Service accounts → download key.
+
 ---
 
 ### Debugging the Tauri Desktop App

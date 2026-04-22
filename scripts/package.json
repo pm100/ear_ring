@@ -1,0 +1,9 @@
+{
+  "name": "ear-ring-scripts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Developer scripts for Ear Ring",
+  "dependencies": {
+    "googleapis": "^144.0.0"
+  }
+}
