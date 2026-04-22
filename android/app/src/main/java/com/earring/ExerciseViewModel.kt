@@ -50,6 +50,7 @@ data class ExerciseState(
     val melodyDurations: List<Float> = emptyList(),
     val melodyDeck: List<Int> = emptyList(),
     val melodyDeckCursor: Int = 0,
+    val chordLabel: String = "",  // Set for diatonic mode; shown below title
 ) {
     /** MIDI of the root note at or just below rangeStart (used for intro chord). */
     val rootMidi: Int get() = rangeStart - ((rangeStart - rootNote + 12) % 12)
@@ -129,7 +130,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             postChordGapMs = prefs.getLong(PREF_POST_CHORD_GAP_MS, DEFAULT_POST_CHORD_GAP_MS),
             wrongNotePauseMs = prefs.getLong(PREF_WRONG_NOTE_PAUSE_MS, DEFAULT_WRONG_NOTE_PAUSE_MS),
             instrumentIndex = prefs.getInt(PREF_INSTRUMENT_INDEX, 0),
-            testType = prefs.getInt(PREF_TEST_TYPE, 0),
+            testType = prefs.getInt(PREF_TEST_TYPE, 0).let { if (it == 1) 0 else it },
         )
     }
 
@@ -217,7 +218,12 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         _state.value = _state.value.copy(instrumentIndex = idx, rangeStart = start, rangeEnd = end)
         saveSettings(_state.value)
     }
-    fun setTestType(type: Int) { _state.value = _state.value.copy(testType = type); saveSettings(_state.value) }
+    fun setTestType(type: Int) {
+        val current = _state.value
+        val newSeqLen = if (type == 2 && current.sequenceLength !in setOf(3, 4)) 3 else current.sequenceLength
+        _state.value = current.copy(testType = type, sequenceLength = newSeqLen)
+        saveSettings(_state.value)
+    }
 
     fun startExercise() {
         audioPlayback.cancelPlayback()
@@ -301,6 +307,26 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
                 status = ExerciseStatus.PLAYING,
                 highlightIndex = -1
             )
+        } else if (state.testType == 2 || state.testType == 3) {
+            // Diatonic arpeggio mode (2=ascending, 3=descending)
+            val seed = System.currentTimeMillis()
+            val centerMidi = (state.rangeStart + state.rangeEnd) / 2
+            val midiNotes = EarRingCore.generateDiatonicChord(
+                state.rootNote, state.scaleId, state.sequenceLength,
+                centerMidi, seed
+            ).toList().let { if (state.testType == 3) it.reversed() else it }
+            val label = EarRingCore.diatonicChordLabel(state.rootNote, state.scaleId, state.sequenceLength, centerMidi, seed)
+            _state.value = state.copy(
+                sequence = midiNotes,
+                melodyDurations = emptyList(),
+                detected = emptyList(),
+                currentNoteIndex = 0,
+                currentAttempt = 1,
+                seed = seed,
+                status = ExerciseStatus.PLAYING,
+                highlightIndex = -1,
+                chordLabel = label
+            )
         } else {
             // Random mode (existing logic)
             val seed = System.currentTimeMillis()
@@ -316,7 +342,8 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
                 currentAttempt = 1,
                 seed = seed,
                 status = ExerciseStatus.PLAYING,
-                highlightIndex = -1
+                highlightIndex = -1,
+                chordLabel = ""
             )
         }
         playPrompt()

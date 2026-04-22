@@ -152,6 +152,29 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         newRangeEnd: Math.min(108, maxMidi),
         title: result.title,
       };
+    } else if (exercise.testType === 2 || exercise.testType === 3) {
+      // Diatonic arpeggio mode (2=ascending, 3=descending)
+      melodyDurationsRef.current = [];
+      melodyTimingsRef.current = [];
+      setMelodyDurations([]);
+      const centerMidi = Math.floor((exercise.rangeStart + exercise.rangeEnd) / 2);
+      const seed = Date.now();
+      const seq = await invoke<number[]>('cmd_generate_diatonic_chord', {
+        rootChroma: exercise.rootNote,
+        scaleId: exercise.scaleId,
+        noteCount: exercise.sequenceLength,
+        centerMidi,
+        seed,
+      });
+      const label = await invoke<string>('cmd_diatonic_chord_label', {
+        rootChroma: exercise.rootNote,
+        scaleId: exercise.scaleId,
+        noteCount: exercise.sequenceLength,
+        centerMidi,
+        seed,
+      });
+      const orderedSeq = exercise.testType === 3 ? [...seq].reverse() : seq;
+      return { sequence: orderedSeq, title: label };
     } else {
       melodyDurationsRef.current = [];
       melodyTimingsRef.current = [];
@@ -215,6 +238,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       rangeRef.current = { start: result.newRangeStart, end: result.newRangeEnd };
     }
     if (result.title !== undefined) setMelodyTitle(result.title);
+    else setMelodyTitle('');
     setCurrentAttempt(1);
     currentAttemptRef.current = 1;
     await playPromptForSequence(result.sequence, result.durations, melodyTimingsRef.current);
@@ -386,7 +410,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         <span className="listening-label" style={{ marginLeft: 8 }}>Listening…</span>
       </div>
 
-      {melodyTitle && (
+      {melodyTitle && exercise.showTestNotes && (
         <div className="melody-title">♫ {melodyTitle}</div>
       )}
 

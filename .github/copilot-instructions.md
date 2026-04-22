@@ -11,3 +11,12 @@
 - Shared Rust logic conventions
 
 Do not rely on memory alone — always read `AGENTS.md` first.
+
+## ⛔ Git Commit / Push Rules
+
+**NEVER run `git commit` or `git push` unless the user explicitly says to in this message.**
+
+- Do not commit after completing a task
+- Do not commit after writing documentation
+- Do not ask "should I commit?" — wait for the user to say so
+- This rule has no exceptions regardless of how complete the work is

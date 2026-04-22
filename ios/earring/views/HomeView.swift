@@ -143,11 +143,17 @@ struct HomeView: View {
                 sectionLabel("Test Type").padding(.top, 28)
                 Picker("Test Type", selection: Binding(
                     get: { model.testType },
-                    set: { if $0 != 2 { model.testType = $0 } }
+                    set: { newType in
+                        model.testType = newType
+                        // Auto-clamp seqLen for diatonic mode
+                        if (newType == 2 || newType == 3) && model.sequenceLength != 3 && model.sequenceLength != 4 {
+                            model.sequenceLength = 3
+                        }
+                    }
                 )) {
                     Text("Random Notes").tag(0)
-                    Text("Melody Snippets").tag(1)
-                    Text("Diatonic Triads (coming soon)").tag(2)
+                    Text("Diatonic Arpeggios (ascend)").tag(2)
+                    Text("Diatonic Arpeggios (desc)").tag(3)
                 }
                 .pickerStyle(.menu)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -181,8 +187,8 @@ struct HomeView: View {
                         }
                         .pickerStyle(.menu)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .disabled(model.testType != 0)
-                        .opacity(model.testType != 0 ? 0.38 : 1.0)
+                        .disabled(model.testType == 1)
+                        .opacity(model.testType == 1 ? 0.38 : 1.0)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -192,7 +198,7 @@ struct HomeView: View {
                 PianoRangePickerView(
                     rangeStart: model.rangeStart,
                     rangeEnd: model.rangeEnd,
-                    onRangeChange: model.testType == 0 ? { s, e in model.rangeStart = s; model.rangeEnd = e } : { _, _ in },
+                    onRangeChange: model.testType == 1 ? { _, _ in } : { s, e in model.rangeStart = s; model.rangeEnd = e },
                     keyScale: keyScale
                 )
                 .frame(height: pianoHeight)
@@ -204,14 +210,19 @@ struct HomeView: View {
                     spacing: 6
                 ) {
                     ForEach(2...8, id: \.self) { len in
+                        let chipEnabled: Bool = {
+                            if model.testType == 1 { return false }
+                            if model.testType == 2 || model.testType == 3 { return len == 3 || len == 4 }
+                            return true
+                        }()
                         Button("\(len)") {
-                            model.sequenceLength = len
+                            if chipEnabled { model.sequenceLength = len }
                         }
-                        .buttonStyle(ChipButtonStyle(selected: model.sequenceLength == len))
+                        .buttonStyle(ChipButtonStyle(selected: model.sequenceLength == len && chipEnabled))
+                        .disabled(!chipEnabled)
+                        .opacity(chipEnabled ? 1.0 : 0.38)
                     }
                 }
-                .disabled(model.testType != 0)
-                .opacity(model.testType != 0 ? 0.38 : 1.0)
 
                 HStack(spacing: 8) {
                     Toggle(isOn: Binding(

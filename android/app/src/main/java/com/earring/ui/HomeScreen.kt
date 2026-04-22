@@ -65,8 +65,8 @@ fun HomeScreen(
         )
         Spacer(Modifier.height(28.dp))
 
-        // Test Type dropdown
-        val testTypeLabels = listOf("Random Notes", "Melody Snippets", "Diatonic Triads (coming soon)")
+        // Test Type dropdown — only Random Notes (0) and Diatonic Triads (2) shown
+        val testTypeOptions = listOf(0 to "Random Notes", 2 to "Diatonic Arpeggios (ascend)", 3 to "Diatonic Arpeggios (desc)")
         var testTypeExpanded by remember { mutableStateOf(false) }
         SectionLabel("Test Type")
         ExposedDropdownMenuBox(
@@ -75,7 +75,7 @@ fun HomeScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             OutlinedTextField(
-                value = testTypeLabels[state.testType.coerceIn(0, 2)],
+                value = testTypeOptions.firstOrNull { it.first == state.testType }?.second ?: "Random Notes",
                 onValueChange = {},
                 readOnly = true,
                 singleLine = true,
@@ -86,15 +86,12 @@ fun HomeScreen(
                 expanded = testTypeExpanded,
                 onDismissRequest = { testTypeExpanded = false }
             ) {
-                testTypeLabels.forEachIndexed { index, label ->
+                testTypeOptions.forEach { (typeId, label) ->
                     DropdownMenuItem(
                         text = { Text(label) },
-                        enabled = index != 2,
                         onClick = {
-                            if (index != 2) {
-                                viewModel.setTestType(index)
-                                testTypeExpanded = false
-                            }
+                            viewModel.setTestType(typeId)
+                            testTypeExpanded = false
                         }
                     )
                 }
@@ -139,12 +136,12 @@ fun HomeScreen(
                     }
                 }
             }
-            Column(modifier = Modifier.weight(1f).alpha(if (state.testType != 0) 0.38f else 1f)) {
+            Column(modifier = Modifier.weight(1f).alpha(if (state.testType == 1) 0.38f else 1f)) {
                 SectionLabel("Scale")
                 var scaleExpanded by remember { mutableStateOf(false) }
                 ExposedDropdownMenuBox(
                     expanded = scaleExpanded,
-                    onExpandedChange = { if (state.testType == 0) scaleExpanded = it },
+                    onExpandedChange = { if (state.testType != 1) scaleExpanded = it },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedTextField(
@@ -152,7 +149,7 @@ fun HomeScreen(
                         onValueChange = {},
                         readOnly = true,
                         singleLine = true,
-                        enabled = state.testType == 0,
+                        enabled = state.testType != 1,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = scaleExpanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth()
                     )
@@ -187,11 +184,13 @@ fun HomeScreen(
 
         // Sequence length
         SectionLabel("Sequence Length")
+        val isDiatonicMode = state.testType == 2 || state.testType == 3
         ChipRow(
             items = (2..8).map { it.toString() },
             selected = state.sequenceLength - 2,
             onSelect = { viewModel.setSequenceLength(it + 2) },
-            enabled = state.testType == 0
+            enabled = state.testType == 0,
+            enabledIndices = if (isDiatonicMode) setOf(1, 2) else null  // indices 1=3, 2=4
         )
         Spacer(Modifier.height(16.dp))
 
@@ -249,23 +248,25 @@ internal fun ChipRow(
     items: List<String>,
     selected: Int,
     onSelect: (Int) -> Unit,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    enabledIndices: Set<Int>? = null  // if non-null, overrides `enabled` per-chip
 ) {
     val chipColors = FilterChipDefaults.filterChipColors(
         selectedContainerColor = MaterialTheme.colorScheme.primary,
         selectedLabelColor = MaterialTheme.colorScheme.onPrimary
     )
     Row(
-        modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.38f),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         items.forEachIndexed { index, label ->
-            val isSelected = index == selected
+            val chipEnabled = enabledIndices?.contains(index) ?: enabled
+            val isSelected = index == selected && chipEnabled
             FilterChip(
                 selected = isSelected,
-                onClick = { if (enabled) onSelect(index) },
+                onClick = { if (chipEnabled) onSelect(index) },
                 label = { Text(label, fontSize = 13.sp) },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).alpha(if (chipEnabled) 1f else 0.38f),
                 colors = chipColors
             )
         }

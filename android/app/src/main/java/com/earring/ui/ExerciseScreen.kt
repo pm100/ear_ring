@@ -114,6 +114,14 @@ fun ExerciseScreen(
             style = MaterialTheme.typography.titleMedium
         )
 
+        if (state.chordLabel.isNotEmpty() && state.showTestNotes) {
+            Text(
+                text = "🎵 ${state.chordLabel}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
         Spacer(Modifier.height(8.dp))
 
         Row(

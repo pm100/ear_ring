@@ -42,6 +42,8 @@ object EarRingCore {
     @JvmStatic external fun nativeShuffleMelodyIndices(seed: Long): IntArray
     @JvmStatic external fun nativePickMelodyByIndex(index: Int, rootChroma: Int): FloatArray
     @JvmStatic external fun nativeMelodyRangeMidi(index: Int, rootChroma: Int): IntArray
+    @JvmStatic external fun nativeGenerateDiatonicChord(rootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long): IntArray
+    @JvmStatic external fun nativeDiatonicChordLabel(rootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long): String
 
     // ── PitchTracker JNI ─────────────────────────────────────────────────────────
     @JvmStatic external fun nativeTrackerNew(silenceThreshold: Float, requiredFrames: Int): Long
@@ -207,4 +209,12 @@ object EarRingCore {
         if (arr.size < 2) return null
         return Pair(arr[0], arr[1])
     }
+
+    fun generateDiatonicChord(rootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long): IntArray =
+        if (loaded) nativeGenerateDiatonicChord(rootChroma, scaleId, noteCount, centerMidi, seed)
+        else IntArray(noteCount) { centerMidi }
+
+    fun diatonicChordLabel(rootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long): String =
+        if (loaded) nativeDiatonicChordLabel(rootChroma, scaleId, noteCount, centerMidi, seed)
+        else ""
 }

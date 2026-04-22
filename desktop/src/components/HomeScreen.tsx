@@ -203,10 +203,22 @@ function PianoRangePicker({ rangeStart: rangeStartProp, rangeEnd: rangeEndProp, 
   );
 }
 
-const TEST_TYPE_NAMES = ['Random Notes', 'Melody Snippets', 'Diatonic Triads'];
+const TEST_TYPE_OPTIONS = [
+  { value: 0, label: 'Random Notes' },
+  { value: 2, label: 'Diatonic Arpeggios (ascend)' },
+  { value: 3, label: 'Diatonic Arpeggios (desc)' },
+];
 
 function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
   const isMelodyMode = settings.testType === 1;
+  const isDiatonicMode = settings.testType === 2 || settings.testType === 3;
+
+  const handleTestTypeChange = (newType: number) => {
+    onUpdateSettings(prev => {
+      const newSeqLen = newType === 2 && prev.sequenceLength !== 3 && prev.sequenceLength !== 4 ? 3 : prev.sequenceLength;
+      return { ...prev, testType: newType, sequenceLength: newSeqLen };
+    });
+  };
 
   const handleStart = () => {
     onStart(settings.rootNote, settings.rangeStart, settings.rangeEnd, settings.scaleId, settings.sequenceLength, settings.tempoBpm, settings.showTestNotes, settings.keySignatureMode, settings.testType);
@@ -223,11 +235,11 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
       <span className="section-label">Test Type</span>
       <select
         value={settings.testType}
-        onChange={e => onUpdateSettings(prev => ({ ...prev, testType: Number(e.target.value) }))}
+        onChange={e => handleTestTypeChange(Number(e.target.value))}
         style={{ width: '100%', padding: '8px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #ccc', marginBottom: 16 }}
       >
-        {TEST_TYPE_NAMES.map((name, i) => (
-          <option key={i} value={i} disabled={i === 2}>{i === 2 ? `${name} (coming soon)` : name}</option>
+        {TEST_TYPE_OPTIONS.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
 
@@ -270,20 +282,24 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
         onChange={isMelodyMode ? () => {} : (s, e) => onUpdateSettings(prev => ({ ...prev, rangeStart: s, rangeEnd: e }))}
       />
 
-      <div style={{ opacity: isMelodyMode ? 0.38 : 1 }}>
+      <div>
         <span className="section-label">Sequence Length</span>
         <div className="chip-row">
-          {[2, 3, 4, 5, 6, 7, 8].map(len => (
-            <button
-              key={len}
-              type="button"
-              disabled={isMelodyMode}
-              className={`chip ${settings.sequenceLength === len ? 'chip-selected' : ''}`}
-              onClick={() => onUpdateSettings(prev => ({ ...prev, sequenceLength: len }))}
-            >
-              {len}
-            </button>
-          ))}
+          {[2, 3, 4, 5, 6, 7, 8].map(len => {
+            const chipEnabled = isMelodyMode ? false : isDiatonicMode ? (len === 3 || len === 4) : true;
+            return (
+              <button
+                key={len}
+                type="button"
+                disabled={!chipEnabled}
+                className={`chip ${settings.sequenceLength === len && chipEnabled ? 'chip-selected' : ''}`}
+                style={{ opacity: chipEnabled ? 1 : 0.38 }}
+                onClick={() => chipEnabled && onUpdateSettings(prev => ({ ...prev, sequenceLength: len }))}
+              >
+                {len}
+              </button>
+            );
+          })}
         </div>
       </div>
 

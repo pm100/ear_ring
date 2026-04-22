@@ -237,6 +237,132 @@ pub fn intro_chord(root: Note, scale: ScaleType) -> Vec<Note> {
     vec![notes[0], notes[third_idx], notes[fifth_idx]]
 }
 
+/// Generate a diatonic triad (note_count=3) or seventh chord (note_count=4) from
+/// a random scale degree, with a random inversion and random ascending/descending
+/// direction. Notes are placed near `center_midi`.
+///
+/// Returns MIDI notes in play order (ascending or descending).
+pub fn generate_diatonic_chord(
+    root_chroma: u8,
+    scale: ScaleType,
+    note_count: u8,
+    center_midi: u8,
+    seed: u64,
+) -> Vec<Note> {
+    let intervals = scale.intervals(); // 7 semitone values from root
+    let nc = note_count.clamp(3, 4) as usize;
+
+    // LCG
+    let mut rng = seed;
+    let mut next = || -> u64 {
+        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng >> 33
+    };
+
+    // Pick diatonic chord root degree (0–6)
+    let degree = (next() % 7) as usize;
+
+    // Build semitone offsets above the SCALE ROOT (not chord root) for each chord tone,
+    // using the skip-one-degree pattern within the scale.
+    let mut offsets: Vec<i32> = Vec::with_capacity(nc);
+    for i in 0..nc {
+        let raw_degree = degree + i * 2;
+        let scale_degree = raw_degree % 7;
+        let octave_bump = (raw_degree / 7) as i32;
+        offsets.push(intervals[scale_degree] as i32 + octave_bump * 12);
+    }
+    // Ensure strictly ascending (handle any mod-7 wrap edge case)
+    for i in 1..offsets.len() {
+        while offsets[i] <= offsets[i - 1] {
+            offsets[i] += 12;
+        }
+    }
+
+    // Apply inversion: raise the bottom note(s) by an octave
+    let inversion = (next() % nc as u64) as usize;
+    for i in 0..inversion {
+        offsets[i] += 12;
+    }
+    offsets.sort_unstable();
+
+    // Find the scale root MIDI so the chord's mid-point sits near center_midi.
+    // Iterate high-to-low so ties favour the higher (brighter) octave.
+    let center = center_midi as i32;
+    let mid_offset = offsets[offsets.len() / 2];
+    let scale_root_chroma = root_chroma % 12;
+    let scale_root_midi: i32 = (2i32..=6)
+        .rev()
+        .map(|oct| (oct + 1) * 12 + scale_root_chroma as i32)
+        .min_by_key(|&m| (m + mid_offset - center).abs())
+        .unwrap_or(60);
+
+    let mut midi_notes: Vec<u8> = offsets
+        .iter()
+        .map(|&o| (scale_root_midi + o).clamp(21, 108) as u8)
+        .collect();
+
+    // Safety: if the lowest note is more than 8 semitones below center (can happen
+    // with wide 2nd-inversion spans), shift the whole chord up one octave.
+    if (*midi_notes.iter().min().unwrap() as i32) < center - 8 {
+        midi_notes.iter_mut().for_each(|n| *n = n.saturating_add(12));
+    }
+
+    // Always play ascending
+    midi_notes.sort_unstable();
+
+    midi_notes.into_iter().map(Note::from_midi).collect()
+}
+
+/// Return a human-readable label for the diatonic chord that `generate_diatonic_chord`
+/// would produce with the same arguments.  Example: "G – 1st Inversion".
+pub fn diatonic_chord_label(
+    root_chroma: u8,
+    scale: ScaleType,
+    note_count: u8,
+    _center_midi: u8,
+    seed: u64,
+) -> String {
+    let intervals = scale.intervals();
+    let nc = note_count.clamp(3, 4) as usize;
+
+    let mut rng = seed;
+    let mut next = || -> u64 {
+        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng >> 33
+    };
+
+    let degree = (next() % 7) as usize;
+    let _inversion_unused = next() % nc as u64; // consume same RNG slot
+    let inversion = _inversion_unused as usize;
+
+    // Chord root note = scale root + intervals[degree]
+    let chord_root_chroma = ((root_chroma as i32 + intervals[degree] as i32) % 12) as u8;
+    // Use key-aware spelling (F# in sharp keys, Gb in flat keys)
+    let chord_root_name = preferred_note_label(chord_root_chroma, root_chroma);
+
+    // Determine chord quality from the third and fifth above the chord root
+    let root_semitones = intervals[degree] as i32;
+    let third_semitones = intervals[(degree + 2) % 7] as i32;
+    let fifth_semitones = intervals[(degree + 4) % 7] as i32;
+    let third_interval = ((third_semitones - root_semitones) + 12) % 12;
+    let fifth_interval = ((fifth_semitones - root_semitones) + 24) % 12;
+    let quality_suffix = match (third_interval, fifth_interval) {
+        (3, 6) => "\u{00b0}", // diminished (°)
+        (3, _) => "-",         // minor
+        (4, 8) => "+",         // augmented (rare in diatonic scales)
+        _ => "",               // major
+    };
+
+    let inversion_label = match inversion {
+        0 => "Root Position",
+        1 => "1st Inversion",
+        2 => "2nd Inversion",
+        _ => "3rd Inversion",
+    };
+
+    format!("{}{} \u{2013} {}", chord_root_name, quality_suffix, inversion_label)
+}
+
 /// Whether a detected note matches the expected note class and is within the
 /// allowed cents tolerance.
 pub fn is_correct_note(detected_midi: u8, cents: i32, expected_midi: u8) -> bool {
@@ -770,5 +896,102 @@ mod tests {
         assert_eq!(test_score(5, 1, true), 100);
         assert_eq!(test_score(5, 3, true), 60);
         assert_eq!(test_score(5, 5, false), 0);
+    }
+
+    #[test]
+    fn test_diatonic_chord_triad_length() {
+        let notes = generate_diatonic_chord(0, ScaleType::Major, 3, 60, 42);
+        assert_eq!(notes.len(), 3);
+    }
+
+    #[test]
+    fn test_diatonic_chord_seventh_length() {
+        let notes = generate_diatonic_chord(0, ScaleType::Major, 4, 60, 99);
+        assert_eq!(notes.len(), 4);
+    }
+
+    #[test]
+    fn test_diatonic_chord_notes_in_scale() {
+        // All chord tones must belong to the C major scale (pitch classes 0,2,4,5,7,9,11)
+        let c_major_classes: std::collections::HashSet<u8> = [0,2,4,5,7,9,11].iter().copied().collect();
+        for seed in [1u64, 7, 42, 100, 999] {
+            let notes = generate_diatonic_chord(0, ScaleType::Major, 3, 60, seed);
+            for n in &notes {
+                assert!(c_major_classes.contains(&(n.midi() % 12)),
+                    "Note {} not in C major (seed {})", n.midi(), seed);
+            }
+        }
+    }
+
+    #[test]
+    fn test_diatonic_chord_exhaustive_all_scales() {
+        // For all 4 scale types, all 12 root chromas, both note counts, many seeds,
+        // every generated note must belong to the scale.
+        let scales: &[(ScaleType, &[u8])] = &[
+            (ScaleType::Major,        &[0,2,4,5,7,9,11]),
+            (ScaleType::NaturalMinor, &[0,2,3,5,7,8,10]),
+            (ScaleType::Dorian,       &[0,2,3,5,7,9,10]),
+            (ScaleType::Mixolydian,   &[0,2,4,5,7,9,10]),
+        ];
+        for (scale, base_intervals) in scales {
+            for root in 0u8..12 {
+                let pcs: std::collections::HashSet<u8> = base_intervals.iter().map(|&i| (root + i) % 12).collect();
+                for &nc in &[3u8, 4] {
+                    for seed in 0u64..500 {
+                        let notes = generate_diatonic_chord(root, *scale, nc, 66, seed);
+                        for n in &notes {
+                            let pc = n.midi() % 12;
+                            assert!(pcs.contains(&pc),
+                                "root={} scale={:?} nc={} seed={}: note {} (pc {}) not in scale {:?}",
+                                root, scale, nc, seed, n.midi(), pc, pcs);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_diatonic_chord_near_center() {
+        // Notes should be roughly centered near MIDI 60 (within 2 octaves)
+        let notes = generate_diatonic_chord(0, ScaleType::Major, 3, 60, 42);
+        for n in &notes {
+            assert!(n.midi() >= 36 && n.midi() <= 84,
+                "Note {} too far from center", n.midi());
+        }
+    }
+
+    #[test]
+    fn test_diatonic_chord_label_quality() {
+        // In C major, degree 6 = B, which forms a diminished triad (B-D-F)
+        // Find a seed that picks degree 6; brute-force a few seeds and check label contains °
+        // Also verify that degree 0 (C) gives no suffix (major), and degree 2 (E) gives no suffix
+        let mut found_dim = false;
+        for seed in 0u64..200 {
+            let label = diatonic_chord_label(0, ScaleType::Major, 3, 60, seed);
+            if label.starts_with('B') {
+                // B in C major must be diminished
+                assert!(label.contains('\u{00b0}'),
+                    "B in C major should be diminished (°), got: {}", label);
+                found_dim = true;
+            }
+            if label.starts_with('C') && !label.contains('\u{00b0}') && !label.contains('-') {
+                // C in C major is major — no suffix expected
+            }
+        }
+        assert!(found_dim, "Did not encounter a B° chord in 200 seeds for C major");
+
+        // In natural minor, degree 1 is the supertonic which is diminished
+        // (e.g., A natural minor: B-D-F)
+        let mut found_dim_minor = false;
+        for seed in 0u64..200 {
+            let label = diatonic_chord_label(9, ScaleType::NaturalMinor, 3, 60, seed);
+            if label.starts_with('B') {
+                assert!(label.contains('\u{00b0}'),
+                    "B in A natural minor should be diminished (°), got: {}", label);
+                found_dim_minor = true;
+            }
+        }
+        assert!(found_dim_minor, "Did not encounter a B° chord in 200 seeds for A natural minor");
     }
 }

@@ -66,7 +66,12 @@ const HAS_LAUNCHED_KEY = 'ear_ring_has_launched';
 function loadSettings(): ExerciseSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return { ...defaultSettings, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = { ...defaultSettings, ...JSON.parse(raw) };
+      // Reset melody mode (testType==1) which is no longer in the UI
+      if (parsed.testType === 1) parsed.testType = 0;
+      return parsed;
+    }
   } catch {}
   return defaultSettings;
 }
@@ -128,8 +133,8 @@ export default function App() {
       cumulativeScorePercent: 0,
       sessionRunning: true,
     };
-    if (testType === 1) {
-      // Melody mode: let ExerciseScreen manage the deck
+    if (testType === 1 || testType === 2 || testType === 3) {
+      // Melody mode and diatonic mode: let ExerciseScreen generate each sequence
       setExercise({
         ...baseExercise,
         sequence: [],

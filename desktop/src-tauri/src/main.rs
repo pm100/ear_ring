@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use ear_ring_core::{
-    accidental_in_key, detect_pitch, freq_to_note, generate_sequence, help_sections_json,
+    accidental_in_key, detect_pitch, diatonic_chord_label, freq_to_note, generate_diatonic_chord, generate_sequence, help_sections_json,
     intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
     melody_count, melody_range_midi, melody_title, melody_to_midi_by_index, note_timing, preferred_midi_label,
     shuffle_melody_indices, staff_position, test_score, Note, PitchTracker, ScaleType,
@@ -94,6 +94,33 @@ fn cmd_generate_sequence(root_chroma: u8, scale_id: u8, length: u8, range_start:
         .iter()
         .map(|n| n.midi())
         .collect()
+}
+
+#[tauri::command]
+fn cmd_generate_diatonic_chord(root_chroma: u8, scale_id: u8, note_count: u8, center_midi: u8, seed: u64) -> Vec<u8> {
+    let scale = match scale_id {
+        0 => ScaleType::Major,
+        1 => ScaleType::NaturalMinor,
+        2 => ScaleType::Dorian,
+        3 => ScaleType::Mixolydian,
+        _ => ScaleType::Major,
+    };
+    generate_diatonic_chord(root_chroma, scale, note_count, center_midi, seed)
+        .iter()
+        .map(|n| n.midi())
+        .collect()
+}
+
+#[tauri::command]
+fn cmd_diatonic_chord_label(root_chroma: u8, scale_id: u8, note_count: u8, center_midi: u8, seed: u64) -> String {
+    let scale = match scale_id {
+        0 => ScaleType::Major,
+        1 => ScaleType::NaturalMinor,
+        2 => ScaleType::Dorian,
+        3 => ScaleType::Mixolydian,
+        _ => ScaleType::Major,
+    };
+    diatonic_chord_label(root_chroma, scale, note_count, center_midi, seed)
 }
 
 #[tauri::command]
@@ -218,6 +245,8 @@ fn main() {
             cmd_freq_to_cents,
             cmd_staff_position,
             cmd_generate_sequence,
+            cmd_generate_diatonic_chord,
+            cmd_diatonic_chord_label,
             cmd_intro_chord,
             cmd_is_correct_note,
             cmd_test_score,

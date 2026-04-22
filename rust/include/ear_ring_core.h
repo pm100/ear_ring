@@ -53,6 +53,32 @@ int32_t ear_ring_generate_sequence(uint8_t root_chroma,
 /// @param out_buf    Output buffer (must be at least 3 bytes)
 int32_t ear_ring_intro_chord(uint8_t root_midi, uint8_t scale_id, uint8_t *out_buf);
 
+/// Generate a diatonic chord (triad or 7th) from the given scale.
+/// Returns the count of notes written into out_buf on success, -1 on failure.
+/// @param root_chroma  Root pitch class (0=C … 11=B)
+/// @param scale_id     Scale identifier (0=Major, 1=NaturalMinor, 2=Dorian, 3=Mixolydian)
+/// @param note_count   Number of chord tones (3 or 4)
+/// @param center_midi  Target centre MIDI note for voicing placement
+/// @param seed         Random seed
+/// @param out_buf      Output buffer (must be at least note_count bytes)
+int32_t ear_ring_generate_diatonic_chord(uint8_t root_chroma,
+                                          uint8_t scale_id,
+                                          uint8_t note_count,
+                                          uint8_t center_midi,
+                                          uint64_t seed,
+                                          uint8_t *out_buf);
+
+/// Return a human-readable label for the diatonic chord with the given parameters.
+/// Writes a null-terminated UTF-8 string into out_buf (e.g. "G – 1st Inversion").
+/// Returns bytes written (excluding null), or -1 on error.
+int32_t ear_ring_diatonic_chord_label(uint8_t root_chroma,
+                                       uint8_t scale_id,
+                                       uint8_t note_count,
+                                       uint8_t center_midi,
+                                       uint64_t seed,
+                                       char *out_buf,
+                                       uint32_t buf_len);
+
 /// Check whether a detected note is correct for the expected note.
 /// Returns 1 if correct, 0 otherwise.
 /// @param detected_midi  Detected MIDI note number

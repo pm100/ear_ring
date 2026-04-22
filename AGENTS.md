@@ -127,9 +127,12 @@ Layout: vertically scrollable column, 16dp/px padding, centred.
 
 [16dp space]
 Section label: "Test Type"
-Dropdown (outlined, full width): Random Notes | Melody Snippets | Diatonic Triads (coming soon, disabled)
-  — testType IDs: 0=Random Notes, 1=Melody Snippets, 2=Diatonic Triads (stub)
-  — Default: Random Notes (0)
+Dropdown (outlined, full width): Random Notes | Diatonic Arpeggios (ascend) | Diatonic Arpeggios (desc)
+  — testType IDs: 0=Random Notes, 2=Diatonic Arpeggios (ascend), 3=Diatonic Arpeggios (desc)
+  — testType 1 (Melody Snippets) code is preserved but not shown in the dropdown
+  — In Diatonic Arpeggios mode: Scale dropdown and Sequence Length chips (2, 5–8) are disabled (opacity 0.38); only 3 and 4 are enabled (triad vs seventh chord)
+  — In Diatonic Arpeggios mode: Piano range picker is fully interactive (range controls chord placement)
+  — In Diatonic Arpeggios mode: chord label (root note + quality + inversion) is shown on the Exercise screen only when "Display Test Notes" is checked
   — In Melody Snippets mode: Scale dropdown and Sequence Length chips are disabled (opacity 0.38)
   — In Melody Snippets mode: Piano range picker is read-only (taps/drags are no-ops)
   — In Melody Snippets mode: range is auto-set by ExerciseScreen to snippet MIDI ± 6 semitones
@@ -144,7 +147,7 @@ Row (equal width, 8dp gap):
                  — Scale IDs: 0=Major, 1=Natural Minor, 2=Dorian, 3=Mixolydian (Harmonic Minor removed)
                  — Non-major scales show the implied major key in parentheses, e.g. "Natural Minor (Eb)"
                    when key=C. The label updates dynamically as the Key dropdown changes.
-                 — **Disabled (opacity 0.38)** when Test Type = Melody Snippets
+                 — **Disabled (opacity 0.38)** when Test Type = Melody Snippets or Diatonic Arpeggios
 
 [16dp space]
 Section label: "Range  (RangeLow – RangeHigh)"   — label updates dynamically with current range
@@ -163,6 +166,7 @@ PianoRangePicker
 Section label: "Sequence Length"
 Chip row: 2  3  4  5  6  7  8   (single row, equal width)
   — **Disabled (opacity 0.38)** when Test Type = Melody Snippets
+  — In Diatonic Arpeggios mode: only chips 3 and 4 are enabled (3=triad, 4=seventh chord); 2, 5–8 are disabled
 
 [16dp space]
 Row (same line): ☐ Display Test Notes    ☐ Use Key Signature

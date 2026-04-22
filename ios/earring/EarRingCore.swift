@@ -171,7 +171,21 @@ struct EarRingCore {
         return (minM, maxM)
     }
 
-    // MARK: - PitchTracker
+    static func generateDiatonicChord(rootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: UInt64) -> [Int] {
+        var buf = [UInt8](repeating: 0, count: noteCount)
+        let written = ear_ring_generate_diatonic_chord(UInt8(rootChroma), UInt8(scaleId), UInt8(noteCount), UInt8(centerMidi), seed, &buf)
+        guard written > 0 else { return [] }
+        return buf.prefix(Int(written)).map { Int($0) }
+    }
+
+    static func diatonicChordLabel(rootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: UInt64) -> String {
+        var buf = [CChar](repeating: 0, count: 64)
+        let written = ear_ring_diatonic_chord_label(UInt8(rootChroma), UInt8(scaleId), UInt8(noteCount), UInt8(centerMidi), seed, &buf, 64)
+        guard written > 0 else { return "" }
+        return String(cString: buf)
+    }
+
+
 
     /// Result from processing one audio buffer through the Rust pitch tracker.
     struct TrackerFrame {

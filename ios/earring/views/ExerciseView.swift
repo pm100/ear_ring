@@ -164,11 +164,22 @@ struct ExerciseView: View {
         }
     }
 
+    @ViewBuilder
+    private var chordLabelRow: some View {
+        if !model.chordLabel.isEmpty && model.showTestNotes {
+            Text("🎵 \(model.chordLabel)")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.erPrimary)
+                .frame(maxWidth: .infinity)
+        }
+    }
+
     // MARK: — Portrait layout (iPhone + iPad portrait)
 
     private var portraitLayout: some View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer().frame(height: 8)
+            chordLabelRow
             staffView
             Spacer().frame(height: 8)
             listeningBanner
@@ -192,6 +203,7 @@ struct ExerciseView: View {
         HStack(alignment: .top, spacing: 24) {
             VStack(alignment: .leading, spacing: 0) {
                 Spacer().frame(height: 8)
+                chordLabelRow
                 staffView
                 Spacer().frame(height: 8)
                 listeningBanner

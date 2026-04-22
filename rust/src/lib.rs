@@ -3,7 +3,7 @@ pub mod pitch_detection;
 pub mod tracker;
 
 pub use music_theory::{
-    accidental_in_key, effective_key_chroma, freq_to_note, generate_sequence, intro_chord,
+    accidental_in_key, diatonic_chord_label, effective_key_chroma, freq_to_note, generate_diatonic_chord, generate_sequence, intro_chord,
     is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
     key_signature_pitch_classes, melody_count, melody_range_midi, melody_raw_notes, melody_title,
     melody_to_midi_by_index, midi_to_freq, midi_to_label, note_name, note_timing,
@@ -96,7 +96,7 @@ pub fn instrument_list_json() -> String {
 // These thin wrappers are called from the React Native Turbo Native Module
 // (Swift / Kotlin) without requiring uniffi code-gen at this stage.
 
-use std::os::raw::{c_float, c_int, c_uchar, c_uint};
+use std::os::raw::{c_char, c_float, c_int, c_uchar, c_uint};
 
 /// Returns a pointer to a null-terminated UTF-8 JSON string containing the
 /// help sections: `[{"title":"...","body":"..."},...]`.
@@ -240,7 +240,70 @@ pub extern "C" fn ear_ring_generate_sequence(
     notes.len() as c_int
 }
 
-/// Returns the number of melody snippets in the library.
+/// Generate a diatonic chord (triad or 7th) near center_midi.
+/// * `out_buf` must be at least `note_count` bytes (max 4).
+/// Returns note count written, or -1 on error.
+#[no_mangle]
+pub extern "C" fn ear_ring_generate_diatonic_chord(
+    root_chroma: c_uchar,
+    scale_id: c_uchar,
+    note_count: c_uchar,
+    center_midi: c_uchar,
+    seed: u64,
+    out_buf: *mut c_uchar,
+) -> c_int {
+    if out_buf.is_null() {
+        return -1;
+    }
+    let scale = match scale_id {
+        0 => ScaleType::Major,
+        1 => ScaleType::NaturalMinor,
+        2 => ScaleType::Dorian,
+        3 => ScaleType::Mixolydian,
+        _ => return -1,
+    };
+    let notes = generate_diatonic_chord(root_chroma, scale, note_count, center_midi, seed);
+    let out = unsafe { std::slice::from_raw_parts_mut(out_buf, note_count as usize) };
+    for (i, note) in notes.iter().enumerate() {
+        out[i] = note.midi();
+    }
+    notes.len() as c_int
+}
+
+/// Return a human-readable label for the diatonic chord with the given parameters.
+/// Writes a null-terminated UTF-8 string into out_buf.
+/// Returns bytes written (excluding null), or -1 on error.
+#[no_mangle]
+pub extern "C" fn ear_ring_diatonic_chord_label(
+    root_chroma: c_uchar,
+    scale_id: c_uchar,
+    note_count: c_uchar,
+    center_midi: c_uchar,
+    seed: u64,
+    out_buf: *mut c_char,
+    buf_len: c_uint,
+) -> c_int {
+    if out_buf.is_null() || buf_len == 0 {
+        return -1;
+    }
+    let scale = match scale_id {
+        0 => ScaleType::Major,
+        1 => ScaleType::NaturalMinor,
+        2 => ScaleType::Dorian,
+        3 => ScaleType::Mixolydian,
+        _ => return -1,
+    };
+    let label = diatonic_chord_label(root_chroma, scale, note_count, center_midi, seed);
+    let bytes = label.as_bytes();
+    let copy_len = bytes.len().min(buf_len as usize - 1);
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr() as *const c_char, out_buf, copy_len);
+        *out_buf.add(copy_len) = 0;
+    }
+    copy_len as c_int
+}
+
+
 #[no_mangle]
 pub extern "C" fn ear_ring_melody_count() -> c_uint {
     melody_count() as c_uint
@@ -619,11 +682,12 @@ mod android_jni {
     use jni::JNIEnv;
 
     use super::{
-        accidental_in_key, detect_pitch, effective_key_chroma, freq_to_note, generate_sequence,
-        intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
-        melody_count, melody_range_midi, melody_to_midi_by_index, midi_to_label, note_name,
-        preferred_midi_label, preferred_note_label, scale_label, scale_name, shuffle_melody_indices,
-        staff_position, staff_position_in_key, test_score, Note, ScaleType,
+        accidental_in_key, detect_pitch, diatonic_chord_label, effective_key_chroma, freq_to_note,
+        generate_diatonic_chord, generate_sequence, intro_chord, is_correct_note, is_sharp_key,
+        key_accidental_count, key_sig_staff_positions, melody_count, melody_range_midi,
+        melody_to_midi_by_index, midi_to_label, note_name, preferred_midi_label,
+        preferred_note_label, scale_label, scale_name, shuffle_melody_indices, staff_position,
+        staff_position_in_key, test_score, Note, ScaleType,
     };
 
     #[no_mangle]
@@ -715,6 +779,60 @@ mod android_jni {
         };
         let _ = env.set_int_array_region(&arr, 0, &midi_vals);
         arr.into_raw()
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeGenerateDiatonicChord(
+        env: JNIEnv,
+        _class: JClass,
+        root_chroma: jint,
+        scale_id: jint,
+        note_count: jint,
+        center_midi: jint,
+        seed: jlong,
+    ) -> jintArray {
+        let scale = match scale_id {
+            0 => ScaleType::Major,
+            1 => ScaleType::NaturalMinor,
+            2 => ScaleType::Dorian,
+            3 => ScaleType::Mixolydian,
+            _ => ScaleType::Major,
+        };
+        let notes = generate_diatonic_chord(
+            root_chroma as u8,
+            scale,
+            note_count as u8,
+            center_midi as u8,
+            seed as u64,
+        );
+        let midi_vals: Vec<jint> = notes.iter().map(|n| n.midi() as jint).collect();
+        let arr: JIntArray = match env.new_int_array(midi_vals.len() as i32) {
+            Ok(a) => a,
+            Err(_) => return std::ptr::null_mut(),
+        };
+        let _ = env.set_int_array_region(&arr, 0, &midi_vals);
+        arr.into_raw()
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeDiatonicChordLabel(
+        mut env: JNIEnv,
+        _class: JClass,
+        root_chroma: jint,
+        scale_id: jint,
+        note_count: jint,
+        center_midi: jint,
+        seed: jlong,
+    ) -> jstring {
+        let scale = match scale_id {
+            0 => ScaleType::Major,
+            1 => ScaleType::NaturalMinor,
+            2 => ScaleType::Dorian,
+            3 => ScaleType::Mixolydian,
+            _ => ScaleType::Major,
+        };
+        let label = diatonic_chord_label(root_chroma as u8, scale, note_count as u8, center_midi as u8, seed as u64);
+        env.new_string(label).map(|s| s.into_raw()).unwrap_or(std::ptr::null_mut())
     }
 
     #[no_mangle]

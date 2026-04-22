@@ -69,7 +69,10 @@ class ExerciseModel: ObservableObject {
             rangeEnd = e
         }
     }
-    @Published var testType: Int = ud.object(forKey: "testType") != nil ? ud.integer(forKey: "testType") : 0 {
+    @Published var testType: Int = {
+        let stored = ud.object(forKey: "testType") != nil ? ud.integer(forKey: "testType") : 0
+        return stored == 1 ? 0 : stored  // Reset melody mode (no longer in UI)
+    }() {
         didSet { UserDefaults.standard.set(testType, forKey: "testType") }
     }
     @Published var sequence: [Int] = []
@@ -95,6 +98,7 @@ class ExerciseModel: ObservableObject {
     @Published var currentAttempt: Int = 1
     @Published var maxAttempts: Int = 5
     @Published var testsCompleted: Int = 0
+    @Published var chordLabel: String = ""  // Set for diatonic mode; empty otherwise
 
     /// MIDI of the root note at or just below rangeStart (used for intro chord).
     var rootMidi: Int { rangeStart - ((rangeStart - rootNote + 12) % 12) }
@@ -235,8 +239,29 @@ class ExerciseModel: ObservableObject {
             rangeStart = max(21, minMidi)
             rangeEnd = min(108, maxMidi)
             sequence = midiNotes
+        } else if testType == 2 || testType == 3 {
+            // Diatonic arpeggio mode (2=ascending, 3=descending)
+            melodyDurations = []
+            let seed = UInt64(Date().timeIntervalSince1970 * 1000)
+            let centerMidi = (rangeStart + rangeEnd) / 2
+            let notes = EarRingCore.generateDiatonicChord(
+                rootChroma: rootNote,
+                scaleId: scaleId,
+                noteCount: sequenceLength,
+                centerMidi: centerMidi,
+                seed: seed
+            )
+            sequence = testType == 3 ? notes.reversed() : notes
+            chordLabel = EarRingCore.diatonicChordLabel(
+                rootChroma: rootNote,
+                scaleId: scaleId,
+                noteCount: sequenceLength,
+                centerMidi: centerMidi,
+                seed: seed
+            )
         } else {
             melodyDurations = []
+            chordLabel = ""
             let seed = UInt64(Date().timeIntervalSince1970 * 1000)
             sequence = EarRingCore.generateSequence(
                 rootChroma: rootNote,

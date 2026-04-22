@@ -32,6 +32,7 @@ desktop:
 test:
     cargo test
 
+
 # Build the iOS app (debug) for a connected device
 ios:
     #!/bin/sh
@@ -97,3 +98,7 @@ ios-testflight:
       --apiIssuer "$APP_STORE_ISSUER_ID" \
       --output-format xml
     echo "Upload to TestFlight complete."
+
+# Count lines of code
+wc:
+    tokei
