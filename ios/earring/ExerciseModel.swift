@@ -49,7 +49,7 @@ class ExerciseModel: ObservableObject {
     @Published var silenceThreshold: Float = ud.object(forKey: "silenceThreshold") != nil ? Float(ud.double(forKey: "silenceThreshold")) : 0.003 {
         didSet { UserDefaults.standard.set(Double(silenceThreshold), forKey: "silenceThreshold") }
     }
-    @Published var framesToConfirm: Int = ud.object(forKey: "framesToConfirm") != nil ? ud.integer(forKey: "framesToConfirm") : 3 {
+    @Published var framesToConfirm: Int = ud.object(forKey: "framesToConfirm") != nil ? ud.integer(forKey: "framesToConfirm") : 2 {
         didSet { UserDefaults.standard.set(framesToConfirm, forKey: "framesToConfirm") }
     }
     @Published var warmupFrames: Int = ud.object(forKey: "warmupFrames") != nil ? ud.integer(forKey: "warmupFrames") : 4 {
@@ -320,10 +320,9 @@ class ExerciseModel: ObservableObject {
     /// the didSet handles exercise commit when appropriate.
     private func processAudioLive(samples: [Float], sampleRate: UInt32) {
         diagFrameCount += 1
-        if diagFrameCount <= 10 {
-            var floats = samples
-            let rms = sqrt(floats.reduce(0.0) { $0 + $1 * $1 } / Float(floats.count))
-            print("[EAR] frame \(diagFrameCount) rms=\(String(format: "%.5f", rms)) sampleRate=\(sampleRate)")
+        if diagFrameCount <= 50 {
+            let rms = sqrt(samples.reduce(0.0) { $0 + $1 * $1 } / Float(samples.count))
+            print("[EAR] frame \(diagFrameCount) samples=\(samples.count) rms=\(String(format: "%.5f", rms)) sampleRate=\(sampleRate)")
         }
         let frame = pitchTracker.process(samples: samples, sampleRate: sampleRate)
         if frame.liveMidi >= 0 {
@@ -375,6 +374,8 @@ class ExerciseModel: ObservableObject {
             }
         }
     }
+
+    private func completeTest(passed: Bool, attemptsUsed: Int, attemptNotes: [DetectedNote]) {
         let testScore = EarRingCore.testScore(maxAttempts: maxAttempts, attemptsUsed: attemptsUsed, passed: passed)
         cumulativeScore += testScore
         testsCompleted += 1
@@ -442,7 +443,7 @@ class ExerciseModel: ObservableObject {
         keySignatureMode = 0
         maxRetries = 5
         silenceThreshold = 0.003
-        framesToConfirm = 3
+        framesToConfirm = 2
         warmupFrames = 4
         postChordGapNanoseconds = 800_000_000
         wrongNotePauseNanoseconds = 3_000_000_000

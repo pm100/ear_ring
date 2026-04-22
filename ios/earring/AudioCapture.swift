@@ -47,7 +47,12 @@ class AudioCapture: @unchecked Sendable {
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: nativeFormat) { buffer, _ in
             guard let channelData = buffer.floatChannelData else { return }
             let frameCount = Int(buffer.frameLength)
-            let samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameCount))
+            // Apply 2× software gain to compensate for iOS .measurement mode
+            // disabling AGC. Android AudioRecord applies AGC by default; this
+            // brings the effective sensitivity closer to parity.
+            // Clamp to ±1.0 to prevent clipping from corrupting YIN detection.
+            var samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameCount))
+            for i in 0..<samples.count { samples[i] = max(-1.0, min(1.0, samples[i] * 2.0)) }
             onAudio(samples, actualSampleRate)
         }
 
