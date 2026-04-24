@@ -21,6 +21,8 @@ const PACKAGE_NAME = process.env.PLAY_PACKAGE_NAME || 'com.earring';
 const TRACK = process.env.PLAY_TRACK || 'internal';
 const AAB_PATH = process.env.PLAY_AAB_PATH ||
   path.join(__dirname, '..', 'android', 'app', 'build', 'outputs', 'bundle', 'release', 'app-release.aab');
+const RELEASE_NOTES = process.env.PLAY_RELEASE_NOTES || 'Bug fixes and improvements.';
+const LANGUAGE = process.env.PLAY_LANGUAGE || 'en-US';
 
 async function main() {
   const keyFile = process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
@@ -85,7 +87,8 @@ async function main() {
       track: TRACK,
       releases: [{
         versionCodes: [String(versionCode)],
-        status: 'completed',
+        status: process.env.PLAY_RELEASE_STATUS || 'draft',
+        releaseNotes: [{ language: LANGUAGE, text: RELEASE_NOTES }],
       }],
     },
   });

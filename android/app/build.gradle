@@ -20,7 +20,7 @@ android {
         applicationId 'com.earring'
         minSdk 26
         targetSdk 35
-        versionCode 1
+        versionCode providers.environmentVariable('VERSION_CODE').map { it.toInteger() }.orElse(3).get()
         versionName "1.0"
         ndk { abiFilters 'arm64-v8a', 'x86_64' }
     }
