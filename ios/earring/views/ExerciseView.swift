@@ -49,7 +49,9 @@ struct ExerciseView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Text("\(model.rangeLabel) \(MusicTheory.SCALE_NAMES[model.scaleId])")
+                let writtenRoot = EarRingCore.writtenNoteName(concertChroma: model.rootNote, instrumentIndex: model.instrumentIndex)
+                let writtenRange = "\(EarRingCore.writtenMidiLabel(concertMidi: model.rangeStart, instrumentIndex: model.instrumentIndex))–\(EarRingCore.writtenMidiLabel(concertMidi: model.rangeEnd, instrumentIndex: model.instrumentIndex))"
+                Text("\(writtenRoot) \(writtenRange) \(MusicTheory.SCALE_NAMES[model.scaleId])")
                     .font(.subheadline.weight(.semibold))
             }
         }
@@ -101,7 +103,7 @@ struct ExerciseView: View {
         MusicStaffView(
             notes: staffNotes,
             fixedSpacing: 44,
-            rootChroma: EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId),
+            rootChroma: (EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId) + ((transpSemitones % 12) + 12) % 12) % 12,
             keySignatureMode: model.keySignatureMode
         )
         .frame(height: staffHeight)

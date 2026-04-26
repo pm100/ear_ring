@@ -66,6 +66,20 @@ struct EarRingCore {
         return String(cString: buf)
     }
 
+    /// Written note name for a concert chroma with instrument transposition applied.
+    static func writtenNoteName(concertChroma: Int, instrumentIndex: Int) -> String {
+        var buf = [CChar](repeating: 0, count: 8)
+        ear_ring_written_note_name(UInt8(concertChroma), UInt32(instrumentIndex), &buf, 8)
+        return String(cString: buf)
+    }
+
+    /// Written MIDI label for a concert MIDI with instrument transposition applied.
+    static func writtenMidiLabel(concertMidi: Int, instrumentIndex: Int) -> String {
+        var buf = [CChar](repeating: 0, count: 16)
+        ear_ring_written_midi_label(UInt8(concertMidi), UInt32(instrumentIndex), &buf, 16)
+        return String(cString: buf)
+    }
+
     /// Display name for a scale ID (0–3).
     static func scaleName(scaleId: Int) -> String {
         var buf = [CChar](repeating: 0, count: 32)
@@ -185,7 +199,25 @@ struct EarRingCore {
         return String(cString: buf)
     }
 
+    static func writtenDiatonicChordLabel(concertRootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: UInt64, instrumentIndex: Int) -> String {
+        var buf = [CChar](repeating: 0, count: 64)
+        let written = ear_ring_written_diatonic_chord_label(UInt8(concertRootChroma), UInt8(scaleId), UInt8(noteCount), UInt8(centerMidi), seed, UInt32(instrumentIndex), &buf, 64)
+        guard written > 0 else { return "" }
+        return String(cString: buf)
+    }
 
+
+
+    static func writtenScaleLabel(concertRootChroma: Int, scaleId: Int, instrumentIndex: Int) -> String {
+        var buf = [CChar](repeating: 0, count: 64)
+        let written = ear_ring_written_scale_label(UInt8(concertRootChroma), UInt8(scaleId), UInt32(instrumentIndex), &buf, 64)
+        guard written > 0 else { return "" }
+        return String(cString: buf)
+    }
+
+    static func effectiveIntroRootMidi(rootNote: Int, scaleId: Int, rangeStart: Int) -> Int {
+        Int(ear_ring_effective_intro_root_midi(UInt8(rootNote), UInt8(scaleId), UInt8(rangeStart)))
+    }
 
     /// Result from processing one audio buffer through the Rust pitch tracker.
     struct TrackerFrame {

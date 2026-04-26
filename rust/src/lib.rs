@@ -3,13 +3,14 @@ pub mod pitch_detection;
 pub mod tracker;
 
 pub use music_theory::{
-    accidental_in_key, diatonic_chord_label, effective_key_chroma, freq_to_note, generate_diatonic_chord, generate_sequence, intro_chord,
+    accidental_in_key, diatonic_chord_label, effective_key_chroma, effective_intro_root_midi, freq_to_note, generate_diatonic_chord, generate_sequence, intro_chord,
     is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
     key_signature_pitch_classes, melody_count, melody_range_midi, melody_raw_notes, melody_title,
     melody_to_midi_by_index, midi_to_freq, midi_to_label, note_name, note_timing,
     preferred_midi_label, preferred_note_label, scale_label, scale_name, scale_notes,
     shuffle_melody_indices, staff_position, staff_position_in_key, test_score,
-    transpose_display_midi, MelodyNote, MelodySnippet, Note, NoteName, ScaleType, FLAT_ORDER,
+    transpose_display_midi, written_diatonic_chord_label, written_midi_label, written_note_name, written_scale_label,
+    MelodyNote, MelodySnippet, Note, NoteName, ScaleType, FLAT_ORDER,
     FLAT_STAFF_POSITIONS, SHARP_ORDER, SHARP_STAFF_POSITIONS,
 };
 pub use pitch_detection::detect_pitch;
@@ -303,6 +304,37 @@ pub extern "C" fn ear_ring_diatonic_chord_label(
     copy_len as c_int
 }
 
+/// Written-pitch version of ear_ring_diatonic_chord_label — chord root name uses instrument transposition.
+#[no_mangle]
+pub extern "C" fn ear_ring_written_diatonic_chord_label(
+    concert_root_chroma: c_uchar,
+    scale_id: c_uchar,
+    note_count: c_uchar,
+    center_midi: c_uchar,
+    seed: u64,
+    instrument_index: c_uint,
+    out_buf: *mut c_char,
+    buf_len: c_uint,
+) -> c_int {
+    if out_buf.is_null() || buf_len == 0 {
+        return -1;
+    }
+    let scale = match scale_id {
+        0 => ScaleType::Major,
+        1 => ScaleType::NaturalMinor,
+        2 => ScaleType::Dorian,
+        3 => ScaleType::Mixolydian,
+        _ => return -1,
+    };
+    let label = written_diatonic_chord_label(concert_root_chroma, scale, note_count, center_midi, seed, instrument_index as usize);
+    let bytes = label.as_bytes();
+    let copy_len = bytes.len().min(buf_len as usize - 1);
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr() as *const c_char, out_buf, copy_len);
+        *out_buf.add(copy_len) = 0;
+    }
+    copy_len as c_int
+}
 
 #[no_mangle]
 pub extern "C" fn ear_ring_melody_count() -> c_uint {
@@ -438,6 +470,52 @@ pub extern "C" fn ear_ring_note_name(
     copy_len as c_int
 }
 
+/// Written note name for a concert chroma with instrument transposition applied.
+/// Writes a null-terminated UTF-8 string into `out_buf`.
+/// Returns the number of bytes written (excluding null), or -1 on error.
+#[no_mangle]
+pub extern "C" fn ear_ring_written_note_name(
+    concert_chroma: c_uchar,
+    instrument_index: c_uint,
+    out_buf: *mut std::os::raw::c_char,
+    buf_len: c_uint,
+) -> c_int {
+    if out_buf.is_null() || buf_len == 0 {
+        return -1;
+    }
+    let name = written_note_name(concert_chroma, instrument_index as usize);
+    let bytes = name.as_bytes();
+    let copy_len = (bytes.len()).min(buf_len as usize - 1);
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr() as *const std::os::raw::c_char, out_buf, copy_len);
+        *out_buf.add(copy_len) = 0;
+    }
+    copy_len as c_int
+}
+
+/// Written MIDI label for a concert MIDI with instrument transposition applied.
+/// Writes a null-terminated UTF-8 string into `out_buf`.
+/// Returns the number of bytes written (excluding null), or -1 on error.
+#[no_mangle]
+pub extern "C" fn ear_ring_written_midi_label(
+    concert_midi: c_uchar,
+    instrument_index: c_uint,
+    out_buf: *mut std::os::raw::c_char,
+    buf_len: c_uint,
+) -> c_int {
+    if out_buf.is_null() || buf_len == 0 {
+        return -1;
+    }
+    let label = written_midi_label(concert_midi, instrument_index as usize);
+    let bytes = label.as_bytes();
+    let copy_len = (bytes.len()).min(buf_len as usize - 1);
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr() as *const std::os::raw::c_char, out_buf, copy_len);
+        *out_buf.add(copy_len) = 0;
+    }
+    copy_len as c_int
+}
+
 /// Display name for a scale ID (0–3).
 /// Writes a null-terminated UTF-8 string into `out_buf`.
 /// Returns the number of bytes written (excluding null), or -1 on error.
@@ -484,12 +562,39 @@ pub extern "C" fn ear_ring_scale_label(
     copy_len as c_int
 }
 
+/// Written-pitch version of ear_ring_scale_label — implied key annotation uses instrument transposition.
+#[no_mangle]
+pub extern "C" fn ear_ring_written_scale_label(
+    concert_root_chroma: c_uchar,
+    scale_id: c_uchar,
+    instrument_index: c_uint,
+    out_buf: *mut std::os::raw::c_char,
+    buf_len: c_uint,
+) -> c_int {
+    if out_buf.is_null() || buf_len == 0 {
+        return -1;
+    }
+    let label = written_scale_label(concert_root_chroma, scale_id, instrument_index as usize);
+    let bytes = label.as_bytes();
+    let copy_len = bytes.len().min(buf_len as usize - 1);
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr() as *const std::os::raw::c_char, out_buf, copy_len);
+        *out_buf.add(copy_len) = 0;
+    }
+    copy_len as c_int
+}
+
 /// Returns the effective major key chroma for display purposes.
 /// For Major this equals root_chroma; for modal/minor scales returns the implied major key chroma.
 /// e.g. root_chroma=0 (C), scale_id=1 (Natural Minor) → 3 (Eb major).
 #[no_mangle]
 pub extern "C" fn ear_ring_effective_key_chroma(root_chroma: c_uchar, scale_id: c_uchar) -> c_uchar {
     effective_key_chroma(root_chroma, scale_id)
+}
+
+#[no_mangle]
+pub extern "C" fn ear_ring_effective_intro_root_midi(root_chroma: c_uchar, scale_id: c_uchar, range_start: c_uchar) -> c_uchar {
+    effective_intro_root_midi(root_chroma, scale_id, range_start)
 }
 
 /// Returns 1 if the major key with this root chroma uses sharps, 0 for flats.
@@ -682,12 +787,12 @@ mod android_jni {
     use jni::JNIEnv;
 
     use super::{
-        accidental_in_key, detect_pitch, diatonic_chord_label, effective_key_chroma, freq_to_note,
+        accidental_in_key, detect_pitch, diatonic_chord_label, effective_key_chroma, effective_intro_root_midi, freq_to_note,
         generate_diatonic_chord, generate_sequence, intro_chord, is_correct_note, is_sharp_key,
         key_accidental_count, key_sig_staff_positions, melody_count, melody_range_midi,
         melody_to_midi_by_index, midi_to_label, note_name, preferred_midi_label,
         preferred_note_label, scale_label, scale_name, shuffle_melody_indices, staff_position,
-        staff_position_in_key, test_score, Note, ScaleType,
+        staff_position_in_key, test_score, written_diatonic_chord_label, written_scale_label, Note, ScaleType,
     };
 
     #[no_mangle]
@@ -836,6 +941,28 @@ mod android_jni {
     }
 
     #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeWrittenDiatonicChordLabel(
+        mut env: JNIEnv,
+        _class: JClass,
+        concert_root_chroma: jint,
+        scale_id: jint,
+        note_count: jint,
+        center_midi: jint,
+        seed: jlong,
+        instrument_index: jint,
+    ) -> jstring {
+        let scale = match scale_id {
+            0 => ScaleType::Major,
+            1 => ScaleType::NaturalMinor,
+            2 => ScaleType::Dorian,
+            3 => ScaleType::Mixolydian,
+            _ => ScaleType::Major,
+        };
+        let label = written_diatonic_chord_label(concert_root_chroma as u8, scale, note_count as u8, center_midi as u8, seed as u64, instrument_index.max(0) as usize);
+        env.new_string(label).map(|s| s.into_raw()).unwrap_or(std::ptr::null_mut())
+    }
+
+    #[no_mangle]
     pub extern "system" fn Java_com_earring_EarRingCore_nativeIntroChord(
         env: JNIEnv,
         _class: JClass,
@@ -937,6 +1064,20 @@ mod android_jni {
     }
 
     #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeWrittenScaleLabel(
+        env: JNIEnv,
+        _class: JClass,
+        concert_root_chroma: jint,
+        scale_id: jint,
+        instrument_index: jint,
+    ) -> jstring {
+        let label = written_scale_label(concert_root_chroma as u8, scale_id as u8, instrument_index.max(0) as usize);
+        env.new_string(label)
+            .map(|s| s.into_raw())
+            .unwrap_or(std::ptr::null_mut())
+    }
+
+    #[no_mangle]
     pub extern "system" fn Java_com_earring_EarRingCore_nativeEffectiveKeyChroma(
         _env: JNIEnv,
         _class: JClass,
@@ -944,6 +1085,17 @@ mod android_jni {
         scale_id: jint,
     ) -> jint {
         effective_key_chroma(root_chroma as u8, scale_id as u8) as jint
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeEffectiveIntroRootMidi(
+        _env: JNIEnv,
+        _class: JClass,
+        root_chroma: jint,
+        scale_id: jint,
+        range_start: jint,
+    ) -> jint {
+        effective_intro_root_midi(root_chroma as u8, scale_id as u8, range_start as u8) as jint
     }
 
     #[no_mangle]
@@ -1062,6 +1214,32 @@ mod android_jni {
         instrument_index: jint,
     ) -> jint {
         super::transpose_display_midi(concert_midi, instrument_index.max(0) as usize) as jint
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeWrittenNoteName(
+        env: JNIEnv,
+        _class: JClass,
+        concert_chroma: jint,
+        instrument_index: jint,
+    ) -> jstring {
+        let name = super::written_note_name(concert_chroma.max(0) as u8, instrument_index.max(0) as usize);
+        env.new_string(name)
+            .map(|s| s.into_raw())
+            .unwrap_or(std::ptr::null_mut())
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_earring_EarRingCore_nativeWrittenMidiLabel(
+        env: JNIEnv,
+        _class: JClass,
+        concert_midi: jint,
+        instrument_index: jint,
+    ) -> jstring {
+        let label = super::written_midi_label(concert_midi.max(0) as u8, instrument_index.max(0) as usize);
+        env.new_string(label)
+            .map(|s| s.into_raw())
+            .unwrap_or(std::ptr::null_mut())
     }
 
     // ── PitchTracker JNI wrappers ────────────────────────────────────────────────

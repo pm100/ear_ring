@@ -28,7 +28,7 @@ export function keyAccidentalCount(rootChroma: number): number {
 }
 
 export function isSharpKey(rootChroma: number): boolean {
-  return keyAccidentalCount(rootChroma) >= 0;
+  return keyAccidentalCount(rootChroma) > 0;
 }
 
 export function preferredMidiLabel(midi: number, rootChroma: number): string {

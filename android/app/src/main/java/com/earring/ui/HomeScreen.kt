@@ -20,9 +20,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.earring.EarRingCore
 import com.earring.ExerciseViewModel
 import com.earring.MusicTheory
 import com.earring.R
+import org.json.JSONArray
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,6 +33,16 @@ fun HomeScreen(
     onStartExercise: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
+
+    // Semitone offset for key display (written vs concert), mod 12.
+    // Transposed Guitar has +12 which collapses to 0 mod 12 — no annotation shown.
+    val instrKeyTranspose = remember(state.instrumentIndex) {
+        try {
+            val arr = JSONArray(EarRingCore.instrumentList())
+            val sem = arr.getJSONObject(state.instrumentIndex).getInt("semitones")
+            ((sem % 12) + 12) % 12
+        } catch (_: Exception) { 0 }
+    }
 
     Column(
         modifier = Modifier
@@ -107,13 +119,18 @@ fun HomeScreen(
             Column(modifier = Modifier.weight(1f)) {
                 SectionLabel("Key")
                 var keyExpanded by remember { mutableStateOf(false) }
+                // Selected display: show written key name + "(concert X)" when transposing
+                val writtenRoot = (state.rootNote + instrKeyTranspose) % 12
+                val selectedKeyLabel = if (instrKeyTranspose != 0)
+                    "${MusicTheory.NOTE_NAMES[writtenRoot]} (concert ${MusicTheory.NOTE_NAMES[state.rootNote]})"
+                else MusicTheory.NOTE_NAMES[state.rootNote]
                 ExposedDropdownMenuBox(
                     expanded = keyExpanded,
                     onExpandedChange = { keyExpanded = it },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedTextField(
-                        value = MusicTheory.NOTE_NAMES[state.rootNote],
+                        value = selectedKeyLabel,
                         onValueChange = {},
                         readOnly = true,
                         singleLine = true,
@@ -124,11 +141,16 @@ fun HomeScreen(
                         expanded = keyExpanded,
                         onDismissRequest = { keyExpanded = false }
                     ) {
-                        MusicTheory.NOTE_NAMES.forEachIndexed { index, name ->
+                        // Iterate in written-key order; value stored as concert chroma
+                        for (wc in 0..11) {
+                            val concertChroma = (wc - instrKeyTranspose + 12) % 12
+                            val label = if (instrKeyTranspose != 0)
+                                "${MusicTheory.NOTE_NAMES[wc]} (concert ${MusicTheory.NOTE_NAMES[concertChroma]})"
+                            else MusicTheory.NOTE_NAMES[wc]
                             DropdownMenuItem(
-                                text = { Text(name) },
+                                text = { Text(label) },
                                 onClick = {
-                                    viewModel.setRootNote(index)
+                                    viewModel.setRootNote(concertChroma)
                                     keyExpanded = false
                                 }
                             )
@@ -145,7 +167,7 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedTextField(
-                        value = MusicTheory.scaleLabel(state.rootNote, state.scaleId),
+                        value = EarRingCore.writtenScaleLabel(state.rootNote, state.scaleId, state.instrumentIndex),
                         onValueChange = {},
                         readOnly = true,
                         singleLine = true,
@@ -159,7 +181,7 @@ fun HomeScreen(
                     ) {
                         MusicTheory.SCALE_NAMES.forEachIndexed { index, _ ->
                             DropdownMenuItem(
-                                text = { Text(MusicTheory.scaleLabel(state.rootNote, index)) },
+                                text = { Text(EarRingCore.writtenScaleLabel(state.rootNote, index, state.instrumentIndex)) },
                                 onClick = {
                                     viewModel.setScaleId(index)
                                     scaleExpanded = false

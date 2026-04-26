@@ -38,12 +38,17 @@ object EarRingCore {
     @JvmStatic external fun nativeHelpContent(): String
     @JvmStatic external fun nativeInstrumentList(): String
     @JvmStatic external fun nativeTransposeDisplayMidi(concertMidi: Int, instrumentIndex: Int): Int
+    @JvmStatic external fun nativeWrittenNoteName(concertChroma: Int, instrumentIndex: Int): String
+    @JvmStatic external fun nativeWrittenMidiLabel(concertMidi: Int, instrumentIndex: Int): String
     @JvmStatic external fun nativeMelodyCount(): Int
     @JvmStatic external fun nativeShuffleMelodyIndices(seed: Long): IntArray
     @JvmStatic external fun nativePickMelodyByIndex(index: Int, rootChroma: Int): FloatArray
     @JvmStatic external fun nativeMelodyRangeMidi(index: Int, rootChroma: Int): IntArray
     @JvmStatic external fun nativeGenerateDiatonicChord(rootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long): IntArray
     @JvmStatic external fun nativeDiatonicChordLabel(rootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long): String
+    @JvmStatic external fun nativeWrittenDiatonicChordLabel(concertRootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long, instrumentIndex: Int): String
+    @JvmStatic external fun nativeWrittenScaleLabel(concertRootChroma: Int, scaleId: Int, instrumentIndex: Int): String
+    @JvmStatic external fun nativeEffectiveIntroRootMidi(rootChroma: Int, scaleId: Int, rangeStart: Int): Int
 
     // ── PitchTracker JNI ─────────────────────────────────────────────────────────
     @JvmStatic external fun nativeTrackerNew(silenceThreshold: Float, requiredFrames: Int): Long
@@ -146,10 +151,7 @@ object EarRingCore {
 
     fun effectiveKeyChroma(rootChroma: Int, scaleId: Int): Int =
         if (loaded) nativeEffectiveKeyChroma(rootChroma, scaleId)
-        else {
-            val offsets = listOf(0, 3, 10, 5)
-            (rootChroma + (offsets.getOrElse(scaleId) { 0 })) % 12
-        }
+        else rootChroma  // All modes share the major key's key signature
 
     fun isSharpKey(rootChroma: Int): Boolean =
         if (loaded) nativeIsSharpKey(rootChroma) != 0
@@ -185,6 +187,12 @@ object EarRingCore {
     fun transposeDisplayMidi(concertMidi: Int, instrumentIndex: Int): Int =
         if (loaded) nativeTransposeDisplayMidi(concertMidi, instrumentIndex) else concertMidi
 
+    fun writtenNoteName(concertChroma: Int, instrumentIndex: Int): String =
+        if (loaded) nativeWrittenNoteName(concertChroma, instrumentIndex) else noteName(concertChroma)
+
+    fun writtenMidiLabel(concertMidi: Int, instrumentIndex: Int): String =
+        if (loaded) nativeWrittenMidiLabel(concertMidi, instrumentIndex) else midiToLabel(concertMidi)
+
     fun melodyCount(): Int =
         if (loaded) nativeMelodyCount() else 0
 
@@ -217,4 +225,16 @@ object EarRingCore {
     fun diatonicChordLabel(rootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long): String =
         if (loaded) nativeDiatonicChordLabel(rootChroma, scaleId, noteCount, centerMidi, seed)
         else ""
+
+    fun writtenDiatonicChordLabel(concertRootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long, instrumentIndex: Int): String =
+        if (loaded) nativeWrittenDiatonicChordLabel(concertRootChroma, scaleId, noteCount, centerMidi, seed, instrumentIndex)
+        else ""
+
+    fun writtenScaleLabel(concertRootChroma: Int, scaleId: Int, instrumentIndex: Int): String =
+        if (loaded) nativeWrittenScaleLabel(concertRootChroma, scaleId, instrumentIndex)
+        else ""
+
+    fun effectiveIntroRootMidi(rootChroma: Int, scaleId: Int, rangeStart: Int): Int =
+        if (loaded) nativeEffectiveIntroRootMidi(rootChroma, scaleId, rangeStart)
+        else rangeStart - ((rangeStart + 12 - rootChroma) % 12)
 }

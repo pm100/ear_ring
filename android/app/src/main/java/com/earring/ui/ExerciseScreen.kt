@@ -38,6 +38,7 @@ import com.earring.ui.components.NoteState
 import com.earring.ui.components.MusicStaff
 import com.earring.ui.components.PitchMeter
 import com.earring.ui.components.StaffNote
+import org.json.JSONArray
 
 @Composable
 fun ExerciseScreen(
@@ -79,6 +80,13 @@ fun ExerciseScreen(
     val liveMidi = if (liveHz > 0f) EarRingCore.freqToMidi(liveHz) else -1
     val noteStepDp = 44.dp
     val instrIdx = state.instrumentIndex
+    val instrKeyTranspose = remember(instrIdx) {
+        try {
+            val arr = JSONArray(EarRingCore.instrumentList())
+            val sem = arr.getJSONObject(instrIdx).getInt("semitones")
+            ((sem % 12) + 12) % 12
+        } catch (_: Exception) { 0 }
+    }
     val staffNotes = if (state.showTestNotes) {
         state.sequence.mapIndexed { index, expectedMidi ->
             val attemptNote = state.detected.getOrNull(index)
@@ -109,8 +117,10 @@ fun ExerciseScreen(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        val writtenRoot = EarRingCore.writtenNoteName(state.rootNote, instrIdx)
+        val writtenRange = "${EarRingCore.writtenMidiLabel(state.rangeStart, instrIdx)}–${EarRingCore.writtenMidiLabel(state.rangeEnd, instrIdx)}"
         Text(
-            text = "${MusicTheory.NOTE_NAMES[state.rootNote]} ${state.rangeLabel}  ${MusicTheory.SCALE_NAMES[state.scaleId]}",
+            text = "$writtenRoot $writtenRange  ${MusicTheory.SCALE_NAMES[state.scaleId]}",
             style = MaterialTheme.typography.titleMedium
         )
 
@@ -146,7 +156,7 @@ fun ExerciseScreen(
             notes = staffNotes,
             modifier = Modifier.fillMaxWidth(),
             fixedSpacingDp = noteStepDp,
-            rootChroma = EarRingCore.effectiveKeyChroma(state.rootNote, state.scaleId),
+            rootChroma = (EarRingCore.effectiveKeyChroma(state.rootNote, state.scaleId) + instrKeyTranspose) % 12,
             keySignatureMode = state.keySignatureMode
         )
 

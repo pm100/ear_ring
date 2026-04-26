@@ -312,10 +312,10 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             val seed = System.currentTimeMillis()
             val centerMidi = (state.rangeStart + state.rangeEnd) / 2
             val midiNotes = EarRingCore.generateDiatonicChord(
-                state.rootNote, state.scaleId, state.sequenceLength,
+                state.rootNote, 0, state.sequenceLength,
                 centerMidi, seed
             ).toList().let { if (state.testType == 3) it.reversed() else it }
-            val label = EarRingCore.diatonicChordLabel(state.rootNote, state.scaleId, state.sequenceLength, centerMidi, seed)
+            val label = EarRingCore.writtenDiatonicChordLabel(state.rootNote, 0, state.sequenceLength, centerMidi, seed, state.instrumentIndex)
             _state.value = state.copy(
                 sequence = midiNotes,
                 melodyDurations = emptyList(),
@@ -365,7 +365,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     private fun playPrompt() {
         val state = _state.value
         if (!state.sessionRunning || state.sequence.isEmpty()) return
-        val triad = EarRingCore.introChord(state.rootMidi, state.scaleId).toList()
+        val triad = EarRingCore.introChord(EarRingCore.effectiveIntroRootMidi(state.rootNote, state.scaleId, state.rangeStart), state.scaleId).toList()
         audioPlayback.playChord(
             midiNotes = triad,
             onDone = {

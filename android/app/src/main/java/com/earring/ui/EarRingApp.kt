@@ -20,6 +20,7 @@ import androidx.navigation.compose.rememberNavController
 import com.earring.ExerciseViewModel
 import com.earring.EarRingCore
 import com.earring.ProgressViewModel
+import org.json.JSONArray
 
 object Routes {
     const val HOME = "home"
@@ -142,11 +143,18 @@ fun EarRingApp() {
             }
             composable(Routes.SETUP) {
                 val state by exerciseViewModel.state.collectAsState()
+                val instrKeyTranspose = remember(state.instrumentIndex) {
+                    try {
+                        val arr = JSONArray(EarRingCore.instrumentList())
+                        val sem = arr.getJSONObject(state.instrumentIndex).getInt("semitones")
+                        ((sem % 12) + 12) % 12
+                    } catch (_: Exception) { 0 }
+                }
                 SetupScreen(
                     onBack = { navController.popBackStack() },
                     rangeStart = state.rangeStart,
                     rangeEnd = state.rangeEnd,
-                    rootChroma = EarRingCore.effectiveKeyChroma(state.rootNote, state.scaleId),
+                    rootChroma = (EarRingCore.effectiveKeyChroma(state.rootNote, state.scaleId) + instrKeyTranspose) % 12,
                     keySignatureMode = state.keySignatureMode,
                     silenceThreshold = state.silenceThreshold,
                     framesToConfirm = state.framesToConfirm,

@@ -7,9 +7,8 @@ import { preferredMidiLabel } from '../music';
 
 interface InstrumentInfo { id: number; name: string; semitones: number; }
 
-const IMPLIED_MAJOR_OFFSETS = [0, 3, 10, 5]; // indexed by scaleId (Major, NaturalMinor, Dorian, Mixolydian)
-function effectiveKeyChroma(rootChroma: number, scaleId: number): number {
-  return (rootChroma + (IMPLIED_MAJOR_OFFSETS[scaleId] ?? 0)) % 12;
+function effectiveKeyChroma(rootChroma: number, _scaleId: number): number {
+  return rootChroma;
 }
 
 interface Props {
@@ -81,7 +80,8 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
   const transpMidi = (midi: number) => Math.max(0, Math.min(127, midi + transpSemitones));
   const displayMidi = currentMidi >= 0 ? transpMidi(currentMidi) : -1;
   const displayHistory = noteHistory.map(transpMidi);
-  const effChroma = effectiveKeyChroma(rootChroma, scaleId);
+  const instrKeyTranspose = ((transpSemitones % 12) + 12) % 12;
+  const effChroma = (effectiveKeyChroma(rootChroma, scaleId) + instrKeyTranspose) % 12;
   const noteLabel = displayMidi >= 0 ? preferredMidiLabel(displayMidi, effChroma) : '—';
   const noteHz = currentMidi >= 0 ? (440 * Math.pow(2, (currentMidi - 69) / 12)) : null;
 

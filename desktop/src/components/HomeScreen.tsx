@@ -1,4 +1,5 @@
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
+import { invoke } from '@tauri-apps/api/tauri';
 import { ExerciseSettings } from '../types';
 
 interface Props {
@@ -8,7 +9,7 @@ interface Props {
 }
 
 const NOTE_NAMES = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
-const SCALE_NAMES = ['Major','Natural Minor','Dorian','Mixolydian'];
+const SCALE_NAMES = ['Major', 'Relative Minor', 'Dorian', 'Mixolydian'];
 // Semitones to add to root chroma to get implied major key; null = no parenthetical (Major).
 const IMPLIED_MAJOR_OFFSETS: (number | null)[] = [null, 3, 10, 5];
 
@@ -213,6 +214,31 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
   const isMelodyMode = settings.testType === 1;
   const isDiatonicMode = settings.testType === 2 || settings.testType === 3;
 
+  // Semitone offset for key display (written vs concert pitch), mod 12.
+  // Transposed Guitar has +12 which collapses to 0 — no annotation shown for it.
+  const [instrKeyTranspose, setInstrKeyTranspose] = useState(0);
+  useEffect(() => {
+    invoke<string>('cmd_instrument_list')
+      .then(json => {
+        const list = JSON.parse(json) as { semitones: number }[];
+        const sem = list[settings.instrumentIndex]?.semitones ?? 0;
+        setInstrKeyTranspose(((sem % 12) + 12) % 12);
+      })
+      .catch(() => setInstrKeyTranspose(0));
+  }, [settings.instrumentIndex]);
+
+  // Scale labels in written pitch for the selected instrument
+  const [scaleLabels, setScaleLabels] = useState<string[]>(['Major', 'Relative Minor', 'Dorian', 'Mixolydian']);
+  useEffect(() => {
+    Promise.all([0, 1, 2, 3].map(i =>
+      invoke<string>('cmd_written_scale_label', {
+        concertRootChroma: settings.rootNote,
+        scaleId: i,
+        instrumentIndex: settings.instrumentIndex,
+      })
+    )).then(setScaleLabels).catch(() => {});
+  }, [settings.rootNote, settings.instrumentIndex]);
+
   const handleTestTypeChange = (newType: number) => {
     onUpdateSettings(prev => {
       const newSeqLen = newType === 2 && prev.sequenceLength !== 3 && prev.sequenceLength !== 4 ? 3 : prev.sequenceLength;
@@ -249,15 +275,19 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
           <select
             value={settings.rootNote}
             onChange={e => {
-              const i = Number(e.target.value);
-              const [rs, re] = defaultRangeForKey(i);
-              onUpdateSettings(prev => ({ ...prev, rootNote: i, rangeStart: rs, rangeEnd: re }));
+              const concertChroma = Number(e.target.value);
+              const [rs, re] = defaultRangeForKey(concertChroma);
+              onUpdateSettings(prev => ({ ...prev, rootNote: concertChroma, rangeStart: rs, rangeEnd: re }));
             }}
             style={{ width: '100%', padding: '8px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #ccc', marginBottom: 4 }}
           >
-            {NOTE_NAMES.map((name, i) => (
-              <option key={i} value={i}>{name}</option>
-            ))}
+            {Array.from({ length: 12 }, (_, wc) => {
+              const concertChroma = (wc - instrKeyTranspose + 12) % 12;
+              const label = instrKeyTranspose !== 0
+                ? `${NOTE_NAMES[wc]} (concert ${NOTE_NAMES[concertChroma]})`
+                : NOTE_NAMES[wc];
+              return <option key={wc} value={concertChroma}>{label}</option>;
+            })}
           </select>
         </div>
         <div style={{ flex: 1, opacity: isMelodyMode ? 0.38 : 1 }}>
@@ -269,7 +299,7 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
             style={{ width: '100%', padding: '8px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #ccc', marginBottom: 4 }}
           >
             {SCALE_NAMES.map((_, i) => (
-              <option key={i} value={i}>{scaleLabel(settings.rootNote, i)}</option>
+              <option key={i} value={i}>{scaleLabels[i] ?? '?'}</option>
             ))}
           </select>
         </div>

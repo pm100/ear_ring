@@ -79,6 +79,16 @@ int32_t ear_ring_diatonic_chord_label(uint8_t root_chroma,
                                        char *out_buf,
                                        uint32_t buf_len);
 
+/// Written-pitch version: chord root name uses instrument transposition.
+int32_t ear_ring_written_diatonic_chord_label(uint8_t concert_root_chroma,
+                                               uint8_t scale_id,
+                                               uint8_t note_count,
+                                               uint8_t center_midi,
+                                               uint64_t seed,
+                                               uint32_t instrument_index,
+                                               char *out_buf,
+                                               uint32_t buf_len);
+
 /// Check whether a detected note is correct for the expected note.
 /// Returns 1 if correct, 0 otherwise.
 /// @param detected_midi  Detected MIDI note number
@@ -102,6 +112,18 @@ int32_t ear_ring_midi_to_label(uint8_t midi, char *out_buf, uint32_t buf_len);
 /// Returns bytes written (excluding null), or -1 on error.
 int32_t ear_ring_note_name(uint8_t chroma, char *out_buf, uint32_t buf_len);
 
+/// Written note name for a concert chroma with instrument transposition applied.
+/// e.g. chroma=10 (Bb), instrument_index=6 (Trumpet, +2) → "C"
+/// Writes a null-terminated string into out_buf.
+/// Returns bytes written (excluding null), or -1 on error.
+int32_t ear_ring_written_note_name(uint8_t concert_chroma, uint32_t instrument_index, char *out_buf, uint32_t buf_len);
+
+/// Written MIDI label for a concert MIDI with instrument transposition applied.
+/// e.g. midi=58 (Bb3), instrument_index=6 (Trumpet, +2) → "C4"
+/// Writes a null-terminated string into out_buf.
+/// Returns bytes written (excluding null), or -1 on error.
+int32_t ear_ring_written_midi_label(uint8_t concert_midi, uint32_t instrument_index, char *out_buf, uint32_t buf_len);
+
 /// Display name for a scale ID (0–3).
 /// Writes a null-terminated string into out_buf.
 /// Returns bytes written (excluding null), or -1 on error.
@@ -112,6 +134,10 @@ int32_t ear_ring_scale_name(uint8_t scale_id, char *out_buf, uint32_t buf_len);
 /// Writes a null-terminated string into out_buf.
 /// Returns bytes written (excluding null), or -1 on error.
 int32_t ear_ring_scale_label(uint8_t root_chroma, uint8_t scale_id, char *out_buf, uint32_t buf_len);
+
+/// Written-pitch version: implied key annotation uses instrument transposition.
+int32_t ear_ring_written_scale_label(uint8_t concert_root_chroma, uint8_t scale_id, uint32_t instrument_index, char *out_buf, uint32_t buf_len);
+uint8_t ear_ring_effective_intro_root_midi(uint8_t root_chroma, uint8_t scale_id, uint8_t range_start);
 
 /// Returns the effective major key chroma for key-signature and note-spelling display.
 /// For Major this equals root_chroma; for modal/minor scales returns the implied major key chroma.

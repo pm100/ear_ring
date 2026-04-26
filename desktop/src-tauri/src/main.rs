@@ -1,10 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use ear_ring_core::{
-    accidental_in_key, detect_pitch, diatonic_chord_label, freq_to_note, generate_diatonic_chord, generate_sequence, help_sections_json,
+    accidental_in_key, detect_pitch, diatonic_chord_label, effective_intro_root_midi, freq_to_note, generate_diatonic_chord, generate_sequence, help_sections_json,
     intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
     melody_count, melody_range_midi, melody_title, melody_to_midi_by_index, note_timing, preferred_midi_label,
-    shuffle_melody_indices, staff_position, test_score, Note, PitchTracker, ScaleType,
+    shuffle_melody_indices, staff_position, test_score, written_diatonic_chord_label, written_note_name, written_midi_label, written_scale_label,
+    Note, PitchTracker, ScaleType,
 };
 use std::sync::Mutex;
 use tauri::State;
@@ -124,6 +125,18 @@ fn cmd_diatonic_chord_label(root_chroma: u8, scale_id: u8, note_count: u8, cente
 }
 
 #[tauri::command]
+fn cmd_written_diatonic_chord_label(concert_root_chroma: u8, scale_id: u8, note_count: u8, center_midi: u8, seed: u64, instrument_index: u32) -> String {
+    let scale = match scale_id {
+        0 => ScaleType::Major,
+        1 => ScaleType::NaturalMinor,
+        2 => ScaleType::Dorian,
+        3 => ScaleType::Mixolydian,
+        _ => ScaleType::Major,
+    };
+    written_diatonic_chord_label(concert_root_chroma, scale, note_count, center_midi, seed, instrument_index as usize)
+}
+
+#[tauri::command]
 fn cmd_intro_chord(root_midi: u8, scale_id: u8) -> Vec<u8> {
     let scale = match scale_id {
         0 => ScaleType::Major,
@@ -196,6 +209,26 @@ fn cmd_transpose_display_midi(concert_midi: i32, instrument_index: i32) -> i32 {
 }
 
 #[tauri::command]
+fn cmd_written_note_name(concert_chroma: u8, instrument_index: u32) -> String {
+    written_note_name(concert_chroma, instrument_index as usize).to_string()
+}
+
+#[tauri::command]
+fn cmd_written_midi_label(concert_midi: u8, instrument_index: u32) -> String {
+    written_midi_label(concert_midi, instrument_index as usize)
+}
+
+#[tauri::command]
+fn cmd_written_scale_label(concert_root_chroma: u8, scale_id: u8, instrument_index: u32) -> String {
+    written_scale_label(concert_root_chroma, scale_id, instrument_index as usize)
+}
+
+#[tauri::command]
+fn cmd_effective_intro_root_midi(root_chroma: u8, scale_id: u8, range_start: u8) -> u8 {
+    effective_intro_root_midi(root_chroma, scale_id, range_start)
+}
+
+#[tauri::command]
 fn cmd_melody_count() -> u32 {
     melody_count() as u32
 }
@@ -247,6 +280,7 @@ fn main() {
             cmd_generate_sequence,
             cmd_generate_diatonic_chord,
             cmd_diatonic_chord_label,
+            cmd_written_diatonic_chord_label,
             cmd_intro_chord,
             cmd_is_correct_note,
             cmd_test_score,
@@ -258,6 +292,10 @@ fn main() {
             cmd_help_content,
             cmd_instrument_list,
             cmd_transpose_display_midi,
+            cmd_written_note_name,
+            cmd_written_midi_label,
+            cmd_written_scale_label,
+            cmd_effective_intro_root_midi,
             cmd_melody_count,
             cmd_shuffle_melody_indices,
             cmd_pick_melody_by_index,

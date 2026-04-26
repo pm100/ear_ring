@@ -12,11 +12,10 @@ interface Props {
   onStop: () => void;
 }
 
-const SCALE_NAMES = ['Major','Natural Minor','Dorian','Mixolydian'];
-const IMPLIED_MAJOR_OFFSETS = [0, 3, 10, 5]; // indexed by scaleId
+const SCALE_NAMES = ['Major','Relative Minor','Dorian','Mixolydian'];
 
-function effectiveKeyChroma(rootNote: number, scaleId: number): number {
-  return (rootNote + (IMPLIED_MAJOR_OFFSETS[scaleId] ?? 0)) % 12;
+function effectiveKeyChroma(rootNote: number, _scaleId: number): number {
+  return rootNote;
 }
 
 function averageScore(cumulativeScorePercent: number, testsCompleted: number): number {
@@ -95,6 +94,23 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   }, [exercise.instrumentIndex]);
   const transpMidi = (midi: number) => Math.max(0, Math.min(127, midi + transpSemitones));
 
+  // Pre-compute written-pitch title via Rust (Tauri invoke is async).
+  const [writtenRoot, setWrittenRoot] = useState('');
+  const [writtenRangeStart, setWrittenRangeStart] = useState('');
+  const [writtenRangeEnd, setWrittenRangeEnd] = useState('');
+  useEffect(() => {
+    const instrIdx = exercise.instrumentIndex ?? 0;
+    Promise.all([
+      invoke<string>('cmd_written_note_name', { concertChroma: exercise.rootNote, instrumentIndex: instrIdx }),
+      invoke<string>('cmd_written_midi_label', { concertMidi: exercise.rangeStart, instrumentIndex: instrIdx }),
+      invoke<string>('cmd_written_midi_label', { concertMidi: exercise.rangeEnd, instrumentIndex: instrIdx }),
+    ]).then(([root, start, end]) => {
+      setWrittenRoot(root);
+      setWrittenRangeStart(start);
+      setWrittenRangeEnd(end);
+    }).catch(() => {});
+  }, [exercise.rootNote, exercise.rangeStart, exercise.rangeEnd, exercise.instrumentIndex]);
+
   const schedule = useCallback((callback: () => void, ms: number) => {
     const id = window.setTimeout(callback, ms);
     timersRef.current.push(id);
@@ -105,8 +121,12 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     timersRef.current = [];
   }, []);
 
-  const fetchIntroTriad = useCallback(() => {
-    const rootMidi = exercise.rangeStart - ((exercise.rangeStart - exercise.rootNote + 12) % 12);
+  const fetchIntroTriad = useCallback(async () => {
+    const rootMidi = await invoke<number>('cmd_effective_intro_root_midi', {
+      rootChroma: exercise.rootNote,
+      scaleId: exercise.scaleId,
+      rangeStart: exercise.rangeStart,
+    });
     return invoke<number[]>('cmd_intro_chord', {
       rootMidi,
       scaleId: exercise.scaleId,
@@ -161,17 +181,18 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       const seed = Date.now();
       const seq = await invoke<number[]>('cmd_generate_diatonic_chord', {
         rootChroma: exercise.rootNote,
-        scaleId: exercise.scaleId,
+        scaleId: 0,
         noteCount: exercise.sequenceLength,
         centerMidi,
         seed,
       });
-      const label = await invoke<string>('cmd_diatonic_chord_label', {
-        rootChroma: exercise.rootNote,
-        scaleId: exercise.scaleId,
+      const label = await invoke<string>('cmd_written_diatonic_chord_label', {
+        concertRootChroma: exercise.rootNote,
+        scaleId: 0,
         noteCount: exercise.sequenceLength,
         centerMidi,
         seed,
+        instrumentIndex: exercise.instrumentIndex ?? 0,
       });
       const orderedSeq = exercise.testType === 3 ? [...seq].reverse() : seq;
       return { sequence: orderedSeq, title: label };
@@ -378,7 +399,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     }
   };
 
-  const rootLabel = `${NOTE_NAMES[exercise.rootNote]}  ${preferredMidiLabel(exercise.rangeStart, effectiveKeyChroma(exercise.rootNote, exercise.scaleId))}–${preferredMidiLabel(exercise.rangeEnd, effectiveKeyChroma(exercise.rootNote, exercise.scaleId))}`;
+  const rootLabel = `${writtenRoot}  ${writtenRangeStart}–${writtenRangeEnd}`;
   const scaleLabel = SCALE_NAMES[exercise.scaleId];
   const score = averageScore(cumulativeScorePercent, testsCompleted);
   const staffNotes: StaffDisplayNote[] = exercise.showTestNotes
@@ -417,7 +438,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       <MusicStaff
         notes={staffNotes}
         fixedSpacing={noteStep}
-        rootChroma={effectiveKeyChroma(exercise.rootNote, exercise.scaleId)}
+        rootChroma={(effectiveKeyChroma(exercise.rootNote, exercise.scaleId) + ((transpSemitones % 12) + 12) % 12) % 12}
         keySignatureMode={exercise.keySignatureMode}
       />
 

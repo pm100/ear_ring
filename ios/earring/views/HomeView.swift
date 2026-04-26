@@ -119,6 +119,8 @@ struct HomeView: View {
     @Binding var path: NavigationPath
     @Environment(\.horizontalSizeClass) var hsc
 
+    @State private var instrKeyTranspose: Int = 0
+
     private var isIPad: Bool { hsc == .regular }
     private var keyScale: CGFloat { isIPad ? 1.35 : 1.0 }
     private var pianoHeight: CGFloat { (22 * keyScale + 80 * keyScale) * 1.0 }  // handleArea + whiteKeyH
@@ -166,8 +168,14 @@ struct HomeView: View {
                             get: { model.rootNote },
                             set: { model.rootNote = $0; model.updateRangeForKey() }
                         )) {
-                            ForEach(0..<12, id: \.self) { i in
-                                Text(MusicTheory.NOTE_NAMES[i]).tag(i)
+                            // Options in written-chroma order; value is concert chroma.
+                            ForEach(0..<12, id: \.self) { wc in
+                                let concertChroma = (wc - instrKeyTranspose + 12) % 12
+                                let writtenName = MusicTheory.NOTE_NAMES[wc]
+                                let label = instrKeyTranspose != 0
+                                    ? "\(writtenName) (concert \(MusicTheory.NOTE_NAMES[concertChroma]))"
+                                    : writtenName
+                                Text(label).tag(concertChroma)
                             }
                         }
                         .pickerStyle(.menu)
@@ -182,7 +190,7 @@ struct HomeView: View {
                             set: { model.scaleId = $0 }
                         )) {
                             ForEach(0..<MusicTheory.SCALE_NAMES.count, id: \.self) { i in
-                                Text(MusicTheory.scaleLabel(rootChroma: model.rootNote, scaleId: i)).tag(i)
+                                Text(EarRingCore.writtenScaleLabel(concertRootChroma: model.rootNote, scaleId: i, instrumentIndex: model.instrumentIndex)).tag(i)
                             }
                         }
                         .pickerStyle(.menu)
@@ -258,6 +266,8 @@ struct HomeView: View {
         }
         .background(Color(.systemBackground))
         .hideNavigationBar()
+        .onAppear { loadInstrTranspose() }
+        .onChange(of: model.instrumentIndex) { _ in loadInstrTranspose() }
     }
 
     @ViewBuilder
@@ -267,5 +277,16 @@ struct HomeView: View {
             .foregroundColor(.erMuted)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 6)
+    }
+
+    private func loadInstrTranspose() {
+        guard let json = try? JSONSerialization.jsonObject(with: Data(EarRingCore.instrumentList().utf8)),
+              let arr = json as? [[String: Any]],
+              arr.indices.contains(model.instrumentIndex) else {
+            instrKeyTranspose = 0
+            return
+        }
+        let sem = (arr[model.instrumentIndex]["semitones"] as? Int) ?? 0
+        instrKeyTranspose = ((sem % 12) + 12) % 12
     }
 }

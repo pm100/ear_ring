@@ -162,7 +162,7 @@ impl ScaleType {
     pub fn display_name(self) -> &'static str {
         match self {
             ScaleType::Major => "Major",
-            ScaleType::NaturalMinor => "Natural Minor",
+            ScaleType::NaturalMinor => "Relative Minor",
             ScaleType::Dorian => "Dorian",
             ScaleType::Mixolydian => "Mixolydian",
         }
@@ -185,6 +185,8 @@ pub fn scale_notes(root: Note, scale: ScaleType) -> Vec<Note> {
 /// Generate a random sequence of `length` notes drawn from the given scale,
 /// restricted to MIDI notes within [range_start, range_end].
 /// Uses a simple LCG seeded by the provided `seed` for reproducibility.
+/// The scale root is shifted to the mode's degree within the parent major key.
+/// e.g. root=C + NaturalMinor → uses A as the filter root (A Natural Minor = Relative Minor of C).
 pub fn generate_sequence(
     root_chroma: u8,
     scale: ScaleType,
@@ -195,9 +197,10 @@ pub fn generate_sequence(
 ) -> Vec<Note> {
     use std::collections::HashSet;
     let intervals: HashSet<u8> = scale.intervals().iter().copied().collect();
+    let mode_root = ((root_chroma as u16 + mode_root_offset(scale) as u16) % 12) as u8;
     let notes: Vec<Note> = (range_start..=range_end)
         .filter(|&m| {
-            let interval = (m + 12 - root_chroma % 12) % 12;
+            let interval = (m + 12 - mode_root) % 12;
             intervals.contains(&interval)
         })
         .map(Note::from_midi)
@@ -347,7 +350,7 @@ pub fn diatonic_chord_label(
     let third_interval = ((third_semitones - root_semitones) + 12) % 12;
     let fifth_interval = ((fifth_semitones - root_semitones) + 24) % 12;
     let quality_suffix = match (third_interval, fifth_interval) {
-        (3, 6) => "\u{00b0}", // diminished (°)
+        (3, 6) => "\u{00f8}", // half-diminished (ø)
         (3, _) => "-",         // minor
         (4, 8) => "+",         // augmented (rare in diatonic scales)
         _ => "",               // major
@@ -363,8 +366,58 @@ pub fn diatonic_chord_label(
     format!("{}{} \u{2013} {}", chord_root_name, quality_suffix, inversion_label)
 }
 
-/// Whether a detected note matches the expected note class and is within the
-/// allowed cents tolerance.
+/// Like `diatonic_chord_label` but displays the chord root in written (transposed) pitch
+/// for the given instrument. All interval/quality logic is unchanged; only the name display
+/// uses the written key.
+pub fn written_diatonic_chord_label(
+    concert_root_chroma: u8,
+    scale: ScaleType,
+    note_count: u8,
+    _center_midi: u8,
+    seed: u64,
+    instrument_index: usize,
+) -> String {
+    let semitones = INSTRUMENTS.get(instrument_index).map(|i| i.semitones).unwrap_or(0);
+    let intervals = scale.intervals();
+    let nc = note_count.clamp(3, 4) as usize;
+
+    let mut rng = seed;
+    let mut next = || -> u64 {
+        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng >> 33
+    };
+
+    let degree = (next() % 7) as usize;
+    let inversion = (next() % nc as u64) as usize;
+
+    // Concert chord root chroma → written chord root chroma
+    let concert_chord_root = ((concert_root_chroma as i32 + intervals[degree] as i32) % 12) as u8;
+    let written_chord_root = ((concert_chord_root as i32 + semitones).rem_euclid(12)) as u8;
+    let written_key_root = ((concert_root_chroma as i32 + semitones).rem_euclid(12)) as u8;
+    let chord_root_name = preferred_note_label(written_chord_root, written_key_root);
+
+    // Quality is determined from scale intervals — same regardless of transposition
+    let root_semitones = intervals[degree] as i32;
+    let third_semitones = intervals[(degree + 2) % 7] as i32;
+    let fifth_semitones = intervals[(degree + 4) % 7] as i32;
+    let third_interval = ((third_semitones - root_semitones) + 12) % 12;
+    let fifth_interval = ((fifth_semitones - root_semitones) + 24) % 12;
+    let quality_suffix = match (third_interval, fifth_interval) {
+        (3, 6) => "\u{00f8}", // half-diminished (ø)
+        (3, _) => "-",
+        (4, 8) => "+",
+        _ => "",
+    };
+
+    let inversion_label = match inversion {
+        0 => "Root Position",
+        1 => "1st Inversion",
+        2 => "2nd Inversion",
+        _ => "3rd Inversion",
+    };
+
+    format!("{}{} \u{2013} {}", chord_root_name, quality_suffix, inversion_label)
+}
 pub fn is_correct_note(detected_midi: u8, cents: i32, expected_midi: u8) -> bool {
     detected_midi % 12 == expected_midi % 12 && cents.abs() <= 50
 }
@@ -437,47 +490,52 @@ pub fn note_name(chroma: u8) -> &'static str {
     NoteName::from_chroma(chroma).display_name()
 }
 
+/// Written note name for a concert chroma, applying the given instrument's transposition.
+/// e.g. chroma=10 (Bb), Trumpet (+2) → "C"
+pub fn written_note_name(concert_chroma: u8, instrument_index: usize) -> &'static str {
+    let semitones = INSTRUMENTS.get(instrument_index).map(|i| i.semitones).unwrap_or(0);
+    note_name(((concert_chroma as i32 + semitones).rem_euclid(12)) as u8)
+}
+
+/// Written MIDI label for a concert MIDI, applying the given instrument's transposition.
+/// e.g. MIDI 58 (Bb3), Trumpet (+2) → "C4"
+pub fn written_midi_label(concert_midi: u8, instrument_index: usize) -> String {
+    let semitones = INSTRUMENTS.get(instrument_index).map(|i| i.semitones).unwrap_or(0);
+    midi_to_label(((concert_midi as i32 + semitones).clamp(0, 127)) as u8)
+}
+
 /// Display name for a scale ID (0–3).
 pub fn scale_name(scale_id: u8) -> &'static str {
     match scale_id {
         0 => "Major",
-        1 => "Natural Minor",
+        1 => "Relative Minor",
         2 => "Dorian",
         3 => "Mixolydian",
         _ => "?",
     }
 }
 
-/// Returns the effective major key chroma for key-signature and note-spelling display.
-/// For Major this is the root itself; for modal/minor scales returns the implied major key chroma.
-/// e.g. root_chroma=0 (C), scale_id=1 (Natural Minor) → 3 (Eb major).
-pub fn effective_key_chroma(root_chroma: u8, scale_id: u8) -> u8 {
-    let scale = match scale_id {
-        0 => ScaleType::Major,
-        1 => ScaleType::NaturalMinor,
-        2 => ScaleType::Dorian,
-        3 => ScaleType::Mixolydian,
-        _ => return root_chroma,
-    };
-    match implied_major_offset(scale) {
-        None => root_chroma,
-        Some(offset) => ((root_chroma as u16 + offset as u16) % 12) as u8,
-    }
+/// Returns the effective major key chroma for key-signature display.
+/// All modes of a major key share the same key signature as that major key.
+/// e.g. root_chroma=0 (C), any scale → 0 (C major key sig).
+pub fn effective_key_chroma(root_chroma: u8, _scale_id: u8) -> u8 {
+    root_chroma
 }
 
-/// Semitones to add to the scale root to get the implied major key root.
-/// Returns None for Major (scale is its own major key).
-fn implied_major_offset(scale: ScaleType) -> Option<u8> {
+/// Semitones from the major key root to the mode's starting degree within that key.
+/// Major = 0 (root); NaturalMinor = 9th semitone (6th degree); etc.
+fn mode_root_offset(scale: ScaleType) -> u8 {
     match scale {
-        ScaleType::Major => None,
-        ScaleType::NaturalMinor => Some(3),  // C minor → Eb major
-        ScaleType::Dorian => Some(10),        // D Dorian → C major
-        ScaleType::Mixolydian => Some(5),     // G Mixolydian → C major
+        ScaleType::Major => 0,
+        ScaleType::NaturalMinor => 9,   // 6th degree (Aeolian / Relative Minor)
+        ScaleType::Dorian => 2,          // 2nd degree
+        ScaleType::Mixolydian => 7,      // 5th degree
     }
 }
 
-/// Full display label for a scale, including implied major key for non-major scales.
-/// e.g. root_chroma=0 (C), scale_id=1 (Natural Minor) → "Natural Minor (Eb)"
+/// Full display label for a scale, annotated with the mode's starting note.
+/// e.g. root_chroma=0 (C), scale_id=1 (Natural Minor) → "Relative Minor (A-)"
+/// e.g. root_chroma=0 (C), scale_id=2 (Dorian)        → "Dorian (D)"
 pub fn scale_label(root_chroma: u8, scale_id: u8) -> String {
     let scale = match scale_id {
         0 => ScaleType::Major,
@@ -486,15 +544,38 @@ pub fn scale_label(root_chroma: u8, scale_id: u8) -> String {
         3 => ScaleType::Mixolydian,
         _ => return "?".to_string(),
     };
-    let base = scale.display_name();
-    match implied_major_offset(scale) {
-        None => base.to_string(),
-        Some(offset) => {
-            let implied_chroma = ((root_chroma as u16 + offset as u16) % 12) as u8;
-            let key_name = NoteName::from_chroma(implied_chroma).display_name();
-            format!("{} ({})", base, key_name)
-        }
+    let offset = mode_root_offset(scale);
+    if offset == 0 {
+        return scale.display_name().to_string();
     }
+    let mode_root_chroma = ((root_chroma as u16 + offset as u16) % 12) as u8;
+    let mode_root_name = NoteName::from_chroma(mode_root_chroma).display_name();
+    // Natural Minor is "Relative Minor" — append "-" to show it is a minor mode.
+    let dash = if matches!(scale, ScaleType::NaturalMinor) { "-" } else { "" };
+    format!("{} ({}{})", scale.display_name(), mode_root_name, dash)
+}
+
+/// Like `scale_label` but uses written (transposed) pitch for the mode root annotation.
+pub fn written_scale_label(concert_root_chroma: u8, scale_id: u8, instrument_index: usize) -> String {
+    let semitones = INSTRUMENTS.get(instrument_index).map(|i| i.semitones).unwrap_or(0);
+    let written_chroma = ((concert_root_chroma as i32 + semitones).rem_euclid(12)) as u8;
+    scale_label(written_chroma, scale_id)
+}
+
+/// MIDI note of the mode's starting degree, at or just below `range_start`.
+/// Used for the intro chord root when in a non-Major scale mode.
+/// e.g. root_chroma=C, scale_id=NaturalMinor, range_start=72 (C5) → 69 (A4).
+pub fn effective_intro_root_midi(root_chroma: u8, scale_id: u8, range_start: u8) -> u8 {
+    let scale = match scale_id {
+        0 => ScaleType::Major,
+        1 => ScaleType::NaturalMinor,
+        2 => ScaleType::Dorian,
+        3 => ScaleType::Mixolydian,
+        _ => ScaleType::Major,
+    };
+    let mode_root_chroma = ((root_chroma as u16 + mode_root_offset(scale) as u16) % 12) as u8;
+    let offset = (range_start + 12 - mode_root_chroma) % 12;
+    range_start - offset
 }
 
 // ── Key signature ─────────────────────────────────────────────────────────────
@@ -532,7 +613,7 @@ pub fn key_accidental_count(root_chroma: u8) -> i8 {
 
 /// Returns true if the major key with this root chroma uses sharps (or is C major).
 pub fn is_sharp_key(root_chroma: u8) -> bool {
-    key_accidental_count(root_chroma) >= 0
+    key_accidental_count(root_chroma) > 0
 }
 
 /// Returns the set of pitch classes that are part of the key signature
@@ -869,6 +950,47 @@ mod tests {
     }
 
     #[test]
+    fn test_generate_sequence_relative_minor() {
+        // Key=C, Relative Minor → A Natural Minor (pitch classes 0,2,3,5,7,8,10 from A=9)
+        // i.e. A(9), B(11), C(0), D(2), E(4), F(5), G(7)
+        let a_minor_pcs: std::collections::HashSet<u8> = [0,2,3,5,7,9,11].iter().copied().collect();
+        let seq = generate_sequence(0, ScaleType::NaturalMinor, 57, 84, 20, 77);
+        for note in &seq {
+            assert!(a_minor_pcs.contains(&(note.midi() % 12)), "Note {:?} not in A minor", note);
+        }
+    }
+
+    #[test]
+    fn test_effective_key_chroma_all_scales() {
+        // All scales for root=C should return 0 (C major key sig shared by all modes of C)
+        assert_eq!(effective_key_chroma(0, 0), 0); // C Major
+        assert_eq!(effective_key_chroma(0, 1), 0); // C → Relative Minor (A minor = C major key sig)
+        assert_eq!(effective_key_chroma(0, 2), 0); // C → Dorian (D Dorian = C major key sig)
+        assert_eq!(effective_key_chroma(0, 3), 0); // C → Mixolydian (G Mixolydian = C major key sig)
+    }
+
+    #[test]
+    fn test_scale_label_relative_minor() {
+        assert_eq!(scale_label(0, 1), "Relative Minor (A-)"); // C → A minor
+        assert_eq!(scale_label(7, 1), "Relative Minor (E-)"); // G → E minor
+        assert_eq!(scale_label(0, 2), "Dorian (D)");          // C → D Dorian
+        assert_eq!(scale_label(0, 3), "Mixolydian (G)");      // C → G Mixolydian
+    }
+
+    #[test]
+    fn test_effective_intro_root_midi() {
+        // Key=C (chroma 0), Relative Minor (scale_id=1), range_start=60 (C4)
+        // mode root = A, MIDI at or just below 60 = A3 = 57
+        assert_eq!(effective_intro_root_midi(0, 1, 60), 57);
+        // Key=C (chroma 0), Major (scale_id=0), range_start=60
+        // mode root = C, MIDI at or just below 60 = 60
+        assert_eq!(effective_intro_root_midi(0, 0, 60), 60);
+        // Key=C, Dorian (scale_id=2), range_start=62 (D4)
+        // mode root = D, MIDI at or just below 62 = 62
+        assert_eq!(effective_intro_root_midi(0, 2, 62), 62);
+    }
+
+    #[test]
     fn test_staff_position() {
         assert_eq!(staff_position(Note::new(NoteName::C, 4)), 0); // middle C
         assert_eq!(staff_position(Note::new(NoteName::D, 4)), 1);
@@ -963,35 +1085,34 @@ mod tests {
 
     #[test]
     fn test_diatonic_chord_label_quality() {
-        // In C major, degree 6 = B, which forms a diminished triad (B-D-F)
-        // Find a seed that picks degree 6; brute-force a few seeds and check label contains °
-        // Also verify that degree 0 (C) gives no suffix (major), and degree 2 (E) gives no suffix
+        // In C major, degree 6 = B, which forms a half-diminished triad (B-D-F)
+        // Find a seed that picks degree 6; brute-force a few seeds and check label contains ø
         let mut found_dim = false;
         for seed in 0u64..200 {
             let label = diatonic_chord_label(0, ScaleType::Major, 3, 60, seed);
             if label.starts_with('B') {
-                // B in C major must be diminished
-                assert!(label.contains('\u{00b0}'),
-                    "B in C major should be diminished (°), got: {}", label);
+                // B in C major must be half-diminished
+                assert!(label.contains('\u{00f8}'),
+                    "B in C major should be half-diminished (ø), got: {}", label);
                 found_dim = true;
             }
-            if label.starts_with('C') && !label.contains('\u{00b0}') && !label.contains('-') {
+            if label.starts_with('C') && !label.contains('\u{00f8}') && !label.contains('-') {
                 // C in C major is major — no suffix expected
             }
         }
-        assert!(found_dim, "Did not encounter a B° chord in 200 seeds for C major");
+        assert!(found_dim, "Did not encounter a Bø chord in 200 seeds for C major");
 
-        // In natural minor, degree 1 is the supertonic which is diminished
+        // In natural minor, degree 1 is the supertonic which is half-diminished
         // (e.g., A natural minor: B-D-F)
         let mut found_dim_minor = false;
         for seed in 0u64..200 {
             let label = diatonic_chord_label(9, ScaleType::NaturalMinor, 3, 60, seed);
             if label.starts_with('B') {
-                assert!(label.contains('\u{00b0}'),
-                    "B in A natural minor should be diminished (°), got: {}", label);
+                assert!(label.contains('\u{00f8}'),
+                    "B in A natural minor should be half-diminished (ø), got: {}", label);
                 found_dim_minor = true;
             }
         }
-        assert!(found_dim_minor, "Did not encounter a B° chord in 200 seeds for A natural minor");
+        assert!(found_dim_minor, "Did not encounter a Bø chord in 200 seeds for A natural minor");
     }
 }

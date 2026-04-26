@@ -246,18 +246,19 @@ class ExerciseModel: ObservableObject {
             let centerMidi = (rangeStart + rangeEnd) / 2
             let notes = EarRingCore.generateDiatonicChord(
                 rootChroma: rootNote,
-                scaleId: scaleId,
+                scaleId: 0,
                 noteCount: sequenceLength,
                 centerMidi: centerMidi,
                 seed: seed
             )
             sequence = testType == 3 ? notes.reversed() : notes
-            chordLabel = EarRingCore.diatonicChordLabel(
-                rootChroma: rootNote,
-                scaleId: scaleId,
+            chordLabel = EarRingCore.writtenDiatonicChordLabel(
+                concertRootChroma: rootNote,
+                scaleId: 0,
                 noteCount: sequenceLength,
                 centerMidi: centerMidi,
-                seed: seed
+                seed: seed,
+                instrumentIndex: instrumentIndex
             )
         } else {
             melodyDurations = []
@@ -273,10 +274,7 @@ class ExerciseModel: ObservableObject {
             )
         }
 
-        let chord = EarRingCore.introChord(rootMidi: rootMidi, scaleId: scaleId)
-        print("[EAR] rootNote=\(rootNote) scaleId=\(scaleId) rangeStart=\(rangeStart) rangeEnd=\(rangeEnd) rootMidi=\(rootMidi)")
-        print("[EAR] sequence=\(sequence.map { MusicTheory.midiToLabel($0) })")
-        print("[EAR] introChord=\(chord.map { MusicTheory.midiToLabel($0) })")
+        let chord = EarRingCore.introChord(rootMidi: EarRingCore.effectiveIntroRootMidi(rootNote: rootNote, scaleId: scaleId, rangeStart: rangeStart), scaleId: scaleId)
         detectedNotes = []
         currentNoteIndex = 0
         currentAttempt = 1
@@ -296,7 +294,7 @@ class ExerciseModel: ObservableObject {
         guard !sequence.isEmpty else { return }
         status = .playing
         audioPlayback.resetCancellation()
-        let chord = EarRingCore.introChord(rootMidi: rootMidi, scaleId: scaleId)
+        let chord = EarRingCore.introChord(rootMidi: EarRingCore.effectiveIntroRootMidi(rootNote: rootNote, scaleId: scaleId, rangeStart: rangeStart), scaleId: scaleId)
         await audioPlayback.playChord(notes: chord)
         // Fade chord sustain concurrently with the post-chord gap so notes
         // are silent before the sequence begins. Cap at 75% of the gap so

@@ -52,7 +52,7 @@ struct SetupView: View {
                     )
                 },
                 fixedSpacing: 44,
-                rootChroma: EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId),
+                rootChroma: (EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId) + ((transpSemitones % 12) + 12) % 12) % 12,
                 keySignatureMode: model.keySignatureMode
             )
             .frame(height: staffHeight)
