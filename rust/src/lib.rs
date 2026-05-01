@@ -921,7 +921,7 @@ mod android_jni {
 
     #[no_mangle]
     pub extern "system" fn Java_com_earring_EarRingCore_nativeDiatonicChordLabel(
-        mut env: JNIEnv,
+        env: JNIEnv,
         _class: JClass,
         root_chroma: jint,
         scale_id: jint,
@@ -942,7 +942,7 @@ mod android_jni {
 
     #[no_mangle]
     pub extern "system" fn Java_com_earring_EarRingCore_nativeWrittenDiatonicChordLabel(
-        mut env: JNIEnv,
+        env: JNIEnv,
         _class: JClass,
         concert_root_chroma: jint,
         scale_id: jint,
@@ -1365,7 +1365,7 @@ mod android_jni {
 
     #[no_mangle]
     pub extern "system" fn Java_com_earring_EarRingCore_nativeShuffleMelodyIndices(
-        mut env: JNIEnv, _class: JClass,
+        env: JNIEnv, _class: JClass,
         seed: jlong,
     ) -> jintArray {
         let indices = shuffle_melody_indices(seed as u64);
@@ -1377,7 +1377,7 @@ mod android_jni {
 
     #[no_mangle]
     pub extern "system" fn Java_com_earring_EarRingCore_nativePickMelodyByIndex(
-        mut env: JNIEnv, _class: JClass,
+        env: JNIEnv, _class: JClass,
         index: jint, root_chroma: jint,
     ) -> jfloatArray {
         match melody_to_midi_by_index(index as u8, root_chroma as u8) {
@@ -1403,7 +1403,7 @@ mod android_jni {
 
     #[no_mangle]
     pub extern "system" fn Java_com_earring_EarRingCore_nativeMelodyRangeMidi(
-        mut env: JNIEnv, _class: JClass,
+        env: JNIEnv, _class: JClass,
         index: jint, root_chroma: jint,
     ) -> jintArray {
         let arr = env.new_int_array(2).unwrap();

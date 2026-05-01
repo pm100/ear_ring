@@ -1,10 +1,22 @@
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 set dotenv-load
 
-adb := if os() == "windows" { env_var_or_default('LOCALAPPDATA', 'C:/Users/Default/AppData/Local') + '/Android/Sdk/platform-tools/adb.exe' } else { "adb" }
+adb      := if os() == "windows" { env_var_or_default('LOCALAPPDATA', 'C:/Users/Default/AppData/Local') + '/Android/Sdk/platform-tools/adb.exe' } else { "adb" }
+emulator := if os() == "windows" { env_var_or_default('LOCALAPPDATA', 'C:/Users/Default/AppData/Local') + '/Android/Sdk/emulator/emulator.exe' } else { "emulator" }
+avd      := env_var_or_default('ANDROID_AVD', 'Medium_Phone_API_36.1')
 
-# Build and install the Android debug APK, then launch the app
+# Build and install the Android debug APK, then launch the app.
+# Starts the emulator automatically if no device/emulator is connected.
 android:
+    @$devices = (& "{{adb}}" devices | Select-String -Pattern '\tdevice$'); \
+     if (-not $devices) { \
+       Write-Host "No device found — starting emulator '{{avd}}'..."; \
+       Start-Process -FilePath "{{emulator}}" -ArgumentList "-avd {{avd}} -no-snapshot-save" -WindowStyle Normal; \
+       Write-Host "Waiting for emulator to boot (this takes ~60 s)..."; \
+       & "{{adb}}" wait-for-device | Out-Null; \
+       do { Start-Sleep 3; $booted = & "{{adb}}" shell getprop sys.boot_completed 2>$null } while ($booted.Trim() -ne '1'); \
+       Write-Host "Emulator ready."; \
+     }
     Push-Location android; .\gradlew installDebug; Pop-Location
     & "{{adb}}" shell am start -n com.earring/.MainActivity
 
