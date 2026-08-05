@@ -60,3 +60,10 @@ ui_dump.xml
 copilot-session-*.md
 screen_home.png
 screen_keydrop.png
+
+# Debug captures and session transcripts (written to repo root by debug tooling)
+/screen*.png
+/tauri_cap.png
+/ui*.xml
+/console.txt
+/copilot-session-*.md

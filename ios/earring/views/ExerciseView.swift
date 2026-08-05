@@ -19,20 +19,27 @@ struct ExerciseView: View {
     }
 
     private var staffNotes: [StaffDisplayNote] {
+        let durations = model.melodyDurations
         if model.showTestNotes {
             return model.sequence.enumerated().map { index, expectedMidi in
+                let dur = index < durations.count ? durations[index] : nil
                 if index < model.detectedNotes.count {
                     let detected = model.detectedNotes[index]
                     return StaffDisplayNote(
                         midi: transpMidi(detected.isCorrect ? expectedMidi : detected.midi),
-                        state: detected.isCorrect ? .correct : .incorrect
+                        state: detected.isCorrect ? .correct : .incorrect,
+                        duration: detected.isCorrect ? dur : nil
                     )
                 }
-                return StaffDisplayNote(midi: transpMidi(expectedMidi), state: .expected)
+                return StaffDisplayNote(midi: transpMidi(expectedMidi), state: .expected, duration: dur)
             }
         }
-        return model.detectedNotes.map {
-            StaffDisplayNote(midi: transpMidi($0.midi), state: $0.isCorrect ? .correct : .incorrect)
+        return model.detectedNotes.enumerated().map { index, note in
+            StaffDisplayNote(
+                midi: transpMidi(note.midi),
+                state: note.isCorrect ? .correct : .incorrect,
+                duration: note.isCorrect && index < durations.count ? durations[index] : nil
+            )
         }
     }
 

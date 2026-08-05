@@ -90,14 +90,21 @@ fun ExerciseScreen(
     val staffNotes = if (state.showTestNotes) {
         state.sequence.mapIndexed { index, expectedMidi ->
             val attemptNote = state.detected.getOrNull(index)
+            val dur = state.melodyDurations.getOrNull(index)
             when {
-                attemptNote == null -> StaffNote(EarRingCore.transposeDisplayMidi(expectedMidi, instrIdx), NoteState.EXPECTED)
-                attemptNote.correct -> StaffNote(EarRingCore.transposeDisplayMidi(expectedMidi, instrIdx), NoteState.CORRECT)
+                attemptNote == null -> StaffNote(EarRingCore.transposeDisplayMidi(expectedMidi, instrIdx), NoteState.EXPECTED, dur)
+                attemptNote.correct -> StaffNote(EarRingCore.transposeDisplayMidi(expectedMidi, instrIdx), NoteState.CORRECT, dur)
                 else -> StaffNote(EarRingCore.transposeDisplayMidi(attemptNote.midi, instrIdx), NoteState.INCORRECT)
             }
         }
     } else {
-        state.detected.map { StaffNote(EarRingCore.transposeDisplayMidi(it.midi, instrIdx), if (it.correct) NoteState.CORRECT else NoteState.INCORRECT) }
+        state.detected.mapIndexed { index, it ->
+            StaffNote(
+                EarRingCore.transposeDisplayMidi(it.midi, instrIdx),
+                if (it.correct) NoteState.CORRECT else NoteState.INCORRECT,
+                if (it.correct) state.melodyDurations.getOrNull(index) else null
+            )
+        }
     }
 
     // Guard against double back-navigation (predictive back + BackHandler race).

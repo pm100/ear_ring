@@ -6,38 +6,46 @@ A music ear training app that helps you develop pitch recognition and interval h
 
 | Platform | Status | Tech Stack |
 |----------|--------|------------|
-| Android | ✅ Working | Kotlin + Jetpack Compose |
-| iOS | ⚠️ Code complete, requires Mac to build | Swift + SwiftUI |
+| Android | ✅ Working (Play Store internal testing) | Kotlin + Jetpack Compose |
+| iOS | ✅ Working (TestFlight) | Swift + SwiftUI |
+| Desktop (Windows/macOS) | ✅ Working | Tauri (Rust + React/TSX) |
+
+A standalone developer tool, **Melody Manager** (`melody-manager/`), is used to vet, edit,
+and import tunes into the melody library — see `docs/melody-manager.md`.
 
 ## Architecture
 
 ```
-┌─────────────────────┐  ┌─────────────────────┐
-│   Android (Kotlin)  │  │     iOS (Swift)      │
-│   Jetpack Compose   │  │      SwiftUI         │
-└────────┬────────────┘  └──────────┬──────────┘
-         │ JNI                      │ C FFI
-         └──────────┬───────────────┘
+┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐
+│   Android (Kotlin)  │  │     iOS (Swift)      │  │  Desktop (Tauri)    │
+│   Jetpack Compose   │  │      SwiftUI         │  │    React / TSX      │
+└────────┬────────────┘  └──────────┬──────────┘  └──────────┬──────────┘
+         │ JNI                      │ C FFI                   │ Tauri IPC
+         └──────────┬───────────────┴─────────────────────────┘
                     │
          ┌──────────▼──────────┐
          │     Rust Core       │
          │  pitch_detection    │
          │  music_theory       │
+         │  melodies + help    │
          └─────────────────────┘
 ```
 
 The Rust core handles all music logic and is shared across platforms:
 - **Pitch detection** — YIN algorithm, real-time from microphone
-- **Music theory** — scales, intervals, MIDI ↔ frequency conversion, staff positioning
-- **Sequence generation** — randomised note sequences from any scale/root
+- **Music theory** — scales, intervals, MIDI ↔ frequency conversion, staff positioning, key signatures
+- **Test generation** — random sequences, melody snippets, and diatonic arpeggios from any scale/root
 
 ## Features
 
-- 8 scale types: Major, Natural Minor, Harmonic Minor, Pentatonic Major/Minor, Dorian, Mixolydian, Blues
-- 12 root notes, octave selection, sequence length 2–8 notes
+- Three test types: Random Notes, Melody Snippets (~50 public-domain tunes with rhythmic playback), and Diatonic Arpeggios (ascending/descending triads and seventh chords)
+- 4 scale types: Major, Natural Minor, Dorian, Mixolydian
+- 12 root notes, interactive piano range picker, sequence length 2–8 notes
 - Real-time pitch detection with cents accuracy
-- Visual music staff with animated note highlighting
-- Session history and streak tracking
+- Visual music staff with key signatures, duration-aware note symbols, and animated highlighting
+- Instrument transposition (Piano, Guitar, Sax, Trumpet, Clarinet…)
+- Continuous hands-free exercise flow with configurable retries and scoring
+- Session history, per-test records, and streak tracking
 - Haptic feedback on correct/incorrect notes
 
 ## Project Structure
@@ -57,10 +65,17 @@ ear_ring/
 │   ├── AudioPlayback.swift
 │   ├── ExerciseModel.swift
 │   └── views/                 # SwiftUI screens
+├── desktop/                   # Desktop app (Tauri + React/TSX)
+│   ├── src/                   # React frontend (screens, hooks)
+│   └── src-tauri/             # Tauri shell + Rust commands
+├── melody-manager/            # Developer tool for curating the melody library
 └── rust/                      # Shared core library
     └── src/
         ├── pitch_detection.rs # YIN pitch detection
-        └── music_theory.rs    # Scales, notes, intervals
+        ├── tracker.rs         # Note confirmation / stability tracking
+        ├── music_theory.rs    # Scales, notes, intervals, melodies, arpeggios
+        ├── melodies.txt       # Melody snippet library (edited via melody-manager)
+        └── help.md            # Shared Help screen content
 ```
 
 ## Building
@@ -95,6 +110,25 @@ rustup target add aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
 ```
 
 The Xcode target rebuilds the Rust iOS static library automatically into `ios/build/generated/rust/<configuration><platform>`. Do not check iOS Rust library artifacts into git or link directly from the shared `target` directory.
+
+### Desktop (Tauri)
+
+**Prerequisites:** Rust, Node 20+
+
+```bash
+cd desktop
+npm install
+npx tauri dev      # run in development
+npx tauri build    # build installer (MSI on Windows, DMG on macOS)
+```
+
+### Releases
+
+`.github/workflows/cd.yml` is a manually-triggered pipeline that builds and uploads all
+platforms in one run: iOS → TestFlight, Android → Play Store internal testing, and
+desktop installers → GitHub Releases. Required secrets are documented in
+`.github/workflows/SECRETS.md`. Equivalent local commands live in the `justfile`
+(`just ios-testflight`, `just android-play`).
 
 ## Audio
 

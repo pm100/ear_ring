@@ -263,7 +263,7 @@ Exercise dynamics:
 - If "Display Test Notes" is enabled, expected notes are shown in black and the current slot updates to green/red as notes are judged.
 - Correct detected notes must be shown on the staff in green immediately.
 - Correct detected notes must remain visible on the staff until the next attempt or next test begins.
-- Display staff notes as proper note symbols: filled noteheads with stems, plus a sharp/flat accidental before the notehead when needed.
+- Display staff notes as proper note symbols: noteheads with stems (duration-aware in melody mode — see Music Staff Specification), plus a sharp/flat accidental before the notehead when needed.
 - Retry the same test up to the retry cap (default 5 attempts total, configurable in Settings).
 - If the user gets the test right, or exhausts retries, immediately generate a **fresh** test and continue hands-free.
 - The user should be able to keep playing indefinitely without touching the app until they choose Stop/Back.
@@ -570,10 +570,32 @@ noteX         = noteAreaStart + index*noteStep + noteStep/2
 ```
 
 **Note symbol rendering**:
-- Use a filled oval notehead rotated slightly clockwise (quarter-note appearance)
-- Draw a stem for every note:
+- Use an oval notehead rotated slightly clockwise (-20°)
+- Stem direction:
   - notes below the B4 centre line (`staffPos < 6`) use an upward stem on the right side
   - notes on/above the B4 centre line use a downward stem on the left side
+
+**Duration-based rendering** (all platforms — desktop `MusicStaff.tsx`, Android `MusicStaff.kt`,
+iOS `MusicStaffView.swift`). Each staff note carries an optional `duration` in beats
+(1.0 = quarter). `duration` absent/null → render as a quarter note (random mode unchanged).
+Melody mode passes the snippet's per-note durations for expected and correct notes;
+incorrect notes render as plain quarters.
+
+| Duration (beats) | Symbol         | Notehead | Stem | Flags | Dot |
+|------------------|----------------|----------|------|-------|-----|
+| ≥ 3.5            | whole          | open     | no   | 0     | no  |
+| ≥ 2.5            | dotted half    | open     | yes  | 0     | yes |
+| ≥ 1.75           | half           | open     | yes  | 0     | no  |
+| ≥ 1.25           | dotted quarter | filled   | yes  | 0     | yes |
+| ≥ 0.875          | quarter        | filled   | yes  | 0     | no  |
+| ≥ 0.625          | dotted eighth  | filled   | yes  | 1     | yes |
+| ≥ 0.375          | eighth         | filled   | yes  | 1     | no  |
+| < 0.375          | sixteenth      | filled   | yes  | 2     | no  |
+
+- **Open notehead**: white fill + 1.5px stroke in the note colour
+- **Augmentation dot**: filled circle, radius `noteRadius*0.3`, centred at `noteX + noteHeadRx*1.6`
+- **Flag**: cubic Bézier from the stem end, 1.5px stroke, round cap; second flag offset
+  `lineSpacing*0.75` back along the stem. Stem-up flags curve right/down; stem-down mirror.
 - Accidental display depends on `keySignatureMode`:
   - **Mode 0 (Inline Accidentals)**: use `preferredMidiLabel(midi, rootChroma)` for key-correct spelling;
     draw `♯` or `♭` before the notehead when the label contains `#` or `b`
@@ -986,6 +1008,13 @@ Bottom nav tab bar tap targets (approx, bottom of 1080×2400 screen):
 ```powershell
 cd C:\work\ear_ring\android
 .\gradlew installDebug 2>&1 | Select-String -Pattern "BUILD|error:|FAILED|Installing"
+```
+
+**Build and install on a physical device** (skips emulators; needs USB debugging enabled):
+```powershell
+just android-device      # Android — installs + launches on first USB device
+just ios-device          # iOS — macOS only; builds Debug, installs + launches via devicectl
+                         # (override device with IOS_DEVICE_ID=<uuid>)
 ```
 
 **Publish to Play Store internal testing:**

@@ -127,7 +127,7 @@ class ExerciseModel: ObservableObject {
 
     private var melodyDeck: [Int] = []
     private var melodyDeckCursor: Int = 0
-    private var melodyDurations: [Float] = []
+    private(set) var melodyDurations: [Float] = []
 
     // Rust-backed pitch tracker — owns stability, silence gating, warmup, and grace period.
     private var pitchTracker: EarRingCore.PitchTracker = EarRingCore.PitchTracker(silenceThreshold: 0.003, requiredFrames: 3)

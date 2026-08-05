@@ -1,34 +1,16 @@
 # Melody Snippet Library — Implementation Plan
 
-## Status (2026-04-08)
+## Status (2026-08-04)
 
-**Desktop/Tauri — complete, including note duration display and audio articulation**
-**Android — NOT YET DONE** (some files partially changed by earlier automation; incomplete and unverified)
-**iOS — NOT YET DONE** (some files partially changed by earlier automation; incomplete and unverified)
+**Complete on all three platforms** — Desktop/Tauri, Android, and iOS all have the melody
+snippet test mode, rhythmic playback, shuffle deck, and note-duration display on the staff
+(open/closed noteheads, flags, augmentation dots — spec now lives in AGENTS.md under
+"Music Staff Specification → Duration-based rendering").
 
-### What is done (Desktop)
-- Rust core: `MelodyNote`, `MelodySnippet`, 57-tune library, all functions — ✅
-- Rust: `note_timing(bpm, duration_beats) -> (hold_ms, step_ms)` — ✅
-- Tauri commands: `cmd_melody_count`, `cmd_shuffle_melody_indices`, `cmd_pick_melody_by_index`, `cmd_melody_range_midi`, `cmd_sequence_timings` — ✅
-- Desktop `types.ts`: `testType`, `duration?` on `StaffDisplayNote` — ✅
-- Desktop `App.tsx`, `ExerciseScreen.tsx`, `useAudioPlayback.ts` — ✅
-- Desktop `HomeScreen.tsx`: Test Type dropdown, Scale/SeqLength disabled in melody mode — ✅
-- Desktop `MusicStaff.tsx`: duration-based rendering (open/closed noteheads, flags, dots) — ✅
-- Audio articulation: notes cut off at 88% of notated duration via Web Audio `source.stop()` — ✅
+The melody library itself is maintained via the Melody Manager app (`melody-manager/`,
+see `docs/melody-manager.md`), which exports to `rust/src/melodies.txt`.
 
-Files to change:
-- `types.ts` — add `duration?: number` to `StaffDisplayNote` — ✅ done
-- `MusicStaff.tsx` — render open/closed noteheads, flags, augmentation dots — ✅ done
-- `ExerciseScreen.tsx` — pass `melodyDurations[i]` into `StaffDisplayNote` for melody mode — ✅ done
-
-### What remains for Android (future session)
-- `EarRingCore.kt`, `AudioPlayback.kt`, `ExerciseViewModel.kt`, `HomeScreen.kt`
-- Note duration display on Android staff canvas
-- Rebuild JNI `.so` files: `cargo ndk -t arm64-v8a -t x86_64 -o android\app\src\main\jniLibs build -p ear_ring_core`
-
-### What remains for iOS (future session)
-- `EarRingCore.swift`, `AudioPlayback.swift`, `ExerciseModel.swift`, `HomeView.swift`
-- Note duration display on iOS staff canvas
+The rest of this document is the original implementation plan, kept for reference.
 
 ## Note Duration Display & Audio Articulation Spec
 

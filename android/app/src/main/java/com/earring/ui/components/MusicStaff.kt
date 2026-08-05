@@ -9,7 +9,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
@@ -22,8 +25,25 @@ enum class NoteState { EXPECTED, CORRECT, INCORRECT, ACTIVE }
 
 data class StaffNote(
     val midi: Int,
-    val state: NoteState
+    val state: NoteState,
+    val duration: Float? = null,
 )
+
+// Duration classification thresholds — identical on all platforms
+// (see desktop MusicStaff.tsx and iOS MusicStaffView.swift).
+private enum class DurationType { WHOLE, DOTTED_HALF, HALF, DOTTED_QUARTER, QUARTER, DOTTED_EIGHTH, EIGHTH, SIXTEENTH }
+
+private fun classifyDuration(beats: Float?): DurationType = when {
+    beats == null   -> DurationType.QUARTER
+    beats >= 3.5f   -> DurationType.WHOLE
+    beats >= 2.5f   -> DurationType.DOTTED_HALF
+    beats >= 1.75f  -> DurationType.HALF
+    beats >= 1.25f  -> DurationType.DOTTED_QUARTER
+    beats >= 0.875f -> DurationType.QUARTER
+    beats >= 0.625f -> DurationType.DOTTED_EIGHTH
+    beats >= 0.375f -> DurationType.EIGHTH
+    else            -> DurationType.SIXTEENTH
+}
 
 @Composable
 fun MusicStaff(
@@ -171,6 +191,16 @@ fun MusicStaff(
             val stemX = if (stemUp) noteX + noteHeadWidth * 0.35f else noteX - noteHeadWidth * 0.35f
             val stemEndY = if (stemUp) noteY - stemLength else noteY + stemLength
 
+            val durType = classifyDuration(staffNote.duration)
+            val openHead = durType == DurationType.WHOLE || durType == DurationType.DOTTED_HALF || durType == DurationType.HALF
+            val hasStem = durType != DurationType.WHOLE
+            val hasDot = durType == DurationType.DOTTED_HALF || durType == DurationType.DOTTED_QUARTER || durType == DurationType.DOTTED_EIGHTH
+            val flagCount = when (durType) {
+                DurationType.EIGHTH, DurationType.DOTTED_EIGHTH -> 1
+                DurationType.SIXTEENTH -> 2
+                else -> 0
+            }
+
             drawLedgerLines(noteX, noteY, staffTop, lineSpacing, noteRadius)
 
             drawIntoCanvas { canvas ->
@@ -186,12 +216,25 @@ fun MusicStaff(
                 val nc = canvas.nativeCanvas
                 nc.save()
                 nc.rotate(-20f, noteX, noteY)
-                nc.drawOval(
-                    android.graphics.RectF(
-                        noteX - noteHeadWidth / 2f, noteY - noteHeadHeight / 2f,
-                        noteX + noteHeadWidth / 2f, noteY + noteHeadHeight / 2f
-                    ), fillPaint
+                val headRect = android.graphics.RectF(
+                    noteX - noteHeadWidth / 2f, noteY - noteHeadHeight / 2f,
+                    noteX + noteHeadWidth / 2f, noteY + noteHeadHeight / 2f
                 )
+                if (openHead) {
+                    val whitePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                        style = android.graphics.Paint.Style.FILL
+                        color = android.graphics.Color.WHITE
+                    }
+                    nc.drawOval(headRect, whitePaint)
+                    val strokePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                        style = android.graphics.Paint.Style.STROKE
+                        strokeWidth = 1.5f
+                        color = fillPaint.color
+                    }
+                    nc.drawOval(headRect, strokePaint)
+                } else {
+                    nc.drawOval(headRect, fillPaint)
+                }
                 nc.restore()
 
                 accIsSharp?.let { isSharp ->
@@ -204,8 +247,34 @@ fun MusicStaff(
                 }
             }
 
-            drawLine(color = noteColor, start = Offset(stemX, noteY),
-                end = Offset(stemX, stemEndY), strokeWidth = 1.7f)
+            if (hasStem) {
+                drawLine(color = noteColor, start = Offset(stemX, noteY),
+                    end = Offset(stemX, stemEndY), strokeWidth = 1.7f)
+            }
+
+            if (hasDot) {
+                drawCircle(
+                    color = noteColor,
+                    radius = noteRadius * 0.3f,
+                    center = Offset(noteX + noteHeadWidth / 2f * 1.6f, noteY)
+                )
+            }
+
+            repeat(flagCount) { fi ->
+                val fDir = if (stemUp) 1f else -1f
+                val fy0 = stemEndY + fi * fDir * lineSpacing * 0.75f
+                val fw = lineSpacing * 1.6f
+                val flagPath = Path().apply {
+                    moveTo(stemX, fy0)
+                    cubicTo(
+                        stemX + fw, fy0 + fDir * lineSpacing * 1.0f,
+                        stemX + fw * 0.7f, fy0 + fDir * lineSpacing * 1.6f,
+                        stemX, fy0 + fDir * lineSpacing * 1.2f
+                    )
+                }
+                drawPath(flagPath, color = noteColor,
+                    style = Stroke(width = 1.5f, cap = StrokeCap.Round))
+            }
         }
     }
 }

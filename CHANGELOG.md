@@ -4,6 +4,11 @@ All notable changes to Ear Ring are documented here.
 
 ## [Unreleased]
 
+### Fixed
+- **Note-duration display on Android and iOS staffs** — melody snippets now render
+  open noteheads (whole/half), augmentation dots, and eighth/sixteenth flags on all
+  platforms, matching the existing desktop implementation
+
 ### Added
 - **Diatonic Arpeggios** — two new test types: *Diatonic Arpeggios (ascend)* and *Diatonic Arpeggios (desc)*
   - Generates diatonic triads and seventh chords from the selected key/scale

@@ -11,6 +11,25 @@ struct StaffDisplayNote: Identifiable {
     let id = UUID()
     let midi: Int
     let state: StaffNoteState
+    var duration: Float? = nil
+}
+
+// Duration classification thresholds — identical on all platforms
+// (see desktop MusicStaff.tsx and Android MusicStaff.kt).
+private enum DurationType {
+    case whole, dottedHalf, half, dottedQuarter, quarter, dottedEighth, eighth, sixteenth
+}
+
+private func classifyDuration(_ beats: Float?) -> DurationType {
+    guard let beats else { return .quarter }
+    if beats >= 3.5   { return .whole }
+    if beats >= 2.5   { return .dottedHalf }
+    if beats >= 1.75  { return .half }
+    if beats >= 1.25  { return .dottedQuarter }
+    if beats >= 0.875 { return .quarter }
+    if beats >= 0.625 { return .dottedEighth }
+    if beats >= 0.375 { return .eighth }
+    return .sixteenth
 }
 
 // Accidental PNG dimensions (matching gen_accidental_symbols.js output).
@@ -158,6 +177,13 @@ struct MusicStaffView: View {
                 let stemX = stemUp ? x + noteHeadWidth * 0.35 : x - noteHeadWidth * 0.35
                 let stemEndY = stemUp ? y - stemLength : y + stemLength
 
+                let durType = classifyDuration(displayNote.duration)
+                let openHead = durType == .whole || durType == .dottedHalf || durType == .half
+                let hasStem = durType != .whole
+                let hasDot = durType == .dottedHalf || durType == .dottedQuarter || durType == .dottedEighth
+                let flagCount = (durType == .eighth || durType == .dottedEighth) ? 1
+                              : (durType == .sixteenth ? 2 : 0)
+
                 // Ledger lines
                 var ledgerBelow = staffBottomY + lineSpacing
                 while y >= ledgerBelow - 0.5 {
@@ -178,20 +204,51 @@ struct MusicStaffView: View {
                     ledgerAbove -= lineSpacing
                 }
 
-                // Stem
-                var stemPath = Path()
-                stemPath.move(to: CGPoint(x: stemX, y: y))
-                stemPath.addLine(to: CGPoint(x: stemX, y: stemEndY))
-                ctx.stroke(stemPath, with: .color(noteColor), lineWidth: 1.7)
+                // Stem (whole notes have none)
+                if hasStem {
+                    var stemPath = Path()
+                    stemPath.move(to: CGPoint(x: stemX, y: y))
+                    stemPath.addLine(to: CGPoint(x: stemX, y: stemEndY))
+                    ctx.stroke(stemPath, with: .color(noteColor), lineWidth: 1.7)
+                }
 
-                // Note head
+                // Note head: open (white fill) for whole/half/dotted-half, filled otherwise
                 let noteRect = CGRect(x: x - noteHeadWidth / 2, y: y - noteHeadHeight / 2,
                                      width: noteHeadWidth, height: noteHeadHeight)
                 let rotation = CGAffineTransform(translationX: x, y: y)
                     .rotated(by: -.pi / 9)
                     .translatedBy(x: -x, y: -y)
                 let noteHead = Path(ellipseIn: noteRect).applying(rotation)
-                ctx.fill(noteHead, with: .color(noteColor))
+                if openHead {
+                    ctx.fill(noteHead, with: .color(.white))
+                    ctx.stroke(noteHead, with: .color(noteColor), lineWidth: 1.5)
+                } else {
+                    ctx.fill(noteHead, with: .color(noteColor))
+                }
+
+                // Augmentation dot
+                if hasDot {
+                    let dotR = noteRadius * 0.3
+                    let dotRect = CGRect(x: x + noteHeadWidth / 2 * 1.6 - dotR, y: y - dotR,
+                                         width: dotR * 2, height: dotR * 2)
+                    ctx.fill(Path(ellipseIn: dotRect), with: .color(noteColor))
+                }
+
+                // Flags (eighth / sixteenth)
+                for fi in 0..<flagCount {
+                    let fDir: CGFloat = stemUp ? 1 : -1
+                    let fy0 = stemEndY + CGFloat(fi) * fDir * lineSpacing * 0.75
+                    let fw = lineSpacing * 1.6
+                    var flagPath = Path()
+                    flagPath.move(to: CGPoint(x: stemX, y: fy0))
+                    flagPath.addCurve(
+                        to: CGPoint(x: stemX, y: fy0 + fDir * lineSpacing * 1.2),
+                        control1: CGPoint(x: stemX + fw, y: fy0 + fDir * lineSpacing * 1.0),
+                        control2: CGPoint(x: stemX + fw * 0.7, y: fy0 + fDir * lineSpacing * 1.6)
+                    )
+                    ctx.stroke(flagPath, with: .color(noteColor),
+                               style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                }
 
                 // Per-note accidental PNG
                 if let isSharp = accIsSharp {
