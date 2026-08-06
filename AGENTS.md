@@ -1031,6 +1031,40 @@ Service account JSON: Play Console → Setup → API access → Service accounts
 
 ---
 
+### Remote iOS Builds over SSH (from the Windows machine)
+
+The iOS `just` recipes run on Paul's MacBook Air, reachable via the `mac` SSH alias
+(`~/.ssh/config` on Windows → `pauls-macbook-air.local`, user `pm100`, key auth).
+The repo lives at `~/work/ear_ring` on the Mac; keep it synced via git (never edit
+files directly on the Mac).
+
+```powershell
+# Typical flow: push from Windows, pull + build on the Mac
+ssh mac "cd ~/work/ear_ring && git pull --ff-only && just ios"
+```
+
+**Code signing headlessly:** plain SSH sessions cannot use the login keychain
+(`errSecInternalComponent` — no GUI SecurityAgent), so signing uses a dedicated
+`earring-build` keychain whose password is stored in
+`~/.config/earring/build-keychain-pass` (chmod 600) on the Mac. All `ios*` recipes
+unlock it automatically via the `_ios-keychain-unlock` helper recipe before building.
+
+One-time setup (and again whenever the Apple certificate is renewed):
+1. On the Mac GUI: Keychain Access → login → My Certificates → select the
+   `Apple Development` (and any `Apple Distribution`) identity → File → Export
+   Items… → save `earring-ids.p12` to Desktop with an export password.
+2. Copy `scripts/setup_ios_build_keychain.sh` to the Mac and run it with a TTY:
+   `ssh -t mac ./setup_ios_build_keychain.sh` — it creates the build keychain,
+   imports the identities, registers the keychain on the search list, and deletes
+   the `.p12`.
+
+If signed builds start failing with `errSecInternalComponent` again, the likely
+causes are: certificate renewed (redo setup), or the build keychain fell off the
+user keychain search list (`security list-keychains -d user` should list
+`earring-build.keychain-db` first, then `login.keychain-db`).
+
+---
+
 ### Debugging the Tauri Desktop App
 
 **Start the dev server** (hot-reloads on file save — Vite reloads TSX, Rust changes require full rebuild):

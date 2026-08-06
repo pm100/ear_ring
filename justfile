@@ -79,9 +79,21 @@ test:
     cargo test
 
 
+# Unlock the dedicated code-signing keychain so codesign works in headless
+# (SSH) sessions. No-op if the keychain hasn't been set up — see
+# scripts/setup_ios_build_keychain.sh. Not listed in `just --list`.
+[private]
+_ios-keychain-unlock:
+    #!/bin/sh
+    KCPASS=$HOME/.config/earring/build-keychain-pass
+    KC=$HOME/Library/Keychains/earring-build.keychain-db
+    if [ -f "$KCPASS" ] && [ -f "$KC" ]; then
+      security unlock-keychain -p "$(cat "$KCPASS")" "$KC"
+    fi
+
 # Build the iOS app (debug) for a connected device
 [doc("Build the iOS app (Debug) — macOS only")]
-ios:
+ios: _ios-keychain-unlock
     #!/bin/sh
     set -eu
     cd "{{justfile_directory()}}/ios"
@@ -96,7 +108,7 @@ ios:
 # Requires macOS + Xcode 15+. Uses the first device devicectl lists unless
 # IOS_DEVICE_ID is set (find identifiers with: xcrun devicectl list devices).
 [doc("Build + install on a connected iPhone/iPad and launch — macOS only")]
-ios-device:
+ios-device: _ios-keychain-unlock
     #!/bin/sh
     set -eu
     cd "{{justfile_directory()}}/ios"
@@ -121,7 +133,7 @@ ios-device:
 # Archive the iOS app and export a Release IPA.
 # Output: /tmp/earring_export/earring.ipa
 [doc("Archive the iOS app and export a Release IPA — macOS only")]
-ios-archive:
+ios-archive: _ios-keychain-unlock
     #!/bin/sh
     set -eu
     cd "{{justfile_directory()}}/ios"
@@ -145,7 +157,7 @@ ios-archive:
 # Example:
 #   APP_STORE_KEY_ID=ABCDEF1234 APP_STORE_ISSUER_ID=xxxx-xxxx just ios-testflight
 [doc("Archive, export, and upload to TestFlight — macOS only")]
-ios-testflight:
+ios-testflight: _ios-keychain-unlock
     #!/bin/sh
     set -eu
     cd "{{justfile_directory()}}/ios"
