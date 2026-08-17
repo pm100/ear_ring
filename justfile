@@ -5,6 +5,14 @@ adb      := if os() == "windows" { env_var_or_default('LOCALAPPDATA', 'C:/Users/
 emulator := if os() == "windows" { env_var_or_default('LOCALAPPDATA', 'C:/Users/Default/AppData/Local') + '/Android/Sdk/emulator/emulator.exe' } else { "emulator" }
 avd      := env_var_or_default('ANDROID_AVD', 'Medium_Phone_API_36.1')
 
+# App Store Connect API key used for headless iOS signing/upload (see
+# scripts/setup_ios_build_keychain.sh notes in AGENTS.md). The Key ID and
+# Issuer ID aren't secret — only the .p8 private key file is, and it stays
+# on the Mac at ~/.private_keys/AuthKey_<KeyID>.p8, never in git. Override
+# either via env var if the key is ever rotated.
+apple_key_id    := env_var_or_default('APP_STORE_KEY_ID', 'W4T73HJBF4')
+apple_issuer_id := env_var_or_default('APP_STORE_ISSUER_ID', '30e7952a-07ae-4893-95c0-3a8cf2db56c4')
+
 # Build and install the Android debug APK, then launch the app.
 # Starts the emulator automatically if no device/emulator is connected.
 [doc("Build + install debug APK and launch (auto-starts emulator if needed)")]
@@ -147,15 +155,17 @@ ios-archive: _ios-keychain-unlock
       -archivePath /tmp/earring.xcarchive \
       -exportOptionsPlist ExportOptions.plist \
       -exportPath /tmp/earring_export \
-      -allowProvisioningUpdates
+      -allowProvisioningUpdates \
+      -authenticationKeyPath "$HOME/.private_keys/AuthKey_{{apple_key_id}}.p8" \
+      -authenticationKeyID {{apple_key_id}} \
+      -authenticationKeyIssuerID {{apple_issuer_id}}
     echo "IPA ready: /tmp/earring_export/earring.ipa"
 
 # Archive, export, and upload to TestFlight.
-# Requires APP_STORE_KEY_ID and APP_STORE_ISSUER_ID env vars,
-# and ~/.private_keys/AuthKey_<KeyID>.p8 (download from
+# Requires ~/.private_keys/AuthKey_<KeyID>.p8 on the Mac (download once from
 # App Store Connect → Users & Access → Integrations → App Store Connect API).
-# Example:
-#   APP_STORE_KEY_ID=ABCDEF1234 APP_STORE_ISSUER_ID=xxxx-xxxx just ios-testflight
+# Key ID/Issuer ID default to the team key above; override via env vars if
+# the key is ever rotated: APP_STORE_KEY_ID=... APP_STORE_ISSUER_ID=... just ios-testflight
 [doc("Archive, export, and upload to TestFlight — macOS only")]
 ios-testflight: _ios-keychain-unlock
     #!/bin/sh
@@ -171,18 +181,15 @@ ios-testflight: _ios-keychain-unlock
       -archivePath /tmp/earring.xcarchive \
       -exportOptionsPlist ExportOptions.plist \
       -exportPath /tmp/earring_export \
-      -allowProvisioningUpdates
-    if [ -z "${APP_STORE_KEY_ID:-}" ]; then
-      printf "App Store Connect Key ID: "; read -r APP_STORE_KEY_ID
-    fi
-    if [ -z "${APP_STORE_ISSUER_ID:-}" ]; then
-      printf "App Store Connect Issuer ID: "; read -r APP_STORE_ISSUER_ID
-    fi
+      -allowProvisioningUpdates \
+      -authenticationKeyPath "$HOME/.private_keys/AuthKey_{{apple_key_id}}.p8" \
+      -authenticationKeyID {{apple_key_id}} \
+      -authenticationKeyIssuerID {{apple_issuer_id}}
     xcrun altool --upload-app \
       -f /tmp/earring_export/earring.ipa \
       -t ios \
-      --apiKey "$APP_STORE_KEY_ID" \
-      --apiIssuer "$APP_STORE_ISSUER_ID" \
+      --apiKey {{apple_key_id}} \
+      --apiIssuer {{apple_issuer_id}} \
       --output-format xml
     echo "Upload to TestFlight complete."
 
