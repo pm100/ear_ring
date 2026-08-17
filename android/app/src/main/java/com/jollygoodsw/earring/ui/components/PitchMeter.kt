@@ -1,4 +1,4 @@
-package com.earring.ui.components
+package com.jollygoodsw.earring.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
@@ -12,7 +12,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.earring.MusicTheory
+import com.jollygoodsw.earring.MusicTheory
 
 @Composable
 fun PitchMeter(

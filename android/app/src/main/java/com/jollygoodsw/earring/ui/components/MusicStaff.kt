@@ -1,4 +1,4 @@
-package com.earring.ui.components
+package com.jollygoodsw.earring.ui.components
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
@@ -18,8 +18,8 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.earring.EarRingCore
-import com.earring.R
+import com.jollygoodsw.earring.EarRingCore
+import com.jollygoodsw.earring.R
 
 enum class NoteState { EXPECTED, CORRECT, INCORRECT, ACTIVE }
 

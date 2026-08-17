@@ -19,7 +19,7 @@ android:
        Write-Host "Emulator ready."; \
      }
     Push-Location android; .\gradlew installDebug; Pop-Location
-    & "{{adb}}" shell am start -n com.earring/.MainActivity
+    & "{{adb}}" shell am start -n com.jollygoodsw.earring/.MainActivity
 
 # Build the Android debug APK and install + launch it on a connected USB device.
 # Ignores emulators — requires a physical device with USB debugging enabled.
@@ -43,11 +43,11 @@ android-device:
      $out = & "{{adb}}" -s $serial install -r $apk 2>&1 | Out-String; \
      if ($out -match 'INSTALL_FAILED_UPDATE_INCOMPATIBLE') { \
        Write-Host "Play Store build detected (signature mismatch) - uninstalling it first..."; \
-       & "{{adb}}" -s $serial uninstall com.earring | Out-Null; \
+       & "{{adb}}" -s $serial uninstall com.jollygoodsw.earring | Out-Null; \
        & "{{adb}}" -s $serial install $apk; \
      } else { Write-Host $out.Trim() }; \
      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; \
-     & "{{adb}}" -s $serial shell am start -n com.earring/.MainActivity
+     & "{{adb}}" -s $serial shell am start -n com.jollygoodsw.earring/.MainActivity
 
 # Compile-check Kotlin only (fast, no install)
 [doc("Compile-check Kotlin only (fast, no install)")]

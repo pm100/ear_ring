@@ -1,4 +1,4 @@
-package com.earring
+package com.jollygoodsw.earring
 
 import android.media.AudioFormat
 import android.media.AudioRecord

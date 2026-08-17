@@ -80,7 +80,7 @@ struct EarRingCore {
         return String(cString: buf)
     }
 
-    /// Display name for a scale ID (0–3).
+    /// Display name for a scale ID (0–4).
     static func scaleName(scaleId: Int) -> String {
         var buf = [CChar](repeating: 0, count: 32)
         ear_ring_scale_name(UInt8(scaleId), &buf, 32)

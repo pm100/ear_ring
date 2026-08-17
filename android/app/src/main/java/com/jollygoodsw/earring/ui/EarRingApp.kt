@@ -1,4 +1,4 @@
-package com.earring.ui
+package com.jollygoodsw.earring.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -17,9 +17,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.earring.ExerciseViewModel
-import com.earring.EarRingCore
-import com.earring.ProgressViewModel
+import com.jollygoodsw.earring.ExerciseViewModel
+import com.jollygoodsw.earring.EarRingCore
+import com.jollygoodsw.earring.ProgressViewModel
 import org.json.JSONArray
 
 object Routes {

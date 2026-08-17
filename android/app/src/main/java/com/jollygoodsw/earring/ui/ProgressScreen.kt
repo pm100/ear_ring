@@ -1,4 +1,4 @@
-package com.earring.ui
+package com.jollygoodsw.earring.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -17,9 +17,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.earring.ProgressViewModel
-import com.earring.SessionRecord
-import com.earring.TestRecord
+import com.jollygoodsw.earring.ProgressViewModel
+import com.jollygoodsw.earring.SessionRecord
+import com.jollygoodsw.earring.TestRecord
 
 @Composable
 fun ProgressScreen(

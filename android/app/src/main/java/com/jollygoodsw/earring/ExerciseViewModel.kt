@@ -1,4 +1,4 @@
-package com.earring
+package com.jollygoodsw.earring
 
 import android.app.Application
 import android.content.Context

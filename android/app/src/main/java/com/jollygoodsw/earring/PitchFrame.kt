@@ -1,4 +1,4 @@
-package com.earring
+package com.jollygoodsw.earring
 
 /** Result of processing one audio frame through the pitch tracker. */
 sealed class PitchFrame {

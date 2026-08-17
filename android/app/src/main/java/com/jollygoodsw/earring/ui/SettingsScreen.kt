@@ -1,4 +1,4 @@
-package com.earring.ui
+package com.jollygoodsw.earring.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -11,8 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.earring.EarRingCore
-import com.earring.ExerciseViewModel
+import com.jollygoodsw.earring.EarRingCore
+import com.jollygoodsw.earring.ExerciseViewModel
 import org.json.JSONArray
 import kotlin.math.roundToInt
 

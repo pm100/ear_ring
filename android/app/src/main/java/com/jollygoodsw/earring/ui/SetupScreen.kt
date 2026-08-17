@@ -1,4 +1,4 @@
-package com.earring.ui
+package com.jollygoodsw.earring.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
@@ -9,12 +9,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.earring.EarRingCore
-import com.earring.MusicTheory
-import com.earring.ui.components.MusicStaff
-import com.earring.ui.components.NoteState
-import com.earring.ui.components.PitchMeter
-import com.earring.ui.components.StaffNote
+import com.jollygoodsw.earring.EarRingCore
+import com.jollygoodsw.earring.MusicTheory
+import com.jollygoodsw.earring.ui.components.MusicStaff
+import com.jollygoodsw.earring.ui.components.NoteState
+import com.jollygoodsw.earring.ui.components.PitchMeter
+import com.jollygoodsw.earring.ui.components.StaffNote
 
 @Composable
 fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, rootChroma: Int = 0, keySignatureMode: Int = 0, silenceThreshold: Float = 0.003f, framesToConfirm: Int = 3, warmupFrames: Int = 4, instrumentIndex: Int = 0) {

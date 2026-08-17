@@ -1,4 +1,4 @@
-package com.earring.ui
+package com.jollygoodsw.earring.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture

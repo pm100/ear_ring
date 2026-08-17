@@ -8,7 +8,7 @@ pub use music_theory::{
     key_signature_pitch_classes, melody_count, melody_range_midi, melody_raw_notes, melody_title,
     melody_to_midi_by_index, midi_to_freq, midi_to_label, note_name, note_timing,
     preferred_midi_label, preferred_note_label, scale_label, scale_name, scale_notes,
-    shuffle_melody_indices, staff_position, staff_position_in_key, test_score,
+    scale_type_from_id, shuffle_melody_indices, staff_position, staff_position_in_key, test_score,
     transpose_display_midi, written_diatonic_chord_label, written_midi_label, written_note_name, written_scale_label,
     MelodyNote, MelodySnippet, Note, NoteName, ScaleType, FLAT_ORDER,
     FLAT_STAFF_POSITIONS, SHARP_ORDER, SHARP_STAFF_POSITIONS,
@@ -205,7 +205,7 @@ pub extern "C" fn ear_ring_staff_position(midi: c_uchar) -> c_int {
 /// Generate a sequence of MIDI note numbers.
 ///
 /// * `root_chroma` – pitch class of the root note (0 = C, 1 = C#, …, 11 = B)
-/// * `scale_id`    – 0=Major, 1=NaturalMinor, 2=Dorian, 3=Mixolydian
+/// * `scale_id`    – 0=Major, 1=NaturalMinor, 2=Dorian, 3=Mixolydian, 4=Locrian
 /// * `length`      – number of notes to generate
 /// * `range_start` – lowest accepted MIDI note (inclusive)
 /// * `range_end`   – highest accepted MIDI note (inclusive)
@@ -226,12 +226,9 @@ pub extern "C" fn ear_ring_generate_sequence(
     if out_buf.is_null() {
         return -1;
     }
-    let scale = match scale_id {
-        0 => ScaleType::Major,
-        1 => ScaleType::NaturalMinor,
-        2 => ScaleType::Dorian,
-        3 => ScaleType::Mixolydian,
-        _ => return -1,
+    let scale = match scale_type_from_id(scale_id) {
+        Some(s) => s,
+        None => return -1,
     };
     let notes = generate_sequence(root_chroma, scale, range_start, range_end, length, seed);
     let out = unsafe { std::slice::from_raw_parts_mut(out_buf, length as usize) };
@@ -256,12 +253,9 @@ pub extern "C" fn ear_ring_generate_diatonic_chord(
     if out_buf.is_null() {
         return -1;
     }
-    let scale = match scale_id {
-        0 => ScaleType::Major,
-        1 => ScaleType::NaturalMinor,
-        2 => ScaleType::Dorian,
-        3 => ScaleType::Mixolydian,
-        _ => return -1,
+    let scale = match scale_type_from_id(scale_id) {
+        Some(s) => s,
+        None => return -1,
     };
     let notes = generate_diatonic_chord(root_chroma, scale, note_count, center_midi, seed);
     let out = unsafe { std::slice::from_raw_parts_mut(out_buf, note_count as usize) };
@@ -287,12 +281,9 @@ pub extern "C" fn ear_ring_diatonic_chord_label(
     if out_buf.is_null() || buf_len == 0 {
         return -1;
     }
-    let scale = match scale_id {
-        0 => ScaleType::Major,
-        1 => ScaleType::NaturalMinor,
-        2 => ScaleType::Dorian,
-        3 => ScaleType::Mixolydian,
-        _ => return -1,
+    let scale = match scale_type_from_id(scale_id) {
+        Some(s) => s,
+        None => return -1,
     };
     let label = diatonic_chord_label(root_chroma, scale, note_count, center_midi, seed);
     let bytes = label.as_bytes();
@@ -319,12 +310,9 @@ pub extern "C" fn ear_ring_written_diatonic_chord_label(
     if out_buf.is_null() || buf_len == 0 {
         return -1;
     }
-    let scale = match scale_id {
-        0 => ScaleType::Major,
-        1 => ScaleType::NaturalMinor,
-        2 => ScaleType::Dorian,
-        3 => ScaleType::Mixolydian,
-        _ => return -1,
+    let scale = match scale_type_from_id(scale_id) {
+        Some(s) => s,
+        None => return -1,
     };
     let label = written_diatonic_chord_label(concert_root_chroma, scale, note_count, center_midi, seed, instrument_index as usize);
     let bytes = label.as_bytes();
@@ -388,12 +376,9 @@ pub extern "C" fn ear_ring_intro_chord(
     if out_buf.is_null() {
         return -1;
     }
-    let scale = match scale_id {
-        0 => ScaleType::Major,
-        1 => ScaleType::NaturalMinor,
-        2 => ScaleType::Dorian,
-        3 => ScaleType::Mixolydian,
-        _ => return -1,
+    let scale = match scale_type_from_id(scale_id) {
+        Some(s) => s,
+        None => return -1,
     };
     let root = Note::from_midi(root_midi);
     let notes = intro_chord(root, scale);
@@ -516,7 +501,7 @@ pub extern "C" fn ear_ring_written_midi_label(
     copy_len as c_int
 }
 
-/// Display name for a scale ID (0–3).
+/// Display name for a scale ID (0–4).
 /// Writes a null-terminated UTF-8 string into `out_buf`.
 /// Returns the number of bytes written (excluding null), or -1 on error.
 #[no_mangle]
@@ -791,12 +776,12 @@ mod android_jni {
         generate_diatonic_chord, generate_sequence, intro_chord, is_correct_note, is_sharp_key,
         key_accidental_count, key_sig_staff_positions, melody_count, melody_range_midi,
         melody_to_midi_by_index, midi_to_label, note_name, preferred_midi_label,
-        preferred_note_label, scale_label, scale_name, shuffle_melody_indices, staff_position,
+        preferred_note_label, scale_label, scale_name, scale_type_from_id, shuffle_melody_indices, staff_position,
         staff_position_in_key, test_score, written_diatonic_chord_label, written_scale_label, Note, ScaleType,
     };
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeDetectPitch(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeDetectPitch(
         env: JNIEnv,
         _class: JClass,
         samples: jfloatArray,
@@ -818,7 +803,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeFreqToMidi(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeFreqToMidi(
         _env: JNIEnv,
         _class: JClass,
         hz: jfloat,
@@ -830,7 +815,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeFreqToCents(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeFreqToCents(
         _env: JNIEnv,
         _class: JClass,
         hz: jfloat,
@@ -842,7 +827,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeStaffPosition(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeStaffPosition(
         _env: JNIEnv,
         _class: JClass,
         midi: jint,
@@ -851,7 +836,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeGenerateSequence(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeGenerateSequence(
         env: JNIEnv,
         _class: JClass,
         root_chroma: jint,
@@ -861,13 +846,7 @@ mod android_jni {
         range_end: jint,
         seed: jlong,
     ) -> jintArray {
-        let scale = match scale_id {
-            0 => ScaleType::Major,
-            1 => ScaleType::NaturalMinor,
-            2 => ScaleType::Dorian,
-            3 => ScaleType::Mixolydian,
-            _ => ScaleType::Major,
-        };
+        let scale = scale_type_from_id(scale_id as u8).unwrap_or(ScaleType::Major);
         let notes = generate_sequence(
             root_chroma as u8,
             scale,
@@ -887,7 +866,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeGenerateDiatonicChord(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeGenerateDiatonicChord(
         env: JNIEnv,
         _class: JClass,
         root_chroma: jint,
@@ -896,13 +875,7 @@ mod android_jni {
         center_midi: jint,
         seed: jlong,
     ) -> jintArray {
-        let scale = match scale_id {
-            0 => ScaleType::Major,
-            1 => ScaleType::NaturalMinor,
-            2 => ScaleType::Dorian,
-            3 => ScaleType::Mixolydian,
-            _ => ScaleType::Major,
-        };
+        let scale = scale_type_from_id(scale_id as u8).unwrap_or(ScaleType::Major);
         let notes = generate_diatonic_chord(
             root_chroma as u8,
             scale,
@@ -920,7 +893,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeDiatonicChordLabel(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeDiatonicChordLabel(
         env: JNIEnv,
         _class: JClass,
         root_chroma: jint,
@@ -929,19 +902,13 @@ mod android_jni {
         center_midi: jint,
         seed: jlong,
     ) -> jstring {
-        let scale = match scale_id {
-            0 => ScaleType::Major,
-            1 => ScaleType::NaturalMinor,
-            2 => ScaleType::Dorian,
-            3 => ScaleType::Mixolydian,
-            _ => ScaleType::Major,
-        };
+        let scale = scale_type_from_id(scale_id as u8).unwrap_or(ScaleType::Major);
         let label = diatonic_chord_label(root_chroma as u8, scale, note_count as u8, center_midi as u8, seed as u64);
         env.new_string(label).map(|s| s.into_raw()).unwrap_or(std::ptr::null_mut())
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeWrittenDiatonicChordLabel(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeWrittenDiatonicChordLabel(
         env: JNIEnv,
         _class: JClass,
         concert_root_chroma: jint,
@@ -951,31 +918,19 @@ mod android_jni {
         seed: jlong,
         instrument_index: jint,
     ) -> jstring {
-        let scale = match scale_id {
-            0 => ScaleType::Major,
-            1 => ScaleType::NaturalMinor,
-            2 => ScaleType::Dorian,
-            3 => ScaleType::Mixolydian,
-            _ => ScaleType::Major,
-        };
+        let scale = scale_type_from_id(scale_id as u8).unwrap_or(ScaleType::Major);
         let label = written_diatonic_chord_label(concert_root_chroma as u8, scale, note_count as u8, center_midi as u8, seed as u64, instrument_index.max(0) as usize);
         env.new_string(label).map(|s| s.into_raw()).unwrap_or(std::ptr::null_mut())
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeIntroChord(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeIntroChord(
         env: JNIEnv,
         _class: JClass,
         root_midi: jint,
         scale_id: jint,
     ) -> jintArray {
-        let scale = match scale_id {
-            0 => ScaleType::Major,
-            1 => ScaleType::NaturalMinor,
-            2 => ScaleType::Dorian,
-            3 => ScaleType::Mixolydian,
-            _ => ScaleType::Major,
-        };
+        let scale = scale_type_from_id(scale_id as u8).unwrap_or(ScaleType::Major);
         let root = Note::from_midi(root_midi as u8);
         let notes = intro_chord(root, scale);
         let midi_vals: Vec<jint> = notes.iter().map(|n| n.midi() as jint).collect();
@@ -989,7 +944,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeIsCorrectNote(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeIsCorrectNote(
         _env: JNIEnv,
         _class: JClass,
         detected_midi: jint,
@@ -1004,7 +959,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeTestScore(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeTestScore(
         _env: JNIEnv,
         _class: JClass,
         max_attempts: jint,
@@ -1015,7 +970,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeMidiToLabel(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeMidiToLabel(
         env: JNIEnv,
         _class: JClass,
         midi: jint,
@@ -1027,7 +982,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeNoteName(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeNoteName(
         env: JNIEnv,
         _class: JClass,
         chroma: jint,
@@ -1039,7 +994,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeScaleName(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeScaleName(
         env: JNIEnv,
         _class: JClass,
         scale_id: jint,
@@ -1051,7 +1006,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeScaleLabel(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeScaleLabel(
         env: JNIEnv,
         _class: JClass,
         root_chroma: jint,
@@ -1064,7 +1019,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeWrittenScaleLabel(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeWrittenScaleLabel(
         env: JNIEnv,
         _class: JClass,
         concert_root_chroma: jint,
@@ -1078,7 +1033,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeEffectiveKeyChroma(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeEffectiveKeyChroma(
         _env: JNIEnv,
         _class: JClass,
         root_chroma: jint,
@@ -1088,7 +1043,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeEffectiveIntroRootMidi(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeEffectiveIntroRootMidi(
         _env: JNIEnv,
         _class: JClass,
         root_chroma: jint,
@@ -1099,7 +1054,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeIsSharpKey(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeIsSharpKey(
         _env: JNIEnv,
         _class: JClass,
         root_chroma: jint,
@@ -1108,7 +1063,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeKeyAccidentalCount(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeKeyAccidentalCount(
         _env: JNIEnv,
         _class: JClass,
         root_chroma: jint,
@@ -1117,7 +1072,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativePreferredMidiLabel(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativePreferredMidiLabel(
         env: JNIEnv,
         _class: JClass,
         midi: jint,
@@ -1130,7 +1085,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativePreferredNoteLabel(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativePreferredNoteLabel(
         env: JNIEnv,
         _class: JClass,
         midi: jint,
@@ -1143,7 +1098,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeAccidentalInKey(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeAccidentalInKey(
         _env: JNIEnv,
         _class: JClass,
         midi: jint,
@@ -1159,7 +1114,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeKeySigPositions(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeKeySigPositions(
         env: JNIEnv,
         _class: JClass,
         root_chroma: jint,
@@ -1175,7 +1130,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeStaffPositionInKey(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeStaffPositionInKey(
         _env: JNIEnv,
         _class: JClass,
         midi: jint,
@@ -1185,7 +1140,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeHelpContent(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeHelpContent(
         env: JNIEnv,
         _class: JClass,
     ) -> jstring {
@@ -1196,7 +1151,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeInstrumentList(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeInstrumentList(
         env: JNIEnv,
         _class: JClass,
     ) -> jstring {
@@ -1207,7 +1162,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeTransposeDisplayMidi(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeTransposeDisplayMidi(
         _env: JNIEnv,
         _class: JClass,
         concert_midi: jint,
@@ -1217,7 +1172,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeWrittenNoteName(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeWrittenNoteName(
         env: JNIEnv,
         _class: JClass,
         concert_chroma: jint,
@@ -1230,7 +1185,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeWrittenMidiLabel(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeWrittenMidiLabel(
         env: JNIEnv,
         _class: JClass,
         concert_midi: jint,
@@ -1247,7 +1202,7 @@ mod android_jni {
     // in Kotlin. Each call passes the handle back so Rust can recover the reference.
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeTrackerNew(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeTrackerNew(
         _env: JNIEnv,
         _class: JClass,
         silence_threshold: jfloat,
@@ -1258,7 +1213,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeTrackerFree(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeTrackerFree(
         _env: JNIEnv,
         _class: JClass,
         handle: jlong,
@@ -1269,7 +1224,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeTrackerReset(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeTrackerReset(
         _env: JNIEnv,
         _class: JClass,
         handle: jlong,
@@ -1280,7 +1235,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeTrackerResetWithWarmup(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeTrackerResetWithWarmup(
         _env: JNIEnv,
         _class: JClass,
         handle: jlong,
@@ -1292,7 +1247,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeTrackerSetParams(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeTrackerSetParams(
         _env: JNIEnv,
         _class: JClass,
         handle: jlong,
@@ -1305,7 +1260,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeTrackerApplyInstrument(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeTrackerApplyInstrument(
         _env: JNIEnv,
         _class: JClass,
         handle: jlong,
@@ -1320,7 +1275,7 @@ mod android_jni {
     /// Returns a float array [live_hz, live_midi_f32, confirmed_midi_f32].
     /// live_midi and confirmed_midi are -1.0 when absent.
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeTrackerProcess(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeTrackerProcess(
         env: JNIEnv,
         _class: JClass,
         handle: jlong,
@@ -1357,14 +1312,14 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeMelodyCount(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeMelodyCount(
         _env: JNIEnv, _class: JClass,
     ) -> jint {
         melody_count() as jint
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeShuffleMelodyIndices(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeShuffleMelodyIndices(
         env: JNIEnv, _class: JClass,
         seed: jlong,
     ) -> jintArray {
@@ -1376,7 +1331,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativePickMelodyByIndex(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativePickMelodyByIndex(
         env: JNIEnv, _class: JClass,
         index: jint, root_chroma: jint,
     ) -> jfloatArray {
@@ -1402,7 +1357,7 @@ mod android_jni {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_earring_EarRingCore_nativeMelodyRangeMidi(
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeMelodyRangeMidi(
         env: JNIEnv, _class: JClass,
         index: jint, root_chroma: jint,
     ) -> jintArray {

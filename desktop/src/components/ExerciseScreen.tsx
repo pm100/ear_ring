@@ -12,7 +12,7 @@ interface Props {
   onStop: () => void;
 }
 
-const SCALE_NAMES = ['Major','Relative Minor','Dorian','Mixolydian'];
+const SCALE_NAMES = ['Major','Relative Minor','Dorian','Mixolydian','Locrian'];
 
 function effectiveKeyChroma(rootNote: number, _scaleId: number): number {
   return rootNote;
@@ -425,7 +425,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         <button className="btn-back" onClick={stopSession}>{'\u2190'} Back</button>
         <span className="screen-title">{rootLabel} {scaleLabel}</span>
       </div>
-
+
       <div className="listening-indicator" style={{ marginBottom: 8, visibility: status === 'listening' ? 'visible' : 'hidden' }}>
         <span className="listening-ear">👂</span>
         <span className="listening-label" style={{ marginLeft: 8 }}>Listening…</span>

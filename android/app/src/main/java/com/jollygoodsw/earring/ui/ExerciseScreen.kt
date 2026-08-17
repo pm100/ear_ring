@@ -1,4 +1,4 @@
-package com.earring.ui
+package com.jollygoodsw.earring.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
@@ -30,14 +30,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.earring.EarRingCore
-import com.earring.ExerciseStatus
-import com.earring.ExerciseViewModel
-import com.earring.MusicTheory
-import com.earring.ui.components.NoteState
-import com.earring.ui.components.MusicStaff
-import com.earring.ui.components.PitchMeter
-import com.earring.ui.components.StaffNote
+import com.jollygoodsw.earring.EarRingCore
+import com.jollygoodsw.earring.ExerciseStatus
+import com.jollygoodsw.earring.ExerciseViewModel
+import com.jollygoodsw.earring.MusicTheory
+import com.jollygoodsw.earring.ui.components.NoteState
+import com.jollygoodsw.earring.ui.components.MusicStaff
+import com.jollygoodsw.earring.ui.components.PitchMeter
+import com.jollygoodsw.earring.ui.components.StaffNote
 import org.json.JSONArray
 
 @Composable
@@ -214,7 +214,7 @@ fun ExerciseScreen(
     }
 }
 
-private fun statusText(state: com.earring.ExerciseState): String =
+private fun statusText(state: com.jollygoodsw.earring.ExerciseState): String =
     when (state.status) {
         ExerciseStatus.PLAYING -> "Listen carefully…"
         ExerciseStatus.LISTENING -> "Play note ${state.currentNoteIndex + 1} of ${state.sequence.size}"

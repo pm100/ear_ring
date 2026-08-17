@@ -1,4 +1,4 @@
-package com.earring.ui
+package com.jollygoodsw.earring.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -11,9 +11,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.earring.ExerciseViewModel
-import com.earring.MusicTheory
-import com.earring.ProgressViewModel
+import com.jollygoodsw.earring.ExerciseViewModel
+import com.jollygoodsw.earring.MusicTheory
+import com.jollygoodsw.earring.ProgressViewModel
 
 @Composable
 fun ResultsScreen(

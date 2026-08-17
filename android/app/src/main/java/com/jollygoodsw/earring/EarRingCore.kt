@@ -1,6 +1,6 @@
-package com.earring
+package com.jollygoodsw.earring
 
-import com.earring.PitchFrame
+import com.jollygoodsw.earring.PitchFrame
 
 object EarRingCore {
 
@@ -110,7 +110,16 @@ object EarRingCore {
         else IntArray(length) { rangeStart }
 
     fun introChord(rootMidi: Int, scaleId: Int): IntArray =
-        if (loaded) nativeIntroChord(rootMidi, scaleId) else intArrayOf(rootMidi, rootMidi + 4, rootMidi + 7)
+        if (loaded) nativeIntroChord(rootMidi, scaleId) else {
+            // Triad quality mirrors the Rust core: major (Major/Mixolydian), minor
+            // (Natural Minor/Dorian), or diminished (Locrian) third + fifth.
+            val (third, fifth) = when (scaleId) {
+                1, 2 -> 3 to 7  // Natural Minor, Dorian → minor triad
+                4 -> 3 to 6     // Locrian → diminished triad
+                else -> 4 to 7  // Major, Mixolydian → major triad
+            }
+            intArrayOf(rootMidi, rootMidi + third, rootMidi + fifth)
+        }
 
     fun isCorrectNote(detectedMidi: Int, cents: Int, expectedMidi: Int): Boolean =
         if (loaded) nativeIsCorrectNote(detectedMidi, cents, expectedMidi) != 0
@@ -134,12 +143,12 @@ object EarRingCore {
 
     fun scaleName(scaleId: Int): String =
         if (loaded) nativeScaleName(scaleId) else
-            listOf("Major","Natural Minor","Dorian","Mixolydian").getOrElse(scaleId) { "?" }
+            listOf("Major","Natural Minor","Dorian","Mixolydian","Locrian").getOrElse(scaleId) { "?" }
 
     fun scaleLabel(rootChroma: Int, scaleId: Int): String =
         if (loaded) nativeScaleLabel(rootChroma, scaleId) else {
             val base = scaleName(scaleId)
-            val offsets = listOf(null, 3, 10, 5)
+            val offsets = listOf(null, 3, 10, 5, 1)
             val offset = offsets.getOrElse(scaleId) { null }
             if (offset == null) base
             else {

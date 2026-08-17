@@ -143,10 +143,12 @@ Row (equal width, 8dp gap):
               Dropdown (outlined, full width of column): C  C#  D  D#  E  F  F#  G  G#  A  A#  B
                 — Selecting a new key auto-resets the range to one octave from the new key closest to middle C
   Right half — Section label: "Scale"
-               Dropdown (outlined, full width of column): Major | Natural Minor | Dorian | Mixolydian
-                 — Scale IDs: 0=Major, 1=Natural Minor, 2=Dorian, 3=Mixolydian (Harmonic Minor removed)
-                 — Non-major scales show the implied major key in parentheses, e.g. "Natural Minor (Eb)"
-                   when key=C. The label updates dynamically as the Key dropdown changes.
+               Dropdown (outlined, full width of column): Major | Natural Minor | Dorian | Mixolydian | Locrian
+                 — Scale IDs: 0=Major, 1=Natural Minor, 2=Dorian, 3=Mixolydian, 4=Locrian (Harmonic Minor removed)
+                 — Non-major scales show the mode's own tonic note in parentheses, using the major key
+                   selected by "Key" as the parent key, e.g. "Relative Minor (A-)" when key=C (dash denotes
+                   minor), "Dorian (D)", "Mixolydian (G)", "Locrian (B)". The label updates dynamically as
+                   the Key dropdown changes.
                  — **Disabled (opacity 0.38)** when Test Type = Melody Snippets or Diatonic Arpeggios
 
 [16dp space]
@@ -252,6 +254,8 @@ Exercise dynamics:
 - For each test:
   1. Staff clears to empty
   2. App plays a piano triad derived from the selected root/scale **as a chord** (simultaneous notes), not as an arpeggio
+     — triad quality follows the scale: major triad for Major/Mixolydian, minor triad for Natural Minor/Dorian,
+       diminished triad for Locrian
   3. Wait an 800ms gap after the chord before the prompt starts
   4. App plays the hidden test sequence
   5. App automatically switches to listening mode
@@ -284,7 +288,7 @@ Exercise control flow (canonical state machine):
    - If `Display Test Notes = Hide`, the staff is blank at the start of the attempt.
    - If `Display Test Notes = Show`, draw the target test notes in black before any audio plays.
 3. **Prompt playback**
-   - Play the tonic triad as a single chord.
+   - Play the tonic triad as a single chord (major/minor/diminished quality follows the selected scale — see above).
    - Wait the post-chord gap (default 800ms, configurable in Settings).
    - Play the hidden test sequence at the selected BPM.
 4. **Auto listening**
@@ -968,11 +972,11 @@ Key facts:
 **Launch the app:**
 ```powershell
 $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
-& $adb shell am start -n com.earring/.MainActivity
+& $adb shell am start -n com.jollygoodsw.earring/.MainActivity
 ```
 
 **The debug build is slow to start** (~60–90 seconds for the splash to clear on first run due to JVM
-verification). Wait for the logcat message `Displayed com.earring/.MainActivity` before tapping.
+verification). Wait for the logcat message `Displayed com.jollygoodsw.earring/.MainActivity` before tapping.
 
 **Take a screenshot:**
 ```powershell

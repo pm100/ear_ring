@@ -12,12 +12,12 @@ def cargoExecutable = org.gradle.internal.os.OperatingSystem.current().isWindows
 def rustJniOutputDir = { variantName -> layout.buildDirectory.dir("generated/rustJniLibs/${variantName}") }
 
 android {
-    namespace 'com.earring'
+    namespace 'com.jollygoodsw.earring'
     compileSdk 35
     ndkVersion '27.0.12077973'
 
     defaultConfig {
-        applicationId 'com.earring'
+        applicationId 'com.jollygoodsw.earring'
         minSdk 26
         targetSdk 35
         versionCode providers.environmentVariable('VERSION_CODE').map { it.toInteger() }.orElse(3).get()

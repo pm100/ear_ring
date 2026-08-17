@@ -146,6 +146,7 @@ pub enum ScaleType {
     NaturalMinor,
     Dorian,
     Mixolydian,
+    Locrian,
 }
 
 impl ScaleType {
@@ -156,6 +157,7 @@ impl ScaleType {
             ScaleType::NaturalMinor => &[0, 2, 3, 5, 7, 8, 10],
             ScaleType::Dorian => &[0, 2, 3, 5, 7, 9, 10],
             ScaleType::Mixolydian => &[0, 2, 4, 5, 7, 9, 10],
+            ScaleType::Locrian => &[0, 1, 3, 5, 6, 8, 10],
         }
     }
 
@@ -165,7 +167,21 @@ impl ScaleType {
             ScaleType::NaturalMinor => "Relative Minor",
             ScaleType::Dorian => "Dorian",
             ScaleType::Mixolydian => "Mixolydian",
+            ScaleType::Locrian => "Locrian",
         }
+    }
+}
+
+/// Maps a scale ID (0=Major, 1=NaturalMinor, 2=Dorian, 3=Mixolydian, 4=Locrian)
+/// to a `ScaleType`. Returns `None` for unrecognized IDs.
+pub fn scale_type_from_id(id: u8) -> Option<ScaleType> {
+    match id {
+        0 => Some(ScaleType::Major),
+        1 => Some(ScaleType::NaturalMinor),
+        2 => Some(ScaleType::Dorian),
+        3 => Some(ScaleType::Mixolydian),
+        4 => Some(ScaleType::Locrian),
+        _ => None,
     }
 }
 
@@ -229,7 +245,11 @@ pub fn generate_sequence(
 
 /// Build a tonic triad-style intro chord from the selected scale.
 /// Uses scale degrees 1, 3, and 5 when available, falling back to the last
-/// available degree for shorter scales.
+/// available degree for shorter scales. Because the 3rd and 5th are drawn
+/// straight from the scale's own interval pattern, the chord quality follows
+/// the scale automatically: major triad for Major/Mixolydian (major 3rd),
+/// minor triad for Natural Minor/Dorian (minor 3rd), and diminished triad
+/// for Locrian (minor 3rd + diminished 5th).
 pub fn intro_chord(root: Note, scale: ScaleType) -> Vec<Note> {
     let notes = scale_notes(root, scale);
     if notes.is_empty() {
@@ -504,13 +524,14 @@ pub fn written_midi_label(concert_midi: u8, instrument_index: usize) -> String {
     midi_to_label(((concert_midi as i32 + semitones).clamp(0, 127)) as u8)
 }
 
-/// Display name for a scale ID (0–3).
+/// Display name for a scale ID (0–4).
 pub fn scale_name(scale_id: u8) -> &'static str {
     match scale_id {
         0 => "Major",
         1 => "Relative Minor",
         2 => "Dorian",
         3 => "Mixolydian",
+        4 => "Locrian",
         _ => "?",
     }
 }
@@ -530,19 +551,18 @@ fn mode_root_offset(scale: ScaleType) -> u8 {
         ScaleType::NaturalMinor => 9,   // 6th degree (Aeolian / Relative Minor)
         ScaleType::Dorian => 2,          // 2nd degree
         ScaleType::Mixolydian => 7,      // 5th degree
+        ScaleType::Locrian => 11,        // 7th degree
     }
 }
 
 /// Full display label for a scale, annotated with the mode's starting note.
 /// e.g. root_chroma=0 (C), scale_id=1 (Natural Minor) → "Relative Minor (A-)"
 /// e.g. root_chroma=0 (C), scale_id=2 (Dorian)        → "Dorian (D)"
+/// e.g. root_chroma=0 (C), scale_id=4 (Locrian)       → "Locrian (B)"
 pub fn scale_label(root_chroma: u8, scale_id: u8) -> String {
-    let scale = match scale_id {
-        0 => ScaleType::Major,
-        1 => ScaleType::NaturalMinor,
-        2 => ScaleType::Dorian,
-        3 => ScaleType::Mixolydian,
-        _ => return "?".to_string(),
+    let scale = match scale_type_from_id(scale_id) {
+        Some(s) => s,
+        None => return "?".to_string(),
     };
     let offset = mode_root_offset(scale);
     if offset == 0 {
@@ -566,13 +586,7 @@ pub fn written_scale_label(concert_root_chroma: u8, scale_id: u8, instrument_ind
 /// Used for the intro chord root when in a non-Major scale mode.
 /// e.g. root_chroma=C, scale_id=NaturalMinor, range_start=72 (C5) → 69 (A4).
 pub fn effective_intro_root_midi(root_chroma: u8, scale_id: u8, range_start: u8) -> u8 {
-    let scale = match scale_id {
-        0 => ScaleType::Major,
-        1 => ScaleType::NaturalMinor,
-        2 => ScaleType::Dorian,
-        3 => ScaleType::Mixolydian,
-        _ => ScaleType::Major,
-    };
+    let scale = scale_type_from_id(scale_id).unwrap_or(ScaleType::Major);
     let mode_root_chroma = ((root_chroma as u16 + mode_root_offset(scale) as u16) % 12) as u8;
     let offset = (range_start + 12 - mode_root_chroma) % 12;
     range_start - offset
@@ -961,6 +975,16 @@ mod tests {
     }
 
     #[test]
+    fn test_generate_sequence_locrian() {
+        // Key=C, Locrian → B Locrian (pitch classes from B=11: 11,0,2,4,5,7,9)
+        let b_locrian_pcs: std::collections::HashSet<u8> = [11,0,2,4,5,7,9].iter().copied().collect();
+        let seq = generate_sequence(0, ScaleType::Locrian, 59, 84, 20, 13);
+        for note in &seq {
+            assert!(b_locrian_pcs.contains(&(note.midi() % 12)), "Note {:?} not in B Locrian", note);
+        }
+    }
+
+    #[test]
     fn test_effective_key_chroma_all_scales() {
         // All scales for root=C should return 0 (C major key sig shared by all modes of C)
         assert_eq!(effective_key_chroma(0, 0), 0); // C Major
@@ -975,6 +999,27 @@ mod tests {
         assert_eq!(scale_label(7, 1), "Relative Minor (E-)"); // G → E minor
         assert_eq!(scale_label(0, 2), "Dorian (D)");          // C → D Dorian
         assert_eq!(scale_label(0, 3), "Mixolydian (G)");      // C → G Mixolydian
+        assert_eq!(scale_label(0, 4), "Locrian (B)");         // C → B Locrian
+    }
+
+    #[test]
+    fn test_locrian_scale_c4() {
+        let root = Note::new(NoteName::C, 4);
+        let notes = scale_notes(root, ScaleType::Locrian);
+        let names: Vec<_> = notes.iter().map(|n| n.name).collect();
+        // C Locrian: C Db Eb F Gb Ab Bb
+        assert_eq!(
+            names,
+            vec![
+                NoteName::C,
+                NoteName::Cs,
+                NoteName::Ds,
+                NoteName::F,
+                NoteName::Fs,
+                NoteName::Gs,
+                NoteName::As,
+            ]
+        );
     }
 
     #[test]
@@ -988,6 +1033,9 @@ mod tests {
         // Key=C, Dorian (scale_id=2), range_start=62 (D4)
         // mode root = D, MIDI at or just below 62 = 62
         assert_eq!(effective_intro_root_midi(0, 2, 62), 62);
+        // Key=C, Locrian (scale_id=4), range_start=72 (C5)
+        // mode root = B, MIDI at or just below 72 = 71 (B4)
+        assert_eq!(effective_intro_root_midi(0, 4, 72), 71);
     }
 
     #[test]
@@ -1004,6 +1052,24 @@ mod tests {
         let chord = intro_chord(root, ScaleType::Major);
         let midis: Vec<_> = chord.into_iter().map(|n| n.midi()).collect();
         assert_eq!(midis, vec![60, 64, 67]);
+    }
+
+    /// The opening triad's quality must follow the selected scale: major triad
+    /// (root, major 3rd, perfect 5th) for Major and Mixolydian; minor triad
+    /// (root, minor 3rd, perfect 5th) for Natural Minor and Dorian; diminished
+    /// triad (root, minor 3rd, diminished 5th) for Locrian.
+    #[test]
+    fn test_intro_chord_quality_follows_scale() {
+        let root = Note::new(NoteName::C, 4); // MIDI 60
+        let quality_of = |scale: ScaleType| -> (i32, i32) {
+            let midis: Vec<i32> = intro_chord(root, scale).into_iter().map(|n| n.midi() as i32).collect();
+            (midis[1] - midis[0], midis[2] - midis[0]) // (3rd interval, 5th interval)
+        };
+        assert_eq!(quality_of(ScaleType::Major), (4, 7), "Major should give a major triad");
+        assert_eq!(quality_of(ScaleType::Mixolydian), (4, 7), "Mixolydian should give a major triad");
+        assert_eq!(quality_of(ScaleType::NaturalMinor), (3, 7), "Natural Minor should give a minor triad");
+        assert_eq!(quality_of(ScaleType::Dorian), (3, 7), "Dorian should give a minor triad");
+        assert_eq!(quality_of(ScaleType::Locrian), (3, 6), "Locrian should give a diminished triad");
     }
 
     #[test]
@@ -1054,6 +1120,7 @@ mod tests {
             (ScaleType::NaturalMinor, &[0,2,3,5,7,8,10]),
             (ScaleType::Dorian,       &[0,2,3,5,7,9,10]),
             (ScaleType::Mixolydian,   &[0,2,4,5,7,9,10]),
+            (ScaleType::Locrian,      &[0,1,3,5,6,8,10]),
         ];
         for (scale, base_intervals) in scales {
             for root in 0u8..12 {

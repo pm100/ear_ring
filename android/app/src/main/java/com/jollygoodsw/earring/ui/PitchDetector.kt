@@ -1,13 +1,13 @@
-package com.earring.ui
+package com.jollygoodsw.earring.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import com.earring.AudioCapture
-import com.earring.EarRingCore
-import com.earring.PitchFrame
+import com.jollygoodsw.earring.AudioCapture
+import com.jollygoodsw.earring.EarRingCore
+import com.jollygoodsw.earring.PitchFrame
 
 /**
  * Shared pitch detection composable used identically by Mic Setup and Exercise screens.

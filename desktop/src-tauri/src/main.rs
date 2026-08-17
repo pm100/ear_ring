@@ -4,7 +4,7 @@ use ear_ring_core::{
     accidental_in_key, detect_pitch, diatonic_chord_label, effective_intro_root_midi, freq_to_note, generate_diatonic_chord, generate_sequence, help_sections_json,
     intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
     melody_count, melody_range_midi, melody_title, melody_to_midi_by_index, note_timing, preferred_midi_label,
-    shuffle_melody_indices, staff_position, test_score, written_diatonic_chord_label, written_note_name, written_midi_label, written_scale_label,
+    scale_type_from_id, shuffle_melody_indices, staff_position, test_score, written_diatonic_chord_label, written_note_name, written_midi_label, written_scale_label,
     Note, PitchTracker, ScaleType,
 };
 use std::sync::Mutex;
@@ -84,13 +84,7 @@ fn cmd_staff_position(midi: u8) -> i32 {
 
 #[tauri::command]
 fn cmd_generate_sequence(root_chroma: u8, scale_id: u8, length: u8, range_start: u8, range_end: u8, seed: u64) -> Vec<u8> {
-    let scale = match scale_id {
-        0 => ScaleType::Major,
-        1 => ScaleType::NaturalMinor,
-        2 => ScaleType::Dorian,
-        3 => ScaleType::Mixolydian,
-        _ => ScaleType::Major,
-    };
+    let scale = scale_type_from_id(scale_id).unwrap_or(ScaleType::Major);
     generate_sequence(root_chroma, scale, range_start, range_end, length, seed)
         .iter()
         .map(|n| n.midi())
@@ -99,13 +93,7 @@ fn cmd_generate_sequence(root_chroma: u8, scale_id: u8, length: u8, range_start:
 
 #[tauri::command]
 fn cmd_generate_diatonic_chord(root_chroma: u8, scale_id: u8, note_count: u8, center_midi: u8, seed: u64) -> Vec<u8> {
-    let scale = match scale_id {
-        0 => ScaleType::Major,
-        1 => ScaleType::NaturalMinor,
-        2 => ScaleType::Dorian,
-        3 => ScaleType::Mixolydian,
-        _ => ScaleType::Major,
-    };
+    let scale = scale_type_from_id(scale_id).unwrap_or(ScaleType::Major);
     generate_diatonic_chord(root_chroma, scale, note_count, center_midi, seed)
         .iter()
         .map(|n| n.midi())
@@ -114,37 +102,19 @@ fn cmd_generate_diatonic_chord(root_chroma: u8, scale_id: u8, note_count: u8, ce
 
 #[tauri::command]
 fn cmd_diatonic_chord_label(root_chroma: u8, scale_id: u8, note_count: u8, center_midi: u8, seed: u64) -> String {
-    let scale = match scale_id {
-        0 => ScaleType::Major,
-        1 => ScaleType::NaturalMinor,
-        2 => ScaleType::Dorian,
-        3 => ScaleType::Mixolydian,
-        _ => ScaleType::Major,
-    };
+    let scale = scale_type_from_id(scale_id).unwrap_or(ScaleType::Major);
     diatonic_chord_label(root_chroma, scale, note_count, center_midi, seed)
 }
 
 #[tauri::command]
 fn cmd_written_diatonic_chord_label(concert_root_chroma: u8, scale_id: u8, note_count: u8, center_midi: u8, seed: u64, instrument_index: u32) -> String {
-    let scale = match scale_id {
-        0 => ScaleType::Major,
-        1 => ScaleType::NaturalMinor,
-        2 => ScaleType::Dorian,
-        3 => ScaleType::Mixolydian,
-        _ => ScaleType::Major,
-    };
+    let scale = scale_type_from_id(scale_id).unwrap_or(ScaleType::Major);
     written_diatonic_chord_label(concert_root_chroma, scale, note_count, center_midi, seed, instrument_index as usize)
 }
 
 #[tauri::command]
 fn cmd_intro_chord(root_midi: u8, scale_id: u8) -> Vec<u8> {
-    let scale = match scale_id {
-        0 => ScaleType::Major,
-        1 => ScaleType::NaturalMinor,
-        2 => ScaleType::Dorian,
-        3 => ScaleType::Mixolydian,
-        _ => ScaleType::Major,
-    };
+    let scale = scale_type_from_id(scale_id).unwrap_or(ScaleType::Major);
     intro_chord(Note::from_midi(root_midi), scale)
         .iter()
         .map(|n| n.midi())

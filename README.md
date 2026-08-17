@@ -39,7 +39,7 @@ The Rust core handles all music logic and is shared across platforms:
 ## Features
 
 - Three test types: Random Notes, Melody Snippets (~50 public-domain tunes with rhythmic playback), and Diatonic Arpeggios (ascending/descending triads and seventh chords)
-- 4 scale types: Major, Natural Minor, Dorian, Mixolydian
+- 5 scale types: Major, Natural Minor, Dorian, Mixolydian, Locrian — the opening triad's quality (major/minor/diminished) follows the selected scale
 - 12 root notes, interactive piano range picker, sequence length 2–8 notes
 - Real-time pitch detection with cents accuracy
 - Visual music staff with key signatures, duration-aware note symbols, and animated highlighting
@@ -53,7 +53,7 @@ The Rust core handles all music logic and is shared across platforms:
 ```
 ear_ring/
 ├── android/                   # Android app (Kotlin + Compose)
-│   └── app/src/main/java/com/earring/
+│   └── app/src/main/java/com/jollygoodsw/earring/
 │       ├── EarRingCore.kt     # JNI bridge to Rust
 │       ├── AudioCapture.kt    # Microphone input
 │       ├── AudioPlayback.kt   # Piano sample playback

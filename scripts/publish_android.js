@@ -8,7 +8,7 @@
  *                                      Setup → API access → Service accounts)
  *
  * Optional:
- *   PLAY_PACKAGE_NAME   defaults to "com.earring"
+ *   PLAY_PACKAGE_NAME   defaults to "com.jollygoodsw.earring"
  *   PLAY_AAB_PATH       defaults to android/app/build/outputs/bundle/release/app-release.aab
  *   PLAY_TRACK          defaults to "internal" (other options: alpha, beta, production)
  */
@@ -17,7 +17,7 @@ const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
 
-const PACKAGE_NAME = process.env.PLAY_PACKAGE_NAME || 'com.earring';
+const PACKAGE_NAME = process.env.PLAY_PACKAGE_NAME || 'com.jollygoodsw.earring';
 const TRACK = process.env.PLAY_TRACK || 'internal';
 const AAB_PATH = process.env.PLAY_AAB_PATH ||
   path.join(__dirname, '..', 'android', 'app', 'build', 'outputs', 'bundle', 'release', 'app-release.aab');

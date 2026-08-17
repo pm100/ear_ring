@@ -9,9 +9,9 @@ interface Props {
 }
 
 const NOTE_NAMES = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
-const SCALE_NAMES = ['Major', 'Relative Minor', 'Dorian', 'Mixolydian'];
+const SCALE_NAMES = ['Major', 'Relative Minor', 'Dorian', 'Mixolydian', 'Locrian'];
 // Semitones to add to root chroma to get implied major key; null = no parenthetical (Major).
-const IMPLIED_MAJOR_OFFSETS: (number | null)[] = [null, 3, 10, 5];
+const IMPLIED_MAJOR_OFFSETS: (number | null)[] = [null, 3, 10, 5, 1];
 
 function scaleLabel(rootNote: number, scaleId: number): string {
   const base = SCALE_NAMES[scaleId];
@@ -228,9 +228,9 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
   }, [settings.instrumentIndex]);
 
   // Scale labels in written pitch for the selected instrument
-  const [scaleLabels, setScaleLabels] = useState<string[]>(['Major', 'Relative Minor', 'Dorian', 'Mixolydian']);
+  const [scaleLabels, setScaleLabels] = useState<string[]>(['Major', 'Relative Minor', 'Dorian', 'Mixolydian', 'Locrian']);
   useEffect(() => {
-    Promise.all([0, 1, 2, 3].map(i =>
+    Promise.all([0, 1, 2, 3, 4].map(i =>
       invoke<string>('cmd_written_scale_label', {
         concertRootChroma: settings.rootNote,
         scaleId: i,

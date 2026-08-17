@@ -1,6 +1,6 @@
 use ear_ring_core::{
-    detect_pitch, freq_to_note, generate_sequence, intro_chord, is_correct_note, staff_position,
-    test_score, Note, ScaleType,
+    detect_pitch, freq_to_note, generate_sequence, intro_chord, is_correct_note, scale_type_from_id,
+    staff_position, test_score, Note, ScaleType,
 };
 use wasm_bindgen::prelude::*;
 
@@ -34,20 +34,14 @@ pub fn wasm_staff_position(midi: u8) -> i32 {
 /// Generate a note sequence; returns a Uint8Array of MIDI note numbers.
 ///
 /// * `root_chroma` – pitch class of the root (0=C … 11=B)
-/// * `scale_id`    – 0=Major … 4=Mixolydian
+/// * `scale_id`    – 0=Major, 1=NaturalMinor, 2=Dorian, 3=Mixolydian, 4=Locrian
 /// * `length`      – number of notes
 /// * `range_start` – lowest accepted MIDI note
 /// * `range_end`   – highest accepted MIDI note
 /// * `seed`        – random seed
 #[wasm_bindgen]
 pub fn wasm_generate_sequence(root_chroma: u8, scale_id: u8, length: u8, range_start: u8, range_end: u8, seed: u64) -> Vec<u8> {
-    let scale = match scale_id {
-        0 => ScaleType::Major,
-        1 => ScaleType::NaturalMinor,
-        2 => ScaleType::Dorian,
-        3 => ScaleType::Mixolydian,
-        _ => ScaleType::Major,
-    };
+    let scale = scale_type_from_id(scale_id).unwrap_or(ScaleType::Major);
     generate_sequence(root_chroma, scale, range_start, range_end, length, seed)
         .iter()
         .map(|n| n.midi())
@@ -56,13 +50,7 @@ pub fn wasm_generate_sequence(root_chroma: u8, scale_id: u8, length: u8, range_s
 
 #[wasm_bindgen]
 pub fn wasm_intro_chord(root_midi: u8, scale_id: u8) -> Vec<u8> {
-    let scale = match scale_id {
-        0 => ScaleType::Major,
-        1 => ScaleType::NaturalMinor,
-        2 => ScaleType::Dorian,
-        3 => ScaleType::Mixolydian,
-        _ => ScaleType::Major,
-    };
+    let scale = scale_type_from_id(scale_id).unwrap_or(ScaleType::Major);
     intro_chord(Note::from_midi(root_midi), scale)
         .iter()
         .map(|n| n.midi())
