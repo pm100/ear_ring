@@ -128,7 +128,7 @@ ios-device: _ios-keychain-unlock
       exit 1
     fi
     xcrun devicectl device install app --device "$IOS_DEVICE_ID" "$APP"
-    xcrun devicectl device process launch --device "$IOS_DEVICE_ID" org.name.earring
+    xcrun devicectl device process launch --device "$IOS_DEVICE_ID" com.jollygoodsw.earring
 
 # Archive the iOS app and export a Release IPA.
 # Output: /tmp/earring_export/earring.ipa

@@ -278,7 +278,7 @@
 					"-lc++",
 					"-lear_ring_core",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = org.name.earring;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jollygoodsw.earring;
 				PRODUCT_NAME = earring;
 				SWIFT_OBJC_BRIDGING_HEADER = "earring/earring-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -312,7 +312,7 @@
 					"-lc++",
 					"-lear_ring_core",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = org.name.earring;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jollygoodsw.earring;
 				PRODUCT_NAME = earring;
 				SWIFT_OBJC_BRIDGING_HEADER = "earring/earring-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
