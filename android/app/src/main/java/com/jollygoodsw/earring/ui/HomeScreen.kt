@@ -208,11 +208,11 @@ fun HomeScreen(
         SectionLabel("Sequence Length")
         val isDiatonicMode = state.testType == 2 || state.testType == 3
         ChipRow(
-            items = (2..8).map { it.toString() },
-            selected = state.sequenceLength - 2,
-            onSelect = { viewModel.setSequenceLength(it + 2) },
+            items = (1..8).map { it.toString() },
+            selected = state.sequenceLength - 1,
+            onSelect = { viewModel.setSequenceLength(it + 1) },
             enabled = state.testType == 0,
-            enabledIndices = if (isDiatonicMode) setOf(1, 2) else null  // indices 1=3, 2=4
+            enabledIndices = if (isDiatonicMode) setOf(2, 3) else null  // indices 2=3, 3=4
         )
         Spacer(Modifier.height(16.dp))
 

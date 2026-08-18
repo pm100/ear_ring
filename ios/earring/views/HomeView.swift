@@ -214,10 +214,10 @@ struct HomeView: View {
                 // ── Sequence Length ───────────────────────────────────────
                 sectionLabel("Sequence Length").padding(.top, 16)
                 LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible()), count: 7),
+                    columns: Array(repeating: GridItem(.flexible()), count: 8),
                     spacing: 6
                 ) {
-                    ForEach(2...8, id: \.self) { len in
+                    ForEach(1...8, id: \.self) { len in
                         let chipEnabled: Bool = {
                             if model.testType == 1 { return false }
                             if model.testType == 2 || model.testType == 3 { return len == 3 || len == 4 }

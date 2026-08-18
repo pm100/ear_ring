@@ -166,9 +166,10 @@ PianoRangePicker
 
 [16dp space]
 Section label: "Sequence Length"
-Chip row: 2  3  4  5  6  7  8   (single row, equal width)
+Chip row: 1  2  3  4  5  6  7  8   (single row, equal width)
+  — "1" plays/tests a single random note (no repeat-rejection applies, since there's only one note)
   — **Disabled (opacity 0.38)** when Test Type = Melody Snippets
-  — In Diatonic Arpeggios mode: only chips 3 and 4 are enabled (3=triad, 4=seventh chord); 2, 5–8 are disabled
+  — In Diatonic Arpeggios mode: only chips 3 and 4 are enabled (3=triad, 4=seventh chord); 1, 2, 5–8 are disabled
 
 [16dp space]
 Row (same line): ☐ Display Test Notes    ☐ Use Key Signature

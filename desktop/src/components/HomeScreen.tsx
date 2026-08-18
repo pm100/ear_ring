@@ -315,7 +315,7 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
       <div>
         <span className="section-label">Sequence Length</span>
         <div className="chip-row">
-          {[2, 3, 4, 5, 6, 7, 8].map(len => {
+          {[1, 2, 3, 4, 5, 6, 7, 8].map(len => {
             const chipEnabled = isMelodyMode ? false : isDiatonicMode ? (len === 3 || len === 4) : true;
             return (
               <button
