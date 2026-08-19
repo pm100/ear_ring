@@ -174,6 +174,11 @@ fn cmd_instrument_list() -> String {
 }
 
 #[tauri::command]
+fn cmd_git_hash() -> String {
+    ear_ring_core::GIT_HASH.to_string()
+}
+
+#[tauri::command]
 fn cmd_transpose_display_midi(concert_midi: i32, instrument_index: i32) -> i32 {
     ear_ring_core::transpose_display_midi(concert_midi, instrument_index.max(0) as usize)
 }
@@ -261,6 +266,7 @@ fn main() {
             cmd_key_sig_positions,
             cmd_help_content,
             cmd_instrument_list,
+            cmd_git_hash,
             cmd_transpose_display_midi,
             cmd_written_note_name,
             cmd_written_midi_label,

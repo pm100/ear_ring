@@ -149,6 +149,12 @@ struct EarRingCore {
         return String(cString: ptr)
     }
 
+    /// Returns the short git commit hash the binary was built from.
+    static func gitHash() -> String {
+        guard let ptr = ear_ring_git_hash() else { return "unknown" }
+        return String(cString: ptr)
+    }
+
     /// Convert concert MIDI to written/display MIDI for the given instrument index.
     static func transposeDisplayMidi(_ concertMidi: Int, instrumentIndex: Int) -> Int {
         Int(ear_ring_transpose_display_midi(Int32(concertMidi), Int32(instrumentIndex)))

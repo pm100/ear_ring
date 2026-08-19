@@ -114,6 +114,12 @@ struct SettingsView: View {
                     Text("All settings will be restored to their defaults. Your progress history will not be affected.")
                 }
 
+                Text("Build \(EarRingCore.gitHash())")
+                    .font(.caption2)
+                    .foregroundColor(.erMuted)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 16)
+
                 Spacer(minLength: 24)
             }
             .padding(.horizontal, 16)

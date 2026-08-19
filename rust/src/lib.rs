@@ -93,6 +93,12 @@ pub fn instrument_list_json() -> String {
     json
 }
 
+// ── Build info ──────────────────────────────────────────────────────────────
+
+/// Short git commit hash the binary was built from, embedded at compile time
+/// by build.rs. Falls back to "unknown" if git wasn't available at build time.
+pub const GIT_HASH: &str = env!("GIT_HASH");
+
 // ── C-compatible FFI surface ──────────────────────────────────────────────────
 // These thin wrappers are called from the React Native Turbo Native Module
 // (Swift / Kotlin) without requiring uniffi code-gen at this stage.
@@ -122,6 +128,20 @@ pub extern "C" fn ear_ring_instrument_list() -> *const std::os::raw::c_char {
     static CACHE: OnceLock<CString> = OnceLock::new();
     CACHE.get_or_init(|| {
         CString::new(instrument_list_json()).unwrap_or_else(|_| CString::new("[]").unwrap())
+    }).as_ptr()
+}
+
+/// Returns a pointer to a static null-terminated UTF-8 string with the short
+/// git commit hash the binary was built from (e.g. "a1b2c3d"), or "unknown"
+/// if it wasn't available at build time. The pointer is valid for the
+/// lifetime of the process.
+#[no_mangle]
+pub extern "C" fn ear_ring_git_hash() -> *const std::os::raw::c_char {
+    use std::ffi::CString;
+    use std::sync::OnceLock;
+    static CACHE: OnceLock<CString> = OnceLock::new();
+    CACHE.get_or_init(|| {
+        CString::new(GIT_HASH).unwrap_or_else(|_| CString::new("unknown").unwrap())
     }).as_ptr()
 }
 
@@ -1157,6 +1177,16 @@ mod android_jni {
     ) -> jstring {
         let json = super::instrument_list_json();
         env.new_string(json)
+            .map(|s| s.into_raw())
+            .unwrap_or(std::ptr::null_mut())
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeGitHash(
+        env: JNIEnv,
+        _class: JClass,
+    ) -> jstring {
+        env.new_string(super::GIT_HASH)
             .map(|s| s.into_raw())
             .unwrap_or(std::ptr::null_mut())
     }

@@ -485,6 +485,15 @@ Section label: "Wrong-Note Pause"
 Slider: 500ms – 5000ms, step 500ms, default 3000ms
   — Pause before replaying sequence after a wrong note
   — Current value shown as label (e.g. "3000 ms")
+
+[16dp space]
+"Build {gitHash}"   — 11sp, muted colour, centred, below "Reset to Defaults"
+  — Short (7-char) git commit hash of the build, e.g. "Build a1b2c3d"
+  — Sourced from the shared Rust core: GIT_HASH const (rust/build.rs embeds it
+    from `git rev-parse --short=7 HEAD` at compile time; "unknown" if git
+    wasn't available at build time)
+  — Exposed to each platform via EarRingCore.gitHash() (Android/iOS) /
+    cmd_git_hash (desktop Tauri command)
 ```
 
 All settings persist across app restarts.

@@ -182,6 +182,12 @@ const char *ear_ring_help_content(void);
 /// The pointer is valid for the lifetime of the process. Do not free it.
 const char *ear_ring_instrument_list(void);
 
+/// Returns a pointer to a static null-terminated UTF-8 string with the short
+/// git commit hash the binary was built from (e.g. "a1b2c3d"), or "unknown"
+/// if it wasn't available at build time.
+/// The pointer is valid for the lifetime of the process. Do not free it.
+const char *ear_ring_git_hash(void);
+
 /// Convert a concert MIDI note number to the written/display MIDI for a given
 /// instrument index (as returned by ear_ring_instrument_list).
 /// Clamps the result to 0–127. Returns the unchanged MIDI if index is out of range.

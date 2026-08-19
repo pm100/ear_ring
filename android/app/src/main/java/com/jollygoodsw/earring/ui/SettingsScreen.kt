@@ -182,5 +182,14 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
         }
 
         Spacer(Modifier.height(16.dp))
+        Text(
+            "Build ${EarRingCore.gitHash()}",
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(16.dp))
     }
 }

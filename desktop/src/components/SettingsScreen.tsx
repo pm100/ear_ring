@@ -41,6 +41,11 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
       .catch(() => setInstruments([{ id: 0, name: 'Piano', semitones: 0, rangeStart: 60, rangeEnd: 72 }]));
   }, []);
 
+  const [gitHash, setGitHash] = useState('unknown');
+  useEffect(() => {
+    invoke<string>('cmd_git_hash').then(setGitHash).catch(() => {});
+  }, []);
+
   return (
     <div className="screen" style={{ paddingBottom: 72 }}>
       <div className="screen-header">
@@ -141,6 +146,7 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
       <div style={{ marginTop: 32, paddingBottom: 16 }}>
         <ResetButton onReset={onResetSettings} />
       </div>
+      <p style={{ textAlign: 'center', fontSize: 11, color: '#9e9e9e', marginTop: 0, paddingBottom: 16 }}>Build {gitHash}</p>
     </div>
   );
 }
