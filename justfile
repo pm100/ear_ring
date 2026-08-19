@@ -64,11 +64,13 @@ android-check:
 
 # Build a signed release AAB for Google Play upload.
 # Prompts for KEYSTORE_PASSWORD if not already set in the environment.
+# versionCode is fetched automatically from Play Console (best-effort guess;
+# see scripts/release_android.js) unless VERSION_CODE is already set.
 # Output: android/app/build/outputs/bundle/release/app-release.aab
 [doc("Build signed release AAB for Google Play upload")]
 android-release:
     @if (-not $env:KEYSTORE_PASSWORD) { $env:KEYSTORE_PASSWORD = Read-Host "Keystore password" }; \
-     Push-Location android; .\gradlew bundleRelease; Pop-Location
+     Push-Location scripts; node release_android.js; Pop-Location
 
 # Take a screenshot from the emulator
 [doc("Take a screenshot from the emulator")]
@@ -201,11 +203,14 @@ ios-testflight: _ios-keychain-unlock
 # Optional:
 #   KEY_PASSWORD   — if different from KEYSTORE_PASSWORD
 #   PLAY_TRACK     — override track (default: internal)
+# versionCode is fetched automatically and self-corrects: if Play rejects it
+# as already used (can happen for uploads our guess can't see, e.g. a closed
+# testing track), release_android.js rebuilds with the corrected code and
+# retries — no manual bumping needed.
 [doc("Build signed AAB + upload to Play Store internal testing")]
 android-play:
     @if (-not $env:KEYSTORE_PASSWORD) { $env:KEYSTORE_PASSWORD = Read-Host "Keystore password" }; \
-     Push-Location android; .\gradlew bundleRelease; Pop-Location
-    Push-Location scripts; node publish_android.js; Pop-Location
+     Push-Location scripts; node release_android.js --upload; Pop-Location
 
 # Upload a previously built AAB to Play Store without rebuilding.
 # Useful if you already ran android-release and just want to re-upload.
