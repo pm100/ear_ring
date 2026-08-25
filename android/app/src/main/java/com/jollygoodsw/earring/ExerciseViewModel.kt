@@ -51,6 +51,7 @@ data class ExerciseState(
     val melodyDeck: List<Int> = emptyList(),
     val melodyDeckCursor: Int = 0,
     val chordLabel: String = "",  // Set for diatonic mode; shown below title
+    val isPremium: Boolean = false,  // Ad-free / paid entitlement; not a user "setting" — survives resetSettings()
 ) {
     /** MIDI of the root note at or just below rangeStart (used for intro chord). */
     val rootMidi: Int get() = rangeStart - ((rangeStart - rootNote + 12) % 12)
@@ -99,6 +100,7 @@ private const val PREF_WRONG_NOTE_PAUSE_MS = "wrongNotePauseMs"
 private const val PREF_INSTRUMENT_INDEX = "instrumentIndex"
 private const val PREF_TEST_TYPE = "testType"
 private const val PREF_HAS_LAUNCHED = "hasLaunched"
+private const val PREF_IS_PREMIUM = "isPremium"
 
 class ExerciseViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -131,6 +133,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             wrongNotePauseMs = prefs.getLong(PREF_WRONG_NOTE_PAUSE_MS, DEFAULT_WRONG_NOTE_PAUSE_MS),
             instrumentIndex = prefs.getInt(PREF_INSTRUMENT_INDEX, 0),
             testType = prefs.getInt(PREF_TEST_TYPE, 0).let { if (it == 1) 0 else it },
+            isPremium = prefs.getBoolean(PREF_IS_PREMIUM, false),
         )
     }
 
@@ -152,10 +155,12 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putLong(PREF_WRONG_NOTE_PAUSE_MS, state.wrongNotePauseMs)
             .putInt(PREF_INSTRUMENT_INDEX, state.instrumentIndex)
             .putInt(PREF_TEST_TYPE, state.testType)
+            .putBoolean(PREF_IS_PREMIUM, state.isPremium)
             .apply()
     }
 
-    /** Resets all settings to their defaults. Does NOT affect progress data.
+    /** Resets all settings to their defaults. Does NOT affect progress data or the
+     *  isPremium entitlement (that's a purchase, not a preference — left untouched).
      *  Also clears the first-launch flag so Help screen shows on next launch. */
     fun resetSettings() {
         val defaults = ExerciseState()
@@ -178,7 +183,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putInt(PREF_TEST_TYPE, defaults.testType)
             .remove(PREF_HAS_LAUNCHED)
             .apply()
-        _state.value = defaults
+        _state.value = defaults.copy(isPremium = _state.value.isPremium)
     }
 
     private val _state = MutableStateFlow(loadInitialState())
@@ -218,6 +223,9 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         _state.value = _state.value.copy(instrumentIndex = idx, rangeStart = start, rangeEnd = end)
         saveSettings(_state.value)
     }
+    /** Ad-free / paid entitlement. Called once purchase state is confirmed (e.g. from
+     *  Play Billing); until real billing lands, nothing sets this to true. */
+    fun setPremium(premium: Boolean) { _state.value = _state.value.copy(isPremium = premium); saveSettings(_state.value) }
     fun setTestType(type: Int) {
         val current = _state.value
         val newSeqLen = if (type == 2 && current.sequenceLength !in setOf(3, 4)) 3 else current.sequenceLength
@@ -330,9 +338,11 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         } else {
             // Random mode (existing logic)
             val seed = System.currentTimeMillis()
+            // Avoid repeating the previous test's opening note, whatever mode it came from.
+            val avoidFirstMidi = state.sequence.firstOrNull() ?: -1
             val sequence = EarRingCore.generateSequence(
                 state.rootNote, state.scaleId, state.sequenceLength,
-                state.rangeStart, state.rangeEnd, seed
+                state.rangeStart, state.rangeEnd, seed, avoidFirstMidi
             ).toList()
             _state.value = state.copy(
                 sequence = sequence,

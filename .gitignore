@@ -67,3 +67,6 @@ screen_keydrop.png
 /ui*.xml
 /console.txt
 /copilot-session-*.md
+
+# graphify knowledge-graph output
+graphify-out/

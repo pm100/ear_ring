@@ -26,7 +26,6 @@ interface Props {
 
 
 export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma = 0, scaleId = 0, keySignatureMode = 0, silenceThreshold = 0.003, framesToConfirm = 3, warmupFrames = 4, instrumentIndex = 0 }: Props) {
-  const [hz, setHz] = useState(0);
   const [currentMidi, setCurrentMidi] = useState<number>(-1);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
   const { start, stop, destroy } = useAudioCapture();
@@ -36,7 +35,6 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
   const midiMax = rangeEnd;
 
   const handleFrame = useCallback(async (frame: TrackerFrame) => {
-    setHz(frame.liveHz);
     if (frame.confirmedMidi >= 0) {
       const midi = frame.confirmedMidi;
       if (midi >= midiMin && midi <= midiMax) {
@@ -120,7 +118,7 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
       </div>
 
       <div className="pitch-meter-circle">
-        <PitchMeter hz={hz} />
+        <PitchMeter midi={displayMidi} />
       </div>
     </div>
   );

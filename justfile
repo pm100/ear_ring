@@ -33,6 +33,17 @@ android:
 # Ignores emulators — requires a physical device with USB debugging enabled.
 # If a Play Store (release-signed) build is on the device, it is uninstalled
 # automatically so the debug build can be installed (on-device app data is lost).
+# Uses `adb install -d` (allow version-code downgrade): debug builds are local,
+# throwaway installs, so their versionCode (VERSION_CODE env var, or the
+# build.gradle fallback) has no business gating installation just because
+# something with a higher versionCode — a Play Store build, or a leftover
+# VERSION_CODE left exported in this shell from a prior `android-release` run
+# — is already on the device. See earring-versioncode-automation memory /
+# AGENTS.md for the Play-upload versionCode flow this is deliberately not part of.
+# Some OEM Android builds ignore -d outright even when passed correctly, so a
+# version-downgrade rejection also falls back to uninstall+reinstall (same as
+# the signature-mismatch case) — that always works since there's nothing left
+# on the device to downgrade from.
 [doc("Build + install debug APK on a connected USB device and launch")]
 android-device:
     @$phys = (& "{{adb}}" devices | Select-String -Pattern '^(?!emulator-)(\S+)\s+device$'); \
@@ -48,11 +59,15 @@ android-device:
      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; \
      $apk = "android/app/build/outputs/apk/debug/app-debug.apk"; \
      Write-Host "Installing on device $serial..."; \
-     $out = & "{{adb}}" -s $serial install -r $apk 2>&1 | Out-String; \
+     $out = & "{{adb}}" -s $serial install -r -d $apk 2>&1 | Out-String; \
      if ($out -match 'INSTALL_FAILED_UPDATE_INCOMPATIBLE') { \
        Write-Host "Play Store build detected (signature mismatch) - uninstalling it first..."; \
        & "{{adb}}" -s $serial uninstall com.jollygoodsw.earring | Out-Null; \
-       & "{{adb}}" -s $serial install $apk; \
+       & "{{adb}}" -s $serial install -d $apk; \
+     } elseif ($out -match 'INSTALL_FAILED_VERSION_DOWNGRADE') { \
+       Write-Host "Device rejected -d downgrade install - uninstalling and reinstalling instead..."; \
+       & "{{adb}}" -s $serial uninstall com.jollygoodsw.earring | Out-Null; \
+       & "{{adb}}" -s $serial install -d $apk; \
      } else { Write-Host $out.Trim() }; \
      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; \
      & "{{adb}}" -s $serial shell am start -n com.jollygoodsw.earring/.MainActivity

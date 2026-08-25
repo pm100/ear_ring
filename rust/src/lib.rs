@@ -224,13 +224,15 @@ pub extern "C" fn ear_ring_staff_position(midi: c_uchar) -> c_int {
 
 /// Generate a sequence of MIDI note numbers.
 ///
-/// * `root_chroma` – pitch class of the root note (0 = C, 1 = C#, …, 11 = B)
-/// * `scale_id`    – 0=Major, 1=NaturalMinor, 2=Dorian, 3=Mixolydian, 4=Locrian
-/// * `length`      – number of notes to generate
-/// * `range_start` – lowest accepted MIDI note (inclusive)
-/// * `range_end`   – highest accepted MIDI note (inclusive)
-/// * `seed`        – random seed for reproducibility
-/// * `out_buf`     – caller-allocated buffer of at least `length` bytes
+/// * `root_chroma`      – pitch class of the root note (0 = C, 1 = C#, …, 11 = B)
+/// * `scale_id`         – 0=Major, 1=NaturalMinor, 2=Dorian, 3=Mixolydian, 4=Locrian
+/// * `length`           – number of notes to generate
+/// * `range_start`      – lowest accepted MIDI note (inclusive)
+/// * `range_end`        – highest accepted MIDI note (inclusive)
+/// * `seed`             – random seed for reproducibility
+/// * `avoid_first_midi` – MIDI note the generated sequence's first note must not equal
+///                        (typically the previous test's first note); pass -1 for none
+/// * `out_buf`          – caller-allocated buffer of at least `length` bytes
 ///
 /// Returns the number of notes written, or -1 on error.
 #[no_mangle]
@@ -241,6 +243,7 @@ pub extern "C" fn ear_ring_generate_sequence(
     range_start: c_uchar,
     range_end: c_uchar,
     seed: u64,
+    avoid_first_midi: c_int,
     out_buf: *mut c_uchar,
 ) -> c_int {
     if out_buf.is_null() {
@@ -250,7 +253,8 @@ pub extern "C" fn ear_ring_generate_sequence(
         Some(s) => s,
         None => return -1,
     };
-    let notes = generate_sequence(root_chroma, scale, range_start, range_end, length, seed);
+    let avoid = u8::try_from(avoid_first_midi).ok();
+    let notes = generate_sequence(root_chroma, scale, range_start, range_end, length, seed, avoid);
     let out = unsafe { std::slice::from_raw_parts_mut(out_buf, length as usize) };
     for (i, note) in notes.iter().enumerate() {
         out[i] = note.midi();
@@ -758,7 +762,12 @@ pub extern "C" fn ear_ring_tracker_apply_instrument(tracker: *mut PitchTracker, 
 /// Process one audio buffer.
 ///
 /// * `out_live_hz`  – set to the detected frequency (0.0 if silent/undetected)
-/// * `out_live_midi` – set to the detected MIDI note (-1 if silent/undetected)
+/// * `out_live_midi` – set to the detected MIDI note (-1 if silent/undetected), straight
+///   from pitch detection with no debouncing — a single frame here can be a transient
+///   detection glitch (e.g. an octave error).
+/// * `out_display_midi` – same note, but only once it has held for 2 consecutive frames.
+///   Prefer this for anything shown to the user; it never lags behind the returned
+///   confirmed MIDI note.
 ///
 /// Returns the confirmed MIDI note the first time a note stabilises, or -1.
 #[no_mangle]
@@ -769,6 +778,7 @@ pub extern "C" fn ear_ring_tracker_process(
     sample_rate: c_uint,
     out_live_hz: *mut c_float,
     out_live_midi: *mut c_int,
+    out_display_midi: *mut c_int,
 ) -> c_int {
     if tracker.is_null() || samples.is_null() {
         return -1;
@@ -780,6 +790,9 @@ pub extern "C" fn ear_ring_tracker_process(
     }
     if !out_live_midi.is_null() {
         unsafe { *out_live_midi = result.live_midi; }
+    }
+    if !out_display_midi.is_null() {
+        unsafe { *out_display_midi = result.display_midi; }
     }
     result.confirmed_midi
 }
@@ -865,8 +878,10 @@ mod android_jni {
         range_start: jint,
         range_end: jint,
         seed: jlong,
+        avoid_first_midi: jint,
     ) -> jintArray {
         let scale = scale_type_from_id(scale_id as u8).unwrap_or(ScaleType::Major);
+        let avoid = u8::try_from(avoid_first_midi).ok();
         let notes = generate_sequence(
             root_chroma as u8,
             scale,
@@ -874,6 +889,7 @@ mod android_jni {
             range_end as u8,
             length as u8,
             seed as u64,
+            avoid,
         );
         let midi_vals: Vec<jint> = notes.iter().map(|n| n.midi() as jint).collect();
 
@@ -1302,8 +1318,10 @@ mod android_jni {
     }
 
     /// Process one audio buffer via the Rust tracker.
-    /// Returns a float array [live_hz, live_midi_f32, confirmed_midi_f32].
-    /// live_midi and confirmed_midi are -1.0 when absent.
+    /// Returns a float array [live_hz, live_midi_f32, confirmed_midi_f32, display_midi_f32].
+    /// live_midi, confirmed_midi, and display_midi are -1.0 when absent. display_midi is
+    /// the same note as live_midi but debounced to 2 consecutive frames — prefer it for
+    /// anything shown to the user, live_midi can carry a single-frame detection glitch.
     #[no_mangle]
     pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeTrackerProcess(
         env: JNIEnv,
@@ -1313,8 +1331,8 @@ mod android_jni {
         sample_rate: jint,
     ) -> jfloatArray {
         let make_empty = || -> jfloatArray {
-            let a = env.new_float_array(3).unwrap();
-            let _ = env.set_float_array_region(&a, 0, &[0.0f32, -1.0f32, -1.0f32]);
+            let a = env.new_float_array(4).unwrap();
+            let _ = env.set_float_array_region(&a, 0, &[0.0f32, -1.0f32, -1.0f32, -1.0f32]);
             a.into_raw()
         };
 
@@ -1331,9 +1349,9 @@ mod android_jni {
         }
 
         let result = unsafe { (*(handle as *mut super::PitchTracker)).process(&buf, sample_rate as u32) };
-        let out_vals = [result.live_hz, result.live_midi as f32, result.confirmed_midi as f32];
+        let out_vals = [result.live_hz, result.live_midi as f32, result.confirmed_midi as f32, result.display_midi as f32];
 
-        let out = match env.new_float_array(3) {
+        let out = match env.new_float_array(4) {
             Ok(a) => a,
             Err(_) => return make_empty(),
         };

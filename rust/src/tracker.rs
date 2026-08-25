@@ -25,14 +25,26 @@ pub struct PitchTracker {
     stable_count: u32,
     pitch_consumed: bool,
     silence_grace: u32,
+    display_midi: i32,  // -1 = nothing debounced yet; see display_midi on FrameResult
 }
 
 /// Result from processing one audio buffer.
 pub struct FrameResult {
     /// Detected frequency in Hz. 0.0 when silent or no confident pitch.
     pub live_hz: f32,
-    /// Detected MIDI note. -1 when silent or no confident pitch.
+    /// Detected MIDI note for this frame, straight from pitch detection with no
+    /// debouncing. -1 when silent or no confident pitch. Prefer `display_midi` for
+    /// anything shown to the user — a single frame here can be a transient
+    /// detection glitch (e.g. an octave error), most common on higher notes where
+    /// a fixed-size analysis window holds fewer complete cycles.
     pub live_midi: i32,
+    /// Same note as `live_midi`, but only once it has held for 2 consecutive frames —
+    /// smooths out single-frame glitches before they ever reach the screen. Any
+    /// confirmed note has already reached 2 consecutive frames (see `process()`), so
+    /// this never lags behind `confirmed_midi`. Goes to -1 immediately on silence,
+    /// same as `live_midi` — only the internal stability count survives the grace
+    /// period, not this displayed value.
+    pub display_midi: i32,
     /// The confirmed MIDI note, emitted exactly once when stability is reached.
     /// -1 means no confirmation this frame.
     pub confirmed_midi: i32,
@@ -50,6 +62,7 @@ impl PitchTracker {
             stable_count: 0,
             pitch_consumed: false,
             silence_grace: 0,
+            display_midi: -1,
         }
     }
 
@@ -60,6 +73,7 @@ impl PitchTracker {
         self.stable_count = 0;
         self.pitch_consumed = false;
         self.silence_grace = 0;
+        self.display_midi = -1;
     }
 
     /// Reset and discard the next `frames` buffers before processing begins.
@@ -90,7 +104,7 @@ impl PitchTracker {
     pub fn process(&mut self, samples: &[f32], sample_rate: u32) -> FrameResult {
         if self.warmup_remaining > 0 {
             self.warmup_remaining -= 1;
-            return FrameResult { live_hz: 0.0, live_midi: -1, confirmed_midi: -1 };
+            return FrameResult { live_hz: 0.0, live_midi: -1, display_midi: -1, confirmed_midi: -1 };
         }
 
         // RMS silence gate
@@ -141,7 +155,17 @@ impl PitchTracker {
             -1
         };
 
-        FrameResult { live_hz: hz, live_midi: effective_midi, confirmed_midi }
+        // Debounce the displayed value: only advance once the same note has held for
+        // 2 consecutive frames, so a single-frame detection glitch (most common on
+        // higher notes, where a fixed-size window holds fewer complete cycles) never
+        // flashes on screen. Confirmation always requires stable_count >= 2 anyway
+        // (the very first frame of a new note only arms stable_midi via the branch
+        // above and never confirms), so this can never lag behind confirmed_midi.
+        if self.stable_count >= 2 {
+            self.display_midi = self.stable_midi;
+        }
+
+        FrameResult { live_hz: hz, live_midi: effective_midi, display_midi: self.display_midi, confirmed_midi }
     }
 
     fn handle_no_detection(&mut self) -> FrameResult {
@@ -151,9 +175,13 @@ impl PitchTracker {
             // grace_frames=1 (default): resets after 2 frames. Guitar uses grace_frames=5.
             self.stable_midi = -1;
             self.stable_count = 0;
+            self.display_midi = -1;
             self.pitch_consumed = false;
         }
-        FrameResult { live_hz: 0.0, live_midi: -1, confirmed_midi: -1 }
+        // display_midi always goes to -1 immediately on silence — same as live_midi —
+        // even mid-grace-period. Only the internal stability count (above) survives
+        // the grace window, so a resumed note re-populates display_midi right away.
+        FrameResult { live_hz: 0.0, live_midi: -1, display_midi: -1, confirmed_midi: -1 }
     }
 }
 
@@ -259,6 +287,54 @@ mod tests {
         tracker.process(&f4, 44100);
         let r_f = tracker.process(&f4, 44100);
         assert_eq!(r_f.confirmed_midi, 65); // F4 confirmed separately
+    }
+
+    #[test]
+    fn test_display_midi_absorbs_single_frame_glitch() {
+        // required_frames=4 so a mid-sequence glitch doesn't accidentally also confirm.
+        // No octave_correction here — this debounce is universal, not instrument-gated.
+        let mut tracker = PitchTracker::new(0.001, 4);
+        let c5 = sine_wave(523.25, 44100, 4096);  // C5 = MIDI 72
+        let c4 = sine_wave(261.63, 44100, 4096);  // C4 = MIDI 60 — simulates an octave-low glitch
+        // Two C5 frames build stability (count=2) — display_midi should now show C5.
+        tracker.process(&c5, 44100);
+        let r2 = tracker.process(&c5, 44100);
+        assert_eq!(r2.display_midi, 72, "display should show C5 once 2 frames agree");
+        // A single glitched C4 frame — resets stability (count=1), must NOT flash on display.
+        let r3 = tracker.process(&c4, 44100);
+        assert_eq!(r3.live_midi, 60, "the raw glitch is still visible on live_midi");
+        assert_eq!(r3.display_midi, 72, "a single-frame glitch must not reach display_midi");
+        // Sequence recovers to C5 — display stays correct throughout.
+        let r4 = tracker.process(&c5, 44100);
+        assert_eq!(r4.display_midi, 72);
+    }
+
+    #[test]
+    fn test_display_midi_never_lags_confirmation() {
+        let mut tracker = PitchTracker::new(0.001, 3);
+        let a4 = sine_wave(440.0, 44100, 4096);
+        tracker.process(&a4, 44100);
+        tracker.process(&a4, 44100);
+        let r = tracker.process(&a4, 44100);
+        assert_eq!(r.confirmed_midi, 69);
+        assert_eq!(r.display_midi, 69, "display_midi must be set no later than confirmation");
+    }
+
+    #[test]
+    fn test_display_midi_clears_immediately_on_silence() {
+        let mut tracker = PitchTracker::new(0.001, 3);
+        let a4 = sine_wave(440.0, 44100, 4096);
+        tracker.process(&a4, 44100);
+        let r = tracker.process(&a4, 44100);
+        assert_eq!(r.display_midi, 69);
+        // Single silent frame, still within the default grace_frames=1 window — internal
+        // stability survives, but the displayed value must blank immediately.
+        let r_silent = tracker.process(&silent(), 44100);
+        assert_eq!(r_silent.display_midi, -1, "display must blank immediately on silence");
+        assert_eq!(r_silent.live_midi, -1);
+        // Resuming the same note re-populates display_midi right away (stability preserved).
+        let r_resume = tracker.process(&a4, 44100);
+        assert_eq!(r_resume.display_midi, 69, "resumed note should redisplay without a fresh 2-frame wait");
     }
 
     #[test]

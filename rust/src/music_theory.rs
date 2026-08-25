@@ -203,6 +203,11 @@ pub fn scale_notes(root: Note, scale: ScaleType) -> Vec<Note> {
 /// Uses a simple LCG seeded by the provided `seed` for reproducibility.
 /// The scale root is shifted to the mode's degree within the parent major key.
 /// e.g. root=C + NaturalMinor → uses A as the filter root (A Natural Minor = Relative Minor of C).
+///
+/// `avoid_first_midi`, when `Some`, is normally the first note of the *previous* test —
+/// the very first note of this sequence (index 0 only) will never match it, so back-to-back
+/// tests don't open on the same note. Notes may still repeat later within the sequence or
+/// pool permitting. Ignored when the scale/range pool has only one note (nothing to avoid to).
 pub fn generate_sequence(
     root_chroma: u8,
     scale: ScaleType,
@@ -210,6 +215,7 @@ pub fn generate_sequence(
     range_end: u8,
     length: u8,
     seed: u64,
+    avoid_first_midi: Option<u8>,
 ) -> Vec<Note> {
     use std::collections::HashSet;
     let intervals: HashSet<u8> = scale.intervals().iter().copied().collect();
@@ -228,14 +234,25 @@ pub fn generate_sequence(
     let mut rng = seed;
     let mut last_idx: Option<usize> = None;
     (0..length)
-        .map(|_| {
+        .map(|i| {
             let idx = loop {
                 rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
                 let candidate = ((rng >> 33) % n) as usize;
-                // Reject consecutive repeats when the pool has more than one note.
-                if n == 1 || Some(candidate) != last_idx {
-                    break candidate;
+                if n > 1 {
+                    // Reject consecutive repeats within the sequence.
+                    if Some(candidate) == last_idx {
+                        continue;
+                    }
+                    // First note only: reject a repeat of the previous test's first note.
+                    if i == 0 {
+                        if let Some(avoid) = avoid_first_midi {
+                            if notes[candidate].midi() == avoid {
+                                continue;
+                            }
+                        }
+                    }
                 }
+                break candidate;
             };
             last_idx = Some(idx);
             notes[idx]
@@ -948,14 +965,14 @@ mod tests {
     #[test]
     fn test_generate_sequence_length() {
         // C major, one octave C4-B4 (MIDI 60-71)
-        let seq = generate_sequence(0, ScaleType::Major, 60, 71, 5, 42);
+        let seq = generate_sequence(0, ScaleType::Major, 60, 71, 5, 42, None);
         assert_eq!(seq.len(), 5);
     }
 
     #[test]
     fn test_generate_sequence_in_scale() {
         // All generated notes must be in C major (intervals 0,2,4,5,7,9,11)
-        let seq = generate_sequence(0, ScaleType::Major, 60, 84, 20, 99);
+        let seq = generate_sequence(0, ScaleType::Major, 60, 84, 20, 99, None);
         let major_intervals: std::collections::HashSet<u8> = [0,2,4,5,7,9,11].iter().copied().collect();
         for note in &seq {
             assert!(major_intervals.contains(&(note.midi() % 12)), "Note {:?} not in C major", note);
@@ -968,7 +985,7 @@ mod tests {
         // Key=C, Relative Minor → A Natural Minor (pitch classes 0,2,3,5,7,8,10 from A=9)
         // i.e. A(9), B(11), C(0), D(2), E(4), F(5), G(7)
         let a_minor_pcs: std::collections::HashSet<u8> = [0,2,3,5,7,9,11].iter().copied().collect();
-        let seq = generate_sequence(0, ScaleType::NaturalMinor, 57, 84, 20, 77);
+        let seq = generate_sequence(0, ScaleType::NaturalMinor, 57, 84, 20, 77, None);
         for note in &seq {
             assert!(a_minor_pcs.contains(&(note.midi() % 12)), "Note {:?} not in A minor", note);
         }
@@ -978,10 +995,36 @@ mod tests {
     fn test_generate_sequence_locrian() {
         // Key=C, Locrian → B Locrian (pitch classes from B=11: 11,0,2,4,5,7,9)
         let b_locrian_pcs: std::collections::HashSet<u8> = [11,0,2,4,5,7,9].iter().copied().collect();
-        let seq = generate_sequence(0, ScaleType::Locrian, 59, 84, 20, 13);
+        let seq = generate_sequence(0, ScaleType::Locrian, 59, 84, 20, 13, None);
         for note in &seq {
             assert!(b_locrian_pcs.contains(&(note.midi() % 12)), "Note {:?} not in B Locrian", note);
         }
+    }
+
+    #[test]
+    fn test_generate_sequence_avoids_first_note_repeat() {
+        // C major, one octave — pool has more than one note, so the first note of the
+        // new sequence must never equal the previous test's first note, across many seeds.
+        for seed in 0..200u64 {
+            let seq = generate_sequence(0, ScaleType::Major, 60, 71, 1, seed, Some(60));
+            assert_ne!(seq[0].midi(), 60, "seed {seed}: first note repeated the avoided note");
+        }
+    }
+
+    #[test]
+    fn test_generate_sequence_avoid_first_note_ignored_when_only_one_note_possible() {
+        // Pool has exactly one note (60) — avoid_first_midi can't be honored, must not hang.
+        let seq = generate_sequence(0, ScaleType::Major, 60, 60, 3, 5, Some(60));
+        assert_eq!(seq.len(), 3);
+        assert!(seq.iter().all(|n| n.midi() == 60));
+    }
+
+    #[test]
+    fn test_generate_sequence_avoid_first_note_only_constrains_index_zero() {
+        // Later notes in the sequence may still equal the avoided note.
+        let seq = generate_sequence(0, ScaleType::Major, 60, 71, 8, 7, Some(60));
+        assert_ne!(seq[0].midi(), 60);
+        assert!(seq.iter().skip(1).any(|n| n.midi() == 60), "expected note 60 to reappear later in a long sequence");
     }
 
     #[test]

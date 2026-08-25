@@ -150,6 +150,8 @@ export default function App() {
           rangeStart,
           rangeEnd,
           seed,
+          // Avoid repeating the previous test's opening note, whatever mode it came from.
+          avoidFirstMidi: exercise.sequence[0] ?? null,
         });
         setExercise({
           ...baseExercise,
@@ -160,7 +162,7 @@ export default function App() {
         console.error('generate_sequence failed', e);
       }
     }
-  }, [settings]);
+  }, [settings, exercise.sequence]);
 
   const stopExercise = useCallback(() => {
     setExercise(prev => ({

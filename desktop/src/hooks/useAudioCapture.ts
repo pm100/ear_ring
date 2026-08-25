@@ -3,7 +3,13 @@ import { invoke } from '@tauri-apps/api/tauri';
 
 export interface TrackerFrame {
   liveHz: number;
+  /** Straight from pitch detection with no debouncing — a single frame here can be a
+   *  transient detection glitch (e.g. an octave error), most common on higher notes.
+   *  Prefer displayMidi for anything shown to the user. */
   liveMidi: number;
+  /** Same note as liveMidi, but only once it has held for 2 consecutive frames — never
+   *  lags behind confirmedMidi. -1 when silent or not yet debounced. */
+  displayMidi: number;
   confirmedMidi: number; // -1 means absent
 }
 
@@ -21,12 +27,12 @@ export function useAudioCapture() {
 
   const processBuffer = async (samples: Float32Array) => {
     try {
-      const [liveHz, liveMidi, confirmedMidi] = await invoke<[number, number, number]>('cmd_tracker_process', {
+      const [liveHz, liveMidi, confirmedMidi, displayMidi] = await invoke<[number, number, number, number]>('cmd_tracker_process', {
         samples: Array.from(samples),
         sampleRate: 44100,
       });
       if (activeRef.current && callbackRef.current) {
-        callbackRef.current({ liveHz, liveMidi, confirmedMidi });
+        callbackRef.current({ liveHz, liveMidi, displayMidi, confirmedMidi });
       }
     } catch (_e) {
       // ignore

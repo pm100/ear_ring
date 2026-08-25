@@ -33,16 +33,19 @@ pub fn wasm_staff_position(midi: u8) -> i32 {
 
 /// Generate a note sequence; returns a Uint8Array of MIDI note numbers.
 ///
-/// * `root_chroma` – pitch class of the root (0=C … 11=B)
-/// * `scale_id`    – 0=Major, 1=NaturalMinor, 2=Dorian, 3=Mixolydian, 4=Locrian
-/// * `length`      – number of notes
-/// * `range_start` – lowest accepted MIDI note
-/// * `range_end`   – highest accepted MIDI note
-/// * `seed`        – random seed
+/// * `root_chroma`      – pitch class of the root (0=C … 11=B)
+/// * `scale_id`         – 0=Major, 1=NaturalMinor, 2=Dorian, 3=Mixolydian, 4=Locrian
+/// * `length`           – number of notes
+/// * `range_start`      – lowest accepted MIDI note
+/// * `range_end`        – highest accepted MIDI note
+/// * `seed`             – random seed
+/// * `avoid_first_midi` – MIDI note the first generated note must not equal (typically
+///                        the previous test's first note); pass -1 for none
 #[wasm_bindgen]
-pub fn wasm_generate_sequence(root_chroma: u8, scale_id: u8, length: u8, range_start: u8, range_end: u8, seed: u64) -> Vec<u8> {
+pub fn wasm_generate_sequence(root_chroma: u8, scale_id: u8, length: u8, range_start: u8, range_end: u8, seed: u64, avoid_first_midi: i32) -> Vec<u8> {
     let scale = scale_type_from_id(scale_id).unwrap_or(ScaleType::Major);
-    generate_sequence(root_chroma, scale, range_start, range_end, length, seed)
+    let avoid = u8::try_from(avoid_first_midi).ok();
+    generate_sequence(root_chroma, scale, range_start, range_end, length, seed, avoid)
         .iter()
         .map(|n| n.midi())
         .collect()

@@ -19,7 +19,7 @@ object EarRingCore {
     @JvmStatic external fun nativeFreqToMidi(hz: Float): Int
     @JvmStatic external fun nativeFreqToCents(hz: Float): Int
     @JvmStatic external fun nativeStaffPosition(midi: Int): Int
-    @JvmStatic external fun nativeGenerateSequence(rootChroma: Int, scaleId: Int, length: Int, rangeStart: Int, rangeEnd: Int, seed: Long): IntArray
+    @JvmStatic external fun nativeGenerateSequence(rootChroma: Int, scaleId: Int, length: Int, rangeStart: Int, rangeEnd: Int, seed: Long, avoidFirstMidi: Int): IntArray
     @JvmStatic external fun nativeIntroChord(rootMidi: Int, scaleId: Int): IntArray
     @JvmStatic external fun nativeIsCorrectNote(detectedMidi: Int, cents: Int, expectedMidi: Int): Int
     @JvmStatic external fun nativeTestScore(maxAttempts: Int, attemptsUsed: Int, passed: Int): Int
@@ -58,7 +58,7 @@ object EarRingCore {
     @JvmStatic external fun nativeTrackerResetWithWarmup(handle: Long, warmupFrames: Int)
     @JvmStatic external fun nativeTrackerSetParams(handle: Long, silenceThreshold: Float, requiredFrames: Int)
     @JvmStatic external fun nativeTrackerApplyInstrument(handle: Long, instrumentIndex: Int)
-    /** Returns FloatArray[3]: [live_hz, live_midi_f32, confirmed_midi_f32]. -1 means absent. */
+    /** Returns FloatArray[4]: [live_hz, live_midi_f32, confirmed_midi_f32, display_midi_f32]. -1 means absent. */
     @JvmStatic external fun nativeTrackerProcess(handle: Long, samples: FloatArray, sampleRate: Int): FloatArray
 
     fun trackerNew(silenceThreshold: Float, requiredFrames: Int): Long =
@@ -87,10 +87,11 @@ object EarRingCore {
         val liveHz = out.getOrElse(0) { -1f }
         val liveMidi = out.getOrElse(1) { -1f }.toInt()
         val confirmedMidi = out.getOrElse(2) { -1f }.toInt()
+        val displayMidi = out.getOrElse(3) { -1f }.toInt()
         return if (liveHz <= 0f || liveMidi < 0) {
             PitchFrame.Silence
         } else {
-            PitchFrame.Active(hz = liveHz, midi = liveMidi, confirmedMidi = if (confirmedMidi >= 0) confirmedMidi else null)
+            PitchFrame.Active(hz = liveHz, midi = liveMidi, displayMidi = displayMidi, confirmedMidi = if (confirmedMidi >= 0) confirmedMidi else null)
         }
     }
 
@@ -106,8 +107,11 @@ object EarRingCore {
     fun staffPosition(midi: Int): Int =
         if (loaded) nativeStaffPosition(midi) else 0
 
-    fun generateSequence(rootChroma: Int, scaleId: Int, length: Int, rangeStart: Int, rangeEnd: Int, seed: Long): IntArray =
-        if (loaded) nativeGenerateSequence(rootChroma, scaleId, length, rangeStart, rangeEnd, seed)
+    /** @param avoidFirstMidi MIDI note the first generated note must not equal — typically
+     *  the previous test's first note, so back-to-back tests don't open on the same note.
+     *  Pass -1 for no constraint (e.g. the first test of a session). */
+    fun generateSequence(rootChroma: Int, scaleId: Int, length: Int, rangeStart: Int, rangeEnd: Int, seed: Long, avoidFirstMidi: Int = -1): IntArray =
+        if (loaded) nativeGenerateSequence(rootChroma, scaleId, length, rangeStart, rangeEnd, seed, avoidFirstMidi)
         else IntArray(length) { rangeStart }
 
     fun introChord(rootMidi: Int, scaleId: Int): IntArray =

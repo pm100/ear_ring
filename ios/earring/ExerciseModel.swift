@@ -75,11 +75,21 @@ class ExerciseModel: ObservableObject {
     }() {
         didSet { UserDefaults.standard.set(testType, forKey: "testType") }
     }
+    /// Ad-free / paid entitlement. Not a user "setting" — deliberately excluded from
+    /// resetSettings()'s key list below. Until real billing lands, nothing sets this true.
+    @Published var isPremium: Bool = ud.object(forKey: "isPremium") != nil ? ud.bool(forKey: "isPremium") : false {
+        didSet { UserDefaults.standard.set(isPremium, forKey: "isPremium") }
+    }
     @Published var sequence: [Int] = []
     @Published var detectedNotes: [DetectedNote] = []
     @Published var status: ExerciseStatus = .stopped
     @Published var currentNoteIndex: Int = 0
     @Published var score: Int = 0
+    /// Concert-pitch MIDI for the pitch meter, sourced from TrackerFrame.displayMidi —
+    /// debounced to 2 consecutive frames so a single-frame detection glitch (most common
+    /// on higher notes) never flashes on screen. Apply instrument transposition before
+    /// display (see ExerciseView/SetupView's pitchMeter). Only consumer is the pitch
+    /// meter; note confirmation uses confirmedLiveMidi, not this.
     @Published var liveMidi: Int? = nil
     @Published var liveCents: Int = 0
     /// Set each time a new stable note is confirmed by the shared detection pipeline.
@@ -264,13 +274,15 @@ class ExerciseModel: ObservableObject {
             melodyDurations = []
             chordLabel = ""
             let seed = UInt64(Date().timeIntervalSince1970 * 1000)
+            // Avoid repeating the previous test's opening note, whatever mode it came from.
             sequence = EarRingCore.generateSequence(
                 rootChroma: rootNote,
                 scaleId: scaleId,
                 length: sequenceLength,
                 rangeStart: rangeStart,
                 rangeEnd: rangeEnd,
-                seed: seed
+                seed: seed,
+                avoidFirstMidi: sequence.first
             )
         }
 
@@ -348,8 +360,8 @@ class ExerciseModel: ObservableObject {
             print("[EAR] frame \(diagFrameCount) samples=\(samples.count) rms=\(String(format: "%.5f", rms)) sampleRate=\(sampleRate)")
         }
         let frame = pitchTracker.process(samples: samples, sampleRate: sampleRate)
-        if frame.liveMidi >= 0 {
-            liveMidi = frame.liveMidi
+        if frame.displayMidi >= 0 {
+            liveMidi = frame.displayMidi
             // Cents not returned by tracker; re-derive from liveHz for the pitch meter.
             if let (_, cents) = EarRingCore.freqToNote(hz: frame.liveHz) {
                 liveCents = cents
@@ -447,7 +459,8 @@ class ExerciseModel: ObservableObject {
         sessionPersisted = true
     }
 
-    /** Resets all settings to their defaults. Does NOT affect progress history.
+    /** Resets all settings to their defaults. Does NOT affect progress history or the
+     *  isPremium entitlement (that's a purchase, not a preference — left untouched).
      *  Also clears the first-launch flag so Help screen shows on next launch. */
     func resetSettings() {
         let ud = UserDefaults.standard

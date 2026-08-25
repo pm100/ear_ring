@@ -142,7 +142,11 @@ struct ExerciseView: View {
     }
 
     private var pitchMeter: some View {
-        PitchMeterView(midi: model.liveMidi, isActive: model.status == .listening)
+        // model.liveMidi is concert pitch; PitchMeterView expects written/display pitch
+        // (same transposition applied to the staff and range labels) — otherwise a
+        // transposing instrument's meter mislabels the octave or note entirely.
+        let displayMidi = model.liveMidi.map { EarRingCore.transposeDisplayMidi($0, instrumentIndex: model.instrumentIndex) }
+        return PitchMeterView(midi: displayMidi, isActive: model.status == .listening)
             .frame(width: meterSize, height: meterSize)
     }
 

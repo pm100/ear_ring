@@ -42,7 +42,7 @@ function appendTestRecord(record: TestRecord) {
 }
 
 export default function ExerciseScreen({ exercise, onStop }: Props) {
-  const [liveHz, setLiveHz] = useState(0);
+  const [displayMidi, setDisplayMidi] = useState(-1);
   const [status, setStatus] = useState(exercise.status);
   const [currentNoteIndex, setCurrentNoteIndex] = useState(0);
   const [currentAttempt, setCurrentAttempt] = useState(1);
@@ -152,6 +152,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         const seq = await invoke<number[]>('cmd_generate_sequence', {
           rootChroma: exercise.rootNote, scaleId: exercise.scaleId, length: exercise.sequenceLength,
           rangeStart: exercise.rangeStart, rangeEnd: exercise.rangeEnd, seed: Date.now(),
+          avoidFirstMidi: sequenceRef.current[0] ?? null,
         });
         return { sequence: seq };
       }
@@ -200,6 +201,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       melodyDurationsRef.current = [];
       melodyTimingsRef.current = [];
       setMelodyDurations([]);
+      // Avoid repeating the previous test's opening note, whatever mode it came from.
       const seq = await invoke<number[]>('cmd_generate_sequence', {
         rootChroma: exercise.rootNote,
         scaleId: exercise.scaleId,
@@ -207,6 +209,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         rangeStart: exercise.rangeStart,
         rangeEnd: exercise.rangeEnd,
         seed: Date.now(),
+        avoidFirstMidi: sequenceRef.current[0] ?? null,
       });
       return { sequence: seq };
     }
@@ -219,7 +222,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     setDisplayedNotes([]);
     setCurrentNoteIndex(0);
     currentNoteIndexRef.current = 0;
-    setLiveHz(0);
+    setDisplayMidi(-1);
     await invoke('cmd_tracker_reset');
     await playChord(await fetchIntroTriad());
     if (!sessionRunningRef.current) return;
@@ -302,7 +305,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
 
   // The audio frame handler — confirmed MIDI comes from the Rust tracker.
   handleFrameRef.current = async (frame: TrackerFrame) => {
-    setLiveHz(frame.liveHz);
+    setDisplayMidi(frame.displayMidi);
     if (!sessionRunningRef.current) return;
     if (frame.confirmedMidi < 0) return;
 
@@ -446,7 +449,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       <div className="exercise-meta">Attempt {currentAttempt} of {exercise.maxRetries} • Tests {testsCompleted} • Score {score}%</div>
 
       <div className="pitch-meter-circle">
-        <PitchMeter hz={liveHz} />
+        <PitchMeter midi={displayMidi >= 0 ? transpMidi(displayMidi) : -1} />
       </div>
 
       <button className="btn-danger" onClick={stopSession}>{'\u23f9'} Stop Testing</button>

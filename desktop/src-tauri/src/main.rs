@@ -40,11 +40,13 @@ fn cmd_tracker_apply_instrument(state: State<TrackerState>, instrument_index: us
 }
 
 /// Process one audio buffer.
-/// Returns `[live_hz, live_midi, confirmed_midi]` as floats; -1.0 means absent.
+/// Returns `(live_hz, live_midi, confirmed_midi, display_midi)`; -1 means absent.
+/// display_midi is the same note as live_midi but debounced to 2 consecutive frames —
+/// prefer it for anything shown to the user; live_midi can carry a single-frame glitch.
 #[tauri::command]
-fn cmd_tracker_process(state: State<TrackerState>, samples: Vec<f32>, sample_rate: u32) -> (f32, i32, i32) {
+fn cmd_tracker_process(state: State<TrackerState>, samples: Vec<f32>, sample_rate: u32) -> (f32, i32, i32, i32) {
     let result = state.0.lock().unwrap().process(&samples, sample_rate);
-    (result.live_hz, result.live_midi, result.confirmed_midi)
+    (result.live_hz, result.live_midi, result.confirmed_midi, result.display_midi)
 }
 
 // ── Other commands ───────────────────────────────────────────────────────────
@@ -83,9 +85,9 @@ fn cmd_staff_position(midi: u8) -> i32 {
 }
 
 #[tauri::command]
-fn cmd_generate_sequence(root_chroma: u8, scale_id: u8, length: u8, range_start: u8, range_end: u8, seed: u64) -> Vec<u8> {
+fn cmd_generate_sequence(root_chroma: u8, scale_id: u8, length: u8, range_start: u8, range_end: u8, seed: u64, avoid_first_midi: Option<u8>) -> Vec<u8> {
     let scale = scale_type_from_id(scale_id).unwrap_or(ScaleType::Major);
-    generate_sequence(root_chroma, scale, range_start, range_end, length, seed)
+    generate_sequence(root_chroma, scale, range_start, range_end, length, seed, avoid_first_midi)
         .iter()
         .map(|n| n.midi())
         .collect()

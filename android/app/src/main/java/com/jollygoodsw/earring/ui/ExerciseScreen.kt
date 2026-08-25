@@ -63,7 +63,7 @@ fun ExerciseScreen(
     // Shared pitch detection — same pipeline as SetupScreen.
     // warmupFrames absorbs mic-settling transients when auto-starting.
     // onConfirmed judges the detected note against the expected sequence.
-    val liveHz = rememberPitchDetector(
+    val pitch = rememberPitchDetector(
         active = state.status == ExerciseStatus.LISTENING,
         midiMin = midiMin,
         midiMax = midiMax,
@@ -77,9 +77,14 @@ fun ExerciseScreen(
         }
     )
 
-    val liveMidi = if (liveHz > 0f) EarRingCore.freqToMidi(liveHz) else -1
     val noteStepDp = 44.dp
     val instrIdx = state.instrumentIndex
+    // Written/display pitch for the pitch meter — same transposition SetupScreen applies
+    // before display, on top of pitch.displayMidi's debouncing (2 consecutive frames must
+    // agree before it updates, so a single-frame detection glitch — most common on higher
+    // notes — never flashes on screen; see PitchDetector.kt). Using the raw per-frame MIDI
+    // here would both mislabel transposing instruments and expose those glitches.
+    val liveMidi = if (pitch.displayMidi >= 0) EarRingCore.transposeDisplayMidi(pitch.displayMidi, instrIdx) else -1
     val instrKeyTranspose = remember(instrIdx) {
         try {
             val arr = JSONArray(EarRingCore.instrumentList())
@@ -187,7 +192,7 @@ fun ExerciseScreen(
 
         PitchMeter(
             detectedMidi = liveMidi,
-            detectedHz = liveHz
+            detectedHz = pitch.liveHz
         )
 
 

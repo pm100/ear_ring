@@ -27,7 +27,7 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, ro
     val concertHistory = remember { mutableStateListOf<Int>() }
 
     // Shared pitch detection — identical pipeline to ExerciseScreen.
-    val liveHz = rememberPitchDetector(
+    val pitch = rememberPitchDetector(
         active = true,
         midiMin = midiMin,
         midiMax = midiMax,
@@ -43,7 +43,7 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, ro
     )
 
     // Clear display when silence detected
-    if (liveHz <= 0f) concertMidi = -1
+    if (pitch.liveHz <= 0f) concertMidi = -1
 
     // Apply instrument transposition for display
     val displayMidi = if (concertMidi >= 0) EarRingCore.transposeDisplayMidi(concertMidi, instrumentIndex) else -1
@@ -117,7 +117,7 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, ro
         }
         Spacer(Modifier.height(24.dp))
 
-        PitchMeter(detectedMidi = displayMidi, detectedHz = liveHz)
+        PitchMeter(detectedMidi = displayMidi, detectedHz = pitch.liveHz)
         Spacer(Modifier.height(32.dp))
     }
 }

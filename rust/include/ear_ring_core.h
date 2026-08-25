@@ -31,19 +31,22 @@ int32_t ear_ring_staff_position(uint8_t midi);
 
 /// Generate a sequence of MIDI notes from a given scale.
 /// Returns the count of notes written into out_buf on success, -1 on failure.
-/// @param root_chroma  Pitch class of the root note (0=C … 11=B)
-/// @param scale_id     Scale identifier (0–7)
-/// @param length       Number of notes to generate
-/// @param range_start  Lowest accepted MIDI note (inclusive)
-/// @param range_end    Highest accepted MIDI note (inclusive)
-/// @param seed         Random seed for reproducible generation
-/// @param out_buf      Output buffer (must be at least `length` bytes)
+/// @param root_chroma      Pitch class of the root note (0=C … 11=B)
+/// @param scale_id         Scale identifier (0–7)
+/// @param length           Number of notes to generate
+/// @param range_start      Lowest accepted MIDI note (inclusive)
+/// @param range_end        Highest accepted MIDI note (inclusive)
+/// @param seed             Random seed for reproducible generation
+/// @param avoid_first_midi MIDI note the first generated note must not equal (typically
+///                         the previous test's first note); pass -1 for none
+/// @param out_buf          Output buffer (must be at least `length` bytes)
 int32_t ear_ring_generate_sequence(uint8_t root_chroma,
                                     uint8_t scale_id,
                                     uint8_t length,
                                     uint8_t range_start,
                                     uint8_t range_end,
                                     uint64_t seed,
+                                    int32_t avoid_first_midi,
                                     uint8_t *out_buf);
 
 /// Build a 3-note intro chord as MIDI note numbers.
@@ -239,7 +242,11 @@ void ear_ring_tracker_apply_instrument(EarRingTracker *tracker, int32_t instrume
 
 /// Process one audio buffer.
 /// Writes the detected frequency (0.0 if silent) into *out_live_hz.
-/// Writes the detected MIDI note (-1 if silent) into *out_live_midi.
+/// Writes the detected MIDI note (-1 if silent) into *out_live_midi — straight from
+/// pitch detection with no debouncing; a single frame can be a transient glitch.
+/// Writes the same note into *out_display_midi, but only once it has held for 2
+/// consecutive frames — prefer this for anything shown to the user, it never lags
+/// behind the returned confirmed MIDI note.
 /// Returns the confirmed MIDI note the first time a note stabilises, or -1.
 int32_t ear_ring_tracker_process(
     EarRingTracker *tracker,
@@ -247,7 +254,8 @@ int32_t ear_ring_tracker_process(
     uint32_t num_samples,
     uint32_t sample_rate,
     float *out_live_hz,
-    int32_t *out_live_midi
+    int32_t *out_live_midi,
+    int32_t *out_display_midi
 );
 
 #ifdef __cplusplus

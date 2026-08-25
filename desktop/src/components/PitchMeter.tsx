@@ -1,15 +1,20 @@
 import React from 'react';
 import { useMemo } from 'react';
-import { hzToLabel } from '../music';
+import { midiToLabel } from '../music';
 
 interface Props {
-  hz: number;
+  /** MIDI note to display, or -1 when nothing is detected. Callers are responsible for
+   *  resolving this to the right value first — debounced (TrackerFrame.displayMidi, not
+   *  liveMidi, so a single-frame detection glitch never flashes on screen) and, for a
+   *  transposing instrument, already shifted to written/display pitch. This component
+   *  does no detection or transposition logic of its own. */
+  midi: number;
 }
 
-export default function PitchMeter({ hz }: Props) {
-  const noteName = useMemo(() => hzToLabel(hz), [hz]);
+export default function PitchMeter({ midi }: Props) {
+  const active = midi >= 0;
+  const noteName = useMemo(() => (active ? midiToLabel(midi) : '—'), [active, midi]);
 
-  const active = hz > 0;
   const ringColor = active ? '#4CAF50' : '#BDBDBD';
   const textColor = active ? '#212121' : '#BDBDBD';
   const fontSize = noteName.length >= 3 ? 16 : 20;

@@ -81,7 +81,9 @@ struct SetupView: View {
             Spacer().frame(height: 24)
             HStack {
                 Spacer()
-                PitchMeterView(midi: model.liveMidi, isActive: model.isCapturing)
+                // model.liveMidi is concert pitch; apply the same transposition as
+                // displayMidi/displayHistory above so the meter matches the big label.
+                PitchMeterView(midi: model.liveMidi.map { min(127, max(0, $0 + transpSemitones)) }, isActive: model.isCapturing)
                     .frame(width: meterSize, height: meterSize)
                 Spacer()
             }
