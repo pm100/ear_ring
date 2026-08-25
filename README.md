@@ -34,11 +34,11 @@ and import tunes into the melody library — see `docs/melody-manager.md`.
 The Rust core handles all music logic and is shared across platforms:
 - **Pitch detection** — YIN algorithm, real-time from microphone
 - **Music theory** — scales, intervals, MIDI ↔ frequency conversion, staff positioning, key signatures
-- **Test generation** — random sequences, melody snippets, and diatonic arpeggios from any scale/root
+- **Test generation** — random sequences and diatonic arpeggios from any scale/root (melody snippets built but not currently exposed in the UI — see `docs/roadmap.md`)
 
 ## Features
 
-- Three test types: Random Notes, Melody Snippets (~50 public-domain tunes with rhythmic playback), and Diatonic Arpeggios (ascending/descending triads and seventh chords)
+- Two live test types: Random Notes and Diatonic Arpeggios (ascending/descending triads and seventh chords). A third, Melody Snippets (~50 public-domain tunes with rhythmic playback), is fully built but currently disabled in the UI — see `docs/roadmap.md`
 - 5 scale types: Major, Natural Minor, Dorian, Mixolydian, Locrian — the opening triad's quality (major/minor/diminished) follows the selected scale
 - 12 root notes, interactive piano range picker, sequence length 2–8 notes
 - Real-time pitch detection with cents accuracy
