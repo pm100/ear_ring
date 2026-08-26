@@ -13,10 +13,16 @@ avd      := env_var_or_default('ANDROID_AVD', 'Medium_Phone_API_36.1')
 apple_key_id    := env_var_or_default('APP_STORE_KEY_ID', 'W4T73HJBF4')
 apple_issuer_id := env_var_or_default('APP_STORE_ISSUER_ID', '30e7952a-07ae-4893-95c0-3a8cf2db56c4')
 
+# Print the Android versionName (from build.gradle) and current git commit hash
+# before building. Not listed in `just --list`.
+[private]
+_android-version:
+    @$vn = (Select-String -Path android/app/build.gradle -Pattern 'versionName\s+"([^"]+)"').Matches[0].Groups[1].Value; $gh = git rev-parse --short=7 HEAD; Write-Host "Android version $vn — git $gh" -ForegroundColor Cyan
+
 # Build and install the Android debug APK, then launch the app.
 # Starts the emulator automatically if no device/emulator is connected.
 [doc("Build + install debug APK and launch (auto-starts emulator if needed)")]
-android:
+android: _android-version
     @$devices = (& "{{adb}}" devices | Select-String -Pattern '\tdevice$'); \
      if (-not $devices) { \
        Write-Host "No device found — starting emulator '{{avd}}'..."; \
@@ -45,7 +51,7 @@ android:
 # the signature-mismatch case) — that always works since there's nothing left
 # on the device to downgrade from.
 [doc("Build + install debug APK on a connected USB device and launch")]
-android-device:
+android-device: _android-version
     @$phys = (& "{{adb}}" devices | Select-String -Pattern '^(?!emulator-)(\S+)\s+device$'); \
      if (-not $phys) { \
        Write-Host "No physical Android device found. Check:" -ForegroundColor Red; \
@@ -74,7 +80,7 @@ android-device:
 
 # Compile-check Kotlin only (fast, no install)
 [doc("Compile-check Kotlin only (fast, no install)")]
-android-check:
+android-check: _android-version
     Push-Location android; .\gradlew :app:compileDebugKotlin; Pop-Location
 
 # Build a signed release AAB for Google Play upload.
@@ -83,7 +89,7 @@ android-check:
 # see scripts/release_android.js) unless VERSION_CODE is already set.
 # Output: android/app/build/outputs/bundle/release/app-release.aab
 [doc("Build signed release AAB for Google Play upload")]
-android-release:
+android-release: _android-version
     @if (-not $env:KEYSTORE_PASSWORD) { $env:KEYSTORE_PASSWORD = Read-Host "Keystore password" }; \
      Push-Location scripts; node release_android.js; Pop-Location
 
@@ -93,9 +99,15 @@ screenshot:
     & "{{adb}}" shell screencap -p /sdcard/screen.png
     & "{{adb}}" pull /sdcard/screen.png screen.png
 
+# Print the desktop package.json version and current git commit hash before
+# building. Not listed in `just --list`.
+[private]
+_desktop-version:
+    @$v = (Get-Content desktop/package.json | ConvertFrom-Json).version; $gh = git rev-parse --short=7 HEAD; Write-Host "Desktop version $v — git $gh" -ForegroundColor Cyan
+
 # Build the Tauri desktop frontend
 [doc("Build the Tauri desktop frontend")]
-desktop:
+desktop: _desktop-version
     Push-Location desktop; npm run build; Pop-Location
 
 # Run cargo tests (shared Rust core)
@@ -116,9 +128,21 @@ _ios-keychain-unlock:
       security unlock-keychain -p "$(cat "$KCPASS")" "$KC"
     fi
 
+# Print the iOS MARKETING_VERSION/CURRENT_PROJECT_VERSION (from the Xcode
+# project) and current git commit hash before building. Not listed in
+# `just --list`.
+[private]
+_ios-version:
+    #!/bin/sh
+    cd "{{justfile_directory()}}/ios"
+    mv=$(grep -m1 'MARKETING_VERSION' earring.xcodeproj/project.pbxproj | sed -E 's/.*= ([^;]+);/\1/')
+    cv=$(grep -m1 'CURRENT_PROJECT_VERSION' earring.xcodeproj/project.pbxproj | sed -E 's/.*= ([^;]+);/\1/')
+    gh=$(git -C "{{justfile_directory()}}" rev-parse --short=7 HEAD)
+    echo "iOS version $mv ($cv) — git $gh"
+
 # Build the iOS app (debug) for a connected device
 [doc("Build the iOS app (Debug) — macOS only")]
-ios: _ios-keychain-unlock
+ios: _ios-version _ios-keychain-unlock
     #!/bin/sh
     set -eu
     cd "{{justfile_directory()}}/ios"
@@ -133,7 +157,7 @@ ios: _ios-keychain-unlock
 # Requires macOS + Xcode 15+. Uses the first device devicectl lists unless
 # IOS_DEVICE_ID is set (find identifiers with: xcrun devicectl list devices).
 [doc("Build + install on a connected iPhone/iPad and launch — macOS only")]
-ios-device: _ios-keychain-unlock
+ios-device: _ios-version _ios-keychain-unlock
     #!/bin/sh
     set -eu
     cd "{{justfile_directory()}}/ios"
@@ -158,7 +182,7 @@ ios-device: _ios-keychain-unlock
 # Archive the iOS app and export a Release IPA.
 # Output: /tmp/earring_export/earring.ipa
 [doc("Archive the iOS app and export a Release IPA — macOS only")]
-ios-archive: _ios-keychain-unlock
+ios-archive: _ios-version _ios-keychain-unlock
     #!/bin/sh
     set -eu
     cd "{{justfile_directory()}}/ios"
@@ -184,7 +208,7 @@ ios-archive: _ios-keychain-unlock
 # Key ID/Issuer ID default to the team key above; override via env vars if
 # the key is ever rotated: APP_STORE_KEY_ID=... APP_STORE_ISSUER_ID=... just ios-testflight
 [doc("Archive, export, and upload to TestFlight — macOS only")]
-ios-testflight: _ios-keychain-unlock
+ios-testflight: _ios-version _ios-keychain-unlock
     #!/bin/sh
     set -eu
     cd "{{justfile_directory()}}/ios"
@@ -223,7 +247,7 @@ ios-testflight: _ios-keychain-unlock
 # testing track), release_android.js rebuilds with the corrected code and
 # retries — no manual bumping needed.
 [doc("Build signed AAB + upload to Play Store internal testing")]
-android-play:
+android-play: _android-version
     @if (-not $env:KEYSTORE_PASSWORD) { $env:KEYSTORE_PASSWORD = Read-Host "Keystore password" }; \
      Push-Location scripts; node release_android.js --upload; Pop-Location
 
