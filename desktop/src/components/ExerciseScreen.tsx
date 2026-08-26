@@ -42,7 +42,7 @@ function appendTestRecord(record: TestRecord) {
 }
 
 export default function ExerciseScreen({ exercise, onStop }: Props) {
-  const [displayMidi, setDisplayMidi] = useState(-1);
+  const [liveHz, setLiveHz] = useState(0);
   const [status, setStatus] = useState(exercise.status);
   const [currentNoteIndex, setCurrentNoteIndex] = useState(0);
   const [currentAttempt, setCurrentAttempt] = useState(1);
@@ -222,7 +222,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     setDisplayedNotes([]);
     setCurrentNoteIndex(0);
     currentNoteIndexRef.current = 0;
-    setDisplayMidi(-1);
+    setLiveHz(0);
     await invoke('cmd_tracker_reset');
     await playChord(await fetchIntroTriad());
     if (!sessionRunningRef.current) return;
@@ -305,7 +305,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
 
   // The audio frame handler — confirmed MIDI comes from the Rust tracker.
   handleFrameRef.current = async (frame: TrackerFrame) => {
-    setDisplayMidi(frame.displayMidi);
+    setLiveHz(frame.liveHz);
     if (!sessionRunningRef.current) return;
     if (frame.confirmedMidi < 0) return;
 
@@ -449,7 +449,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       <div className="exercise-meta">Attempt {currentAttempt} of {exercise.maxRetries} • Tests {testsCompleted} • Score {score}%</div>
 
       <div className="pitch-meter-circle">
-        <PitchMeter midi={displayMidi >= 0 ? transpMidi(displayMidi) : -1} />
+        <PitchMeter hz={liveHz} />
       </div>
 
       <button className="btn-danger" onClick={stopSession}>{'\u23f9'} Stop Testing</button>

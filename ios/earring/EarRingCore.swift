@@ -232,14 +232,8 @@ struct EarRingCore {
     struct TrackerFrame {
         /// Detected frequency in Hz. 0 when silent or no confident pitch.
         var liveHz: Float
-        /// Detected MIDI note for this frame, straight from pitch detection with no
-        /// debouncing. -1 when silent or no confident pitch. Prefer `displayMidi` for
-        /// anything shown to the user — a single frame here can be a transient detection
-        /// glitch (e.g. an octave error), most common on higher notes.
+        /// Detected MIDI note. -1 when silent or no confident pitch.
         var liveMidi: Int
-        /// Same note as `liveMidi`, but only once it has held for 2 consecutive frames —
-        /// never lags behind `confirmedMidi`. -1 when silent or not yet debounced.
-        var displayMidi: Int
         /// The confirmed MIDI note, emitted exactly once when stability is reached. -1 means absent.
         var confirmedMidi: Int
     }
@@ -276,9 +270,8 @@ struct EarRingCore {
             var floats = samples
             var outHz: Float = 0
             var outMidi: Int32 = -1
-            var outDisplayMidi: Int32 = -1
-            let confirmed = Int(ear_ring_tracker_process(handle, &floats, UInt32(floats.count), sampleRate, &outHz, &outMidi, &outDisplayMidi))
-            return TrackerFrame(liveHz: outHz, liveMidi: Int(outMidi), displayMidi: Int(outDisplayMidi), confirmedMidi: confirmed)
+            let confirmed = Int(ear_ring_tracker_process(handle, &floats, UInt32(floats.count), sampleRate, &outHz, &outMidi))
+            return TrackerFrame(liveHz: outHz, liveMidi: Int(outMidi), confirmedMidi: confirmed)
         }
     }
 }

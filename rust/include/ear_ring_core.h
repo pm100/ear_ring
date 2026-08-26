@@ -242,11 +242,7 @@ void ear_ring_tracker_apply_instrument(EarRingTracker *tracker, int32_t instrume
 
 /// Process one audio buffer.
 /// Writes the detected frequency (0.0 if silent) into *out_live_hz.
-/// Writes the detected MIDI note (-1 if silent) into *out_live_midi — straight from
-/// pitch detection with no debouncing; a single frame can be a transient glitch.
-/// Writes the same note into *out_display_midi, but only once it has held for 2
-/// consecutive frames — prefer this for anything shown to the user, it never lags
-/// behind the returned confirmed MIDI note.
+/// Writes the detected MIDI note (-1 if silent) into *out_live_midi.
 /// Returns the confirmed MIDI note the first time a note stabilises, or -1.
 int32_t ear_ring_tracker_process(
     EarRingTracker *tracker,
@@ -254,8 +250,7 @@ int32_t ear_ring_tracker_process(
     uint32_t num_samples,
     uint32_t sample_rate,
     float *out_live_hz,
-    int32_t *out_live_midi,
-    int32_t *out_display_midi
+    int32_t *out_live_midi
 );
 
 #ifdef __cplusplus

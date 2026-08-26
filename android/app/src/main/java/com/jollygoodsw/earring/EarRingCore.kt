@@ -58,7 +58,7 @@ object EarRingCore {
     @JvmStatic external fun nativeTrackerResetWithWarmup(handle: Long, warmupFrames: Int)
     @JvmStatic external fun nativeTrackerSetParams(handle: Long, silenceThreshold: Float, requiredFrames: Int)
     @JvmStatic external fun nativeTrackerApplyInstrument(handle: Long, instrumentIndex: Int)
-    /** Returns FloatArray[4]: [live_hz, live_midi_f32, confirmed_midi_f32, display_midi_f32]. -1 means absent. */
+    /** Returns FloatArray[3]: [live_hz, live_midi_f32, confirmed_midi_f32]. -1 means absent. */
     @JvmStatic external fun nativeTrackerProcess(handle: Long, samples: FloatArray, sampleRate: Int): FloatArray
 
     fun trackerNew(silenceThreshold: Float, requiredFrames: Int): Long =
@@ -87,11 +87,10 @@ object EarRingCore {
         val liveHz = out.getOrElse(0) { -1f }
         val liveMidi = out.getOrElse(1) { -1f }.toInt()
         val confirmedMidi = out.getOrElse(2) { -1f }.toInt()
-        val displayMidi = out.getOrElse(3) { -1f }.toInt()
         return if (liveHz <= 0f || liveMidi < 0) {
             PitchFrame.Silence
         } else {
-            PitchFrame.Active(hz = liveHz, midi = liveMidi, displayMidi = displayMidi, confirmedMidi = if (confirmedMidi >= 0) confirmedMidi else null)
+            PitchFrame.Active(hz = liveHz, midi = liveMidi, confirmedMidi = if (confirmedMidi >= 0) confirmedMidi else null)
         }
     }
 

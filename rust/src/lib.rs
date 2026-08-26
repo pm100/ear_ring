@@ -762,12 +762,7 @@ pub extern "C" fn ear_ring_tracker_apply_instrument(tracker: *mut PitchTracker, 
 /// Process one audio buffer.
 ///
 /// * `out_live_hz`  – set to the detected frequency (0.0 if silent/undetected)
-/// * `out_live_midi` – set to the detected MIDI note (-1 if silent/undetected), straight
-///   from pitch detection with no debouncing — a single frame here can be a transient
-///   detection glitch (e.g. an octave error).
-/// * `out_display_midi` – same note, but only once it has held for 2 consecutive frames.
-///   Prefer this for anything shown to the user; it never lags behind the returned
-///   confirmed MIDI note.
+/// * `out_live_midi` – set to the detected MIDI note (-1 if silent/undetected)
 ///
 /// Returns the confirmed MIDI note the first time a note stabilises, or -1.
 #[no_mangle]
@@ -778,7 +773,6 @@ pub extern "C" fn ear_ring_tracker_process(
     sample_rate: c_uint,
     out_live_hz: *mut c_float,
     out_live_midi: *mut c_int,
-    out_display_midi: *mut c_int,
 ) -> c_int {
     if tracker.is_null() || samples.is_null() {
         return -1;
@@ -790,9 +784,6 @@ pub extern "C" fn ear_ring_tracker_process(
     }
     if !out_live_midi.is_null() {
         unsafe { *out_live_midi = result.live_midi; }
-    }
-    if !out_display_midi.is_null() {
-        unsafe { *out_display_midi = result.display_midi; }
     }
     result.confirmed_midi
 }
@@ -1318,10 +1309,8 @@ mod android_jni {
     }
 
     /// Process one audio buffer via the Rust tracker.
-    /// Returns a float array [live_hz, live_midi_f32, confirmed_midi_f32, display_midi_f32].
-    /// live_midi, confirmed_midi, and display_midi are -1.0 when absent. display_midi is
-    /// the same note as live_midi but debounced to 2 consecutive frames — prefer it for
-    /// anything shown to the user, live_midi can carry a single-frame detection glitch.
+    /// Returns a float array [live_hz, live_midi_f32, confirmed_midi_f32].
+    /// live_midi and confirmed_midi are -1.0 when absent.
     #[no_mangle]
     pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeTrackerProcess(
         env: JNIEnv,
@@ -1331,8 +1320,8 @@ mod android_jni {
         sample_rate: jint,
     ) -> jfloatArray {
         let make_empty = || -> jfloatArray {
-            let a = env.new_float_array(4).unwrap();
-            let _ = env.set_float_array_region(&a, 0, &[0.0f32, -1.0f32, -1.0f32, -1.0f32]);
+            let a = env.new_float_array(3).unwrap();
+            let _ = env.set_float_array_region(&a, 0, &[0.0f32, -1.0f32, -1.0f32]);
             a.into_raw()
         };
 
@@ -1349,9 +1338,9 @@ mod android_jni {
         }
 
         let result = unsafe { (*(handle as *mut super::PitchTracker)).process(&buf, sample_rate as u32) };
-        let out_vals = [result.live_hz, result.live_midi as f32, result.confirmed_midi as f32, result.display_midi as f32];
+        let out_vals = [result.live_hz, result.live_midi as f32, result.confirmed_midi as f32];
 
-        let out = match env.new_float_array(4) {
+        let out = match env.new_float_array(3) {
             Ok(a) => a,
             Err(_) => return make_empty(),
         };

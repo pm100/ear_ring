@@ -40,13 +40,11 @@ fn cmd_tracker_apply_instrument(state: State<TrackerState>, instrument_index: us
 }
 
 /// Process one audio buffer.
-/// Returns `(live_hz, live_midi, confirmed_midi, display_midi)`; -1 means absent.
-/// display_midi is the same note as live_midi but debounced to 2 consecutive frames —
-/// prefer it for anything shown to the user; live_midi can carry a single-frame glitch.
+/// Returns `[live_hz, live_midi, confirmed_midi]` as floats; -1.0 means absent.
 #[tauri::command]
-fn cmd_tracker_process(state: State<TrackerState>, samples: Vec<f32>, sample_rate: u32) -> (f32, i32, i32, i32) {
+fn cmd_tracker_process(state: State<TrackerState>, samples: Vec<f32>, sample_rate: u32) -> (f32, i32, i32) {
     let result = state.0.lock().unwrap().process(&samples, sample_rate);
-    (result.live_hz, result.live_midi, result.confirmed_midi, result.display_midi)
+    (result.live_hz, result.live_midi, result.confirmed_midi)
 }
 
 // ── Other commands ───────────────────────────────────────────────────────────
