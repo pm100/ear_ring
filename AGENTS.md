@@ -53,6 +53,13 @@ prefer Rust implementations first, including things like:
 If logic must temporarily live in platform code, treat that as an exception and prefer
 moving it back into Rust in the next related change.
 
+**`rust_wasm/` is currently dead code.** It's a workspace member (so `cargo build`/
+`cargo test` compile it, which is why it stays in sync with the core API — e.g. it
+picked up `avoid_first_midi`), but nothing packages or loads it: no `justfile` recipe
+runs `wasm-pack`, no platform (desktop/Tauri included, which talks to the Rust core
+directly via native Tauri commands) imports it. Left in place for now for a possible
+future web target — don't wire it up or delete it without asking first.
+
 ---
 
 ## UI Consistency Rule
