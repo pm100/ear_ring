@@ -1038,7 +1038,9 @@ just ios-device          # iOS — macOS only; builds Debug, installs + launches
                          # (override device with IOS_DEVICE_ID=<uuid>)
 ```
 
-**Publish to Play Store internal testing:**
+**Publish to Play Store closed testing (alpha)** — the track our real named testers
+and the production-graduation clock are on (`PLAY_TRACK=internal` overrides to the
+no-review internal-only track instead):
 ```powershell
 # One step: build signed AAB + upload
 just android-play

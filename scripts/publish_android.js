@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * publish_android.js — upload a signed release AAB to Play Store internal testing.
+ * publish_android.js — upload a signed release AAB to Play Store closed testing.
  *
  * Required environment variables:
  *   GOOGLE_PLAY_SERVICE_ACCOUNT_JSON  path to your service account key JSON file
@@ -10,7 +10,9 @@
  * Optional:
  *   PLAY_PACKAGE_NAME   defaults to "com.jollygoodsw.earring"
  *   PLAY_AAB_PATH       defaults to android/app/build/outputs/bundle/release/app-release.aab
- *   PLAY_TRACK          defaults to "internal" (other options: alpha, beta, production)
+ *   PLAY_TRACK          defaults to "alpha" (the Closed testing track — where our real
+ *                       named testers and the 12-tester/14-day production-graduation
+ *                       clock live). Other options: internal, beta, production.
  */
 
 const { google } = require('googleapis');
@@ -18,7 +20,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PACKAGE_NAME = process.env.PLAY_PACKAGE_NAME || 'com.jollygoodsw.earring';
-const TRACK = process.env.PLAY_TRACK || 'internal';
+const TRACK = process.env.PLAY_TRACK || 'alpha';
 const AAB_PATH = process.env.PLAY_AAB_PATH ||
   path.join(__dirname, '..', 'android', 'app', 'build', 'outputs', 'bundle', 'release', 'app-release.aab');
 const RELEASE_NOTES = process.env.PLAY_RELEASE_NOTES || 'Bug fixes and improvements.';

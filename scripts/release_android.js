@@ -27,6 +27,11 @@
  * Optional:
  *   KEY_PASSWORD, PLAY_PACKAGE_NAME, PLAY_TRACK, PLAY_RELEASE_STATUS,
  *   PLAY_RELEASE_NOTES, PLAY_LANGUAGE, PLAY_AAB_PATH
+ *
+ * PLAY_TRACK defaults to "alpha" (the Closed testing track — where our real
+ * named testers and the 12-tester/14-day production-graduation clock live;
+ * see AGENTS.md). Override to "internal" for a quick no-review
+ * internal-only test build.
  */
 
 const { google } = require('googleapis');
@@ -35,7 +40,7 @@ const fs = require('fs');
 const path = require('path');
 const { getNextVersionCode, PACKAGE_NAME } = require('./get_next_version_code');
 
-const TRACK = process.env.PLAY_TRACK || 'internal';
+const TRACK = process.env.PLAY_TRACK || 'alpha';
 const AAB_PATH = process.env.PLAY_AAB_PATH ||
   path.join(__dirname, '..', 'android', 'app', 'build', 'outputs', 'bundle', 'release', 'app-release.aab');
 const RELEASE_NOTES = process.env.PLAY_RELEASE_NOTES || 'Bug fixes and improvements.';

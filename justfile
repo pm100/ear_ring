@@ -234,19 +234,21 @@ ios-testflight: _ios-version _ios-keychain-unlock
       --output-format xml
     echo "Upload to TestFlight complete."
 
-# Build signed release AAB and upload to Play Store internal testing.
-# Requires:
+# Build signed release AAB and upload to Play Store closed testing (alpha) —
+# the track our real named testers and the 12-tester/14-day production-
+# graduation clock are on. Requires:
 #   KEYSTORE_PASSWORD                  — keystore password (prompted if not set)
 #   GOOGLE_PLAY_SERVICE_ACCOUNT_JSON   — path to service account key JSON file
 #     (Play Console → Setup → API access → Service accounts → download JSON key)
 # Optional:
 #   KEY_PASSWORD   — if different from KEYSTORE_PASSWORD
-#   PLAY_TRACK     — override track (default: internal)
+#   PLAY_TRACK     — override track (default: alpha); use "internal" for a
+#     quick no-review internal-only test build
 # versionCode is fetched automatically and self-corrects: if Play rejects it
 # as already used (can happen for uploads our guess can't see, e.g. a closed
 # testing track), release_android.js rebuilds with the corrected code and
 # retries — no manual bumping needed.
-[doc("Build signed AAB + upload to Play Store internal testing")]
+[doc("Build signed AAB + upload to Play Store closed testing (alpha)")]
 android-play: _android-version
     @if (-not $env:KEYSTORE_PASSWORD) { $env:KEYSTORE_PASSWORD = Read-Host "Keystore password" }; \
      Push-Location scripts; node release_android.js --upload; Pop-Location
