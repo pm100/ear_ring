@@ -37,15 +37,49 @@ but currently hidden from the UI — `testType == 1` is force-reset to `0` on lo
 `ExerciseModel.swift`). Re-exposing it as a premium-only Test Type option is close to
 free: remove the reset-to-0 guard, gate the option's visibility on `isPremium`.
 
-### Voice as an instrument
+### Voice as an instrument (and other continuous-pitch instruments)
 Add singing voice as a selectable input alongside the existing instruments
 (`InstrumentInfo` / `instrumentIndex`) — i.e. exercises can be completed by singing the
-answer instead of playing it. Needs a voice-vs-instrument pitch detection distinction
-(voice pitch tracking behaves differently — vibrato, breathy onset, wider cents wobble —
-from a struck note), so likely a second tracker profile rather than reusing instrument
-thresholds as-is. Per the Shared Logic Rule, the core tracking math should land in
+answer instead of playing it. This is the foundational feature the next one depends on.
+
+**The tracker's stability check doesn't tolerate pitch wobble today, and that's not a
+voice-specific gap.** In `tracker.rs`, `PitchTracker::process()` only advances
+`stable_count` when the *rounded MIDI note* is bit-identical to the previous frame's
+(`effective_midi == self.stable_midi`) — any frame that rounds to a different semitone
+resets the count to 1. Natural vibrato (~±30–100 cents of swing) will routinely cross a
+semitone boundary frame-to-frame, so a wobbly note can reset its own stability
+indefinitely and never confirm. This affects every instrument that lacks a mechanical
+stop pinning the pitch to a fixed value, not just voice:
+- **Trombone** — slide has no fixed positions; landing/holding a pitch is a live
+  muscular judgment, same as singing.
+- **Fretless strings** (violin, cello, fretless bass/guitar) — finger position, not a
+  mechanical stop, defines pitch; vibrato is core idiomatic technique here.
+- **Voice**, plus the usual breathy/glide onset that's slower and messier than a
+  struck or blown attack.
+
+Sax/trumpet/clarinet are mechanically quantized (fingering picks a fixed pitch) so
+they're lower risk, but a player leaning into embouchure vibrato could still trip the
+same bug — it's just narrower and less likely than on a fully continuous instrument.
+And this is an *ear-training* app: the person producing the target pitch is often the
+one with the least reliable pitch control, so expect more hunting-for-pitch wobble in
+practice than a clean-tone assumption would suggest.
+
+**Recommended shape:** don't build this as a one-off "Voice profile." Add a generic
+capability instead — e.g. a `pitch_tolerance_cents` (or `continuous_pitch: bool`) field
+on `InstrumentInfo`, with one shared hysteresis-band implementation in `tracker.rs`: a
+note stays "stable" while cents drift stays within a band around a running center,
+rather than requiring the rounded MIDI to be bit-identical every frame. Trombone,
+fretless strings, and voice would all set that flag/threshold; piano/fretted
+guitar/winds keep today's strict behavior. Per the Shared Logic Rule, this belongs in
 `rust/src/tracker.rs` / `pitch_detection.rs`, with platform code only handling which mic
-input mode is active. This is the foundational feature the next one depends on.
+input mode is active (and, for voice specifically, that's the only new platform-side
+work — the tracker fix is instrument-agnostic core logic).
+
+Also worth noting before trusting any of this: the existing 47 Rust tracker/pitch tests
+all use synthesized pure sine waves (`sine_wave()` in `tracker.rs`'s test module) — none
+simulate vibrato, breathiness, or glide onset, so passing tests today give zero evidence
+about real sung or slid/fretless-played audio. Validate against real recordings before
+shipping any continuous-pitch instrument.
 
 ### "Sing then play" test mode
 New exercise mode: the user sings the prompted note/interval first, then confirms by
