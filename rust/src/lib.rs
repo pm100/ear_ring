@@ -262,15 +262,17 @@ pub extern "C" fn ear_ring_generate_sequence(
     notes.len() as c_int
 }
 
-/// Generate a diatonic chord (triad or 7th) near center_midi.
+/// Generate a diatonic chord (triad or 7th), every note within [range_start, range_end].
 /// * `out_buf` must be at least `note_count` bytes (max 4).
-/// Returns note count written, or -1 on error.
+/// Returns note count written (may be less than `note_count` if a voicing wider than
+/// the range collapses duplicate notes at the boundary), or -1 on error.
 #[no_mangle]
 pub extern "C" fn ear_ring_generate_diatonic_chord(
     root_chroma: c_uchar,
     scale_id: c_uchar,
     note_count: c_uchar,
-    center_midi: c_uchar,
+    range_start: c_uchar,
+    range_end: c_uchar,
     seed: u64,
     out_buf: *mut c_uchar,
 ) -> c_int {
@@ -281,7 +283,7 @@ pub extern "C" fn ear_ring_generate_diatonic_chord(
         Some(s) => s,
         None => return -1,
     };
-    let notes = generate_diatonic_chord(root_chroma, scale, note_count, center_midi, seed);
+    let notes = generate_diatonic_chord(root_chroma, scale, note_count, range_start, range_end, seed);
     let out = unsafe { std::slice::from_raw_parts_mut(out_buf, note_count as usize) };
     for (i, note) in notes.iter().enumerate() {
         out[i] = note.midi();
@@ -899,7 +901,8 @@ mod android_jni {
         root_chroma: jint,
         scale_id: jint,
         note_count: jint,
-        center_midi: jint,
+        range_start: jint,
+        range_end: jint,
         seed: jlong,
     ) -> jintArray {
         let scale = scale_type_from_id(scale_id as u8).unwrap_or(ScaleType::Major);
@@ -907,7 +910,8 @@ mod android_jni {
             root_chroma as u8,
             scale,
             note_count as u8,
-            center_midi as u8,
+            range_start as u8,
+            range_end as u8,
             seed as u64,
         );
         let midi_vals: Vec<jint> = notes.iter().map(|n| n.midi() as jint).collect();

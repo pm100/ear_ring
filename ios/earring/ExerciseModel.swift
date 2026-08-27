@@ -253,7 +253,8 @@ class ExerciseModel: ObservableObject {
                 rootChroma: rootNote,
                 scaleId: 0,
                 noteCount: sequenceLength,
-                centerMidi: centerMidi,
+                rangeStart: rangeStart,
+                rangeEnd: rangeEnd,
                 seed: seed
             )
             sequence = testType == 3 ? notes.reversed() : notes

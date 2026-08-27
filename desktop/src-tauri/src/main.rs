@@ -92,9 +92,9 @@ fn cmd_generate_sequence(root_chroma: u8, scale_id: u8, length: u8, range_start:
 }
 
 #[tauri::command]
-fn cmd_generate_diatonic_chord(root_chroma: u8, scale_id: u8, note_count: u8, center_midi: u8, seed: u64) -> Vec<u8> {
+fn cmd_generate_diatonic_chord(root_chroma: u8, scale_id: u8, note_count: u8, range_start: u8, range_end: u8, seed: u64) -> Vec<u8> {
     let scale = scale_type_from_id(scale_id).unwrap_or(ScaleType::Major);
-    generate_diatonic_chord(root_chroma, scale, note_count, center_midi, seed)
+    generate_diatonic_chord(root_chroma, scale, note_count, range_start, range_end, seed)
         .iter()
         .map(|n| n.midi())
         .collect()

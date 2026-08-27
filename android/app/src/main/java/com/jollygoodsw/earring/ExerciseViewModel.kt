@@ -321,7 +321,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             val centerMidi = (state.rangeStart + state.rangeEnd) / 2
             val midiNotes = EarRingCore.generateDiatonicChord(
                 state.rootNote, 0, state.sequenceLength,
-                centerMidi, seed
+                state.rangeStart, state.rangeEnd, seed
             ).toList().let { if (state.testType == 3) it.reversed() else it }
             val label = EarRingCore.writtenDiatonicChordLabel(state.rootNote, 0, state.sequenceLength, centerMidi, seed, state.instrumentIndex)
             _state.value = state.copy(

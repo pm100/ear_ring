@@ -279,14 +279,21 @@ pub fn intro_chord(root: Note, scale: ScaleType) -> Vec<Note> {
 
 /// Generate a diatonic triad (note_count=3) or seventh chord (note_count=4) from
 /// a random scale degree, with a random inversion and random ascending/descending
-/// direction. Notes are placed near `center_midi`.
+/// direction. Every note is guaranteed to fall within `[range_start, range_end]`
+/// (the user's selected instrument range) — the chosen root octave first tries to
+/// fit the whole voicing inside that window with zero overflow; if the voicing's
+/// span is wider than the window (possible for a 7th chord in a wide inversion
+/// squeezed into a narrow range), the closest-fitting octave is used and any note
+/// still outside the window is clamped to the nearest boundary rather than
+/// escaping it.
 ///
 /// Returns MIDI notes in play order (ascending or descending).
 pub fn generate_diatonic_chord(
     root_chroma: u8,
     scale: ScaleType,
     note_count: u8,
-    center_midi: u8,
+    range_start: u8,
+    range_end: u8,
     seed: u64,
 ) -> Vec<Note> {
     let intervals = scale.intervals(); // 7 semitone values from root
@@ -325,30 +332,47 @@ pub fn generate_diatonic_chord(
     }
     offsets.sort_unstable();
 
-    // Find the scale root MIDI so the chord's mid-point sits near center_midi.
-    // Iterate high-to-low so ties favour the higher (brighter) octave.
-    let center = center_midi as i32;
-    let mid_offset = offsets[offsets.len() / 2];
+    // Find the scale-root octave that fits the whole voicing inside
+    // [range_start, range_end]. Search every octave the root pitch class could
+    // occupy across the full MIDI range; prefer a placement with zero overflow
+    // (iterating high-to-low so ties favour the higher, brighter octave), and
+    // fall back to the smallest total overflow when no octave fits the full span
+    // (a voicing wider than the available range can't fit anywhere).
+    let range_start_i = range_start as i32;
+    let range_end_i = range_end as i32;
     let scale_root_chroma = root_chroma % 12;
-    let scale_root_midi: i32 = (2i32..=6)
-        .rev()
-        .map(|oct| (oct + 1) * 12 + scale_root_chroma as i32)
-        .min_by_key(|&m| (m + mid_offset - center).abs())
-        .unwrap_or(60);
+    let lo_offset = offsets[0];
+    let hi_offset = offsets[offsets.len() - 1];
+    let mut best_root = 60i32;
+    let mut best_overflow = i32::MAX;
+    for oct in (-1i32..=9).rev() {
+        let root_midi = (oct + 1) * 12 + scale_root_chroma as i32;
+        let lo = root_midi + lo_offset;
+        let hi = root_midi + hi_offset;
+        if lo < 0 || hi > 127 {
+            continue;
+        }
+        let overflow = (range_start_i - lo).max(0) + (hi - range_end_i).max(0);
+        if overflow < best_overflow {
+            best_overflow = overflow;
+            best_root = root_midi;
+            if overflow == 0 {
+                break;
+            }
+        }
+    }
 
+    // Final clamp guarantees every note lands inside [range_start, range_end] even
+    // when the voicing's span is wider than the available range — that note
+    // collapses to the nearest boundary rather than escaping the playable range.
     let mut midi_notes: Vec<u8> = offsets
         .iter()
-        .map(|&o| (scale_root_midi + o).clamp(21, 108) as u8)
+        .map(|&o| (best_root + o).clamp(range_start_i, range_end_i) as u8)
         .collect();
-
-    // Safety: if the lowest note is more than 8 semitones below center (can happen
-    // with wide 2nd-inversion spans), shift the whole chord up one octave.
-    if (*midi_notes.iter().min().unwrap() as i32) < center - 8 {
-        midi_notes.iter_mut().for_each(|n| *n = n.saturating_add(12));
-    }
 
     // Always play ascending
     midi_notes.sort_unstable();
+    midi_notes.dedup();
 
     midi_notes.into_iter().map(Note::from_midi).collect()
 }
@@ -1131,13 +1155,13 @@ mod tests {
 
     #[test]
     fn test_diatonic_chord_triad_length() {
-        let notes = generate_diatonic_chord(0, ScaleType::Major, 3, 60, 42);
+        let notes = generate_diatonic_chord(0, ScaleType::Major, 3, 48, 84, 42);
         assert_eq!(notes.len(), 3);
     }
 
     #[test]
     fn test_diatonic_chord_seventh_length() {
-        let notes = generate_diatonic_chord(0, ScaleType::Major, 4, 60, 99);
+        let notes = generate_diatonic_chord(0, ScaleType::Major, 4, 48, 84, 99);
         assert_eq!(notes.len(), 4);
     }
 
@@ -1146,7 +1170,7 @@ mod tests {
         // All chord tones must belong to the C major scale (pitch classes 0,2,4,5,7,9,11)
         let c_major_classes: std::collections::HashSet<u8> = [0,2,4,5,7,9,11].iter().copied().collect();
         for seed in [1u64, 7, 42, 100, 999] {
-            let notes = generate_diatonic_chord(0, ScaleType::Major, 3, 60, seed);
+            let notes = generate_diatonic_chord(0, ScaleType::Major, 3, 48, 84, seed);
             for n in &notes {
                 assert!(c_major_classes.contains(&(n.midi() % 12)),
                     "Note {} not in C major (seed {})", n.midi(), seed);
@@ -1170,7 +1194,7 @@ mod tests {
                 let pcs: std::collections::HashSet<u8> = base_intervals.iter().map(|&i| (root + i) % 12).collect();
                 for &nc in &[3u8, 4] {
                     for seed in 0u64..500 {
-                        let notes = generate_diatonic_chord(root, *scale, nc, 66, seed);
+                        let notes = generate_diatonic_chord(root, *scale, nc, 48, 84, seed);
                         for n in &notes {
                             let pc = n.midi() % 12;
                             assert!(pcs.contains(&pc),
@@ -1184,12 +1208,29 @@ mod tests {
     }
 
     #[test]
-    fn test_diatonic_chord_near_center() {
-        // Notes should be roughly centered near MIDI 60 (within 2 octaves)
-        let notes = generate_diatonic_chord(0, ScaleType::Major, 3, 60, 42);
-        for n in &notes {
-            assert!(n.midi() >= 36 && n.midi() <= 84,
-                "Note {} too far from center", n.midi());
+    fn test_diatonic_chord_within_range() {
+        // Every generated note must fall inside [range_start, range_end] — the user's
+        // actual selected instrument range, not just "somewhere near center". Uses the
+        // real one-octave (12-semitone) instrument ranges from INSTRUMENTS, since that's
+        // the tightest real-world case and where a wide 7th-chord voicing is most likely
+        // to overflow if placement doesn't account for the range width.
+        let scales = [ScaleType::Major, ScaleType::NaturalMinor, ScaleType::Dorian, ScaleType::Mixolydian, ScaleType::Locrian];
+        for inst in INSTRUMENTS {
+            let (range_start, range_end) = (inst.range_start as u8, inst.range_end as u8);
+            for &scale in &scales {
+                for root in 0u8..12 {
+                    for &nc in &[3u8, 4] {
+                        for seed in 0u64..300 {
+                            let notes = generate_diatonic_chord(root, scale, nc, range_start, range_end, seed);
+                            for n in &notes {
+                                assert!(n.midi() >= range_start && n.midi() <= range_end,
+                                    "{}: root={} scale={:?} nc={} seed={}: note {} outside [{},{}]",
+                                    inst.name, root, scale, nc, seed, n.midi(), range_start, range_end);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 

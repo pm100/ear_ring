@@ -45,7 +45,7 @@ object EarRingCore {
     @JvmStatic external fun nativeShuffleMelodyIndices(seed: Long): IntArray
     @JvmStatic external fun nativePickMelodyByIndex(index: Int, rootChroma: Int): FloatArray
     @JvmStatic external fun nativeMelodyRangeMidi(index: Int, rootChroma: Int): IntArray
-    @JvmStatic external fun nativeGenerateDiatonicChord(rootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long): IntArray
+    @JvmStatic external fun nativeGenerateDiatonicChord(rootChroma: Int, scaleId: Int, noteCount: Int, rangeStart: Int, rangeEnd: Int, seed: Long): IntArray
     @JvmStatic external fun nativeDiatonicChordLabel(rootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long): String
     @JvmStatic external fun nativeWrittenDiatonicChordLabel(concertRootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long, instrumentIndex: Int): String
     @JvmStatic external fun nativeWrittenScaleLabel(concertRootChroma: Int, scaleId: Int, instrumentIndex: Int): String
@@ -234,9 +234,9 @@ object EarRingCore {
         return Pair(arr[0], arr[1])
     }
 
-    fun generateDiatonicChord(rootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long): IntArray =
-        if (loaded) nativeGenerateDiatonicChord(rootChroma, scaleId, noteCount, centerMidi, seed)
-        else IntArray(noteCount) { centerMidi }
+    fun generateDiatonicChord(rootChroma: Int, scaleId: Int, noteCount: Int, rangeStart: Int, rangeEnd: Int, seed: Long): IntArray =
+        if (loaded) nativeGenerateDiatonicChord(rootChroma, scaleId, noteCount, rangeStart, rangeEnd, seed)
+        else IntArray(noteCount) { rangeStart }
 
     fun diatonicChordLabel(rootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long): String =
         if (loaded) nativeDiatonicChordLabel(rootChroma, scaleId, noteCount, centerMidi, seed)

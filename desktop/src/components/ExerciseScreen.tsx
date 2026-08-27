@@ -184,7 +184,8 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         rootChroma: exercise.rootNote,
         scaleId: 0,
         noteCount: exercise.sequenceLength,
-        centerMidi,
+        rangeStart: exercise.rangeStart,
+        rangeEnd: exercise.rangeEnd,
         seed,
       });
       const label = await invoke<string>('cmd_written_diatonic_chord_label', {
