@@ -101,10 +101,11 @@ struct SetupView: View {
         }
         .onChange(of: model.confirmedNoteSeq) { _ in
             guard let midi = model.confirmedLiveMidi else { return }
-            // Mic Setup exists to test what the mic can hear, independent of whatever
-            // range the exercise happens to be configured for — do not filter by
-            // model.rangeStart/rangeEnd here, or notes outside it silently vanish.
+            // Text/Hz always reflect the truth. The staff, though, stays confined to
+            // the configured exercise range — it's read as "where am I in my range",
+            // not "what can the mic hear".
             concertMidi = midi
+            guard midi >= model.rangeStart && midi <= model.rangeEnd else { return }
             var h = concertHistory + [midi]
             if h.count > 8 { h.removeFirst() }
             concertHistory = h

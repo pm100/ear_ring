@@ -41,10 +41,15 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, ro
         instrumentIndex = instrumentIndex,
         warmupFrames = warmupFrames,
         onConfirmed = { midi, hz ->
+            // Text/Hz always reflect the truth. The staff, though, stays confined to
+            // the configured exercise range — it's read as "where am I in my range",
+            // not "what can the mic hear".
             concertMidi = midi
             concertHz = hz
-            concertHistory.add(midi)
-            if (concertHistory.size > maxHistory) concertHistory.removeAt(0)
+            if (midi in rangeStart..rangeEnd) {
+                concertHistory.add(midi)
+                if (concertHistory.size > maxHistory) concertHistory.removeAt(0)
+            }
         }
     )
 

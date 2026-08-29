@@ -33,26 +33,28 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
   const { start, stop, destroy } = useAudioCapture();
 
   const NOTE_STEP = 44;
-  // Mic Setup exists to test what the mic can hear, independent of whatever range
-  // the exercise happens to be configured for right now — do not gate on
-  // rangeStart/rangeEnd here, or notes outside it silently vanish.
 
   const handleFrame = useCallback(async (frame: TrackerFrame) => {
     setHz(frame.liveHz);
     if (frame.confirmedMidi >= 0) {
       const midi = frame.confirmedMidi;
+      // Text/Hz always reflect the truth. The staff, though, stays confined to
+      // the configured exercise range — it's read as "where am I in my range",
+      // not "what can the mic hear".
       setCurrentMidi(midi);
       setCurrentHz(frame.liveHz);
-      setNoteHistory(prev => {
-        const next = [...prev, midi];
-        if (next.length > 8) next.shift();
-        return next;
-      });
+      if (midi >= rangeStart && midi <= rangeEnd) {
+        setNoteHistory(prev => {
+          const next = [...prev, midi];
+          if (next.length > 8) next.shift();
+          return next;
+        });
+      }
     } else if (frame.liveMidi < 0) {
       // Silent frame: clear the live display only (history remains)
       setCurrentMidi(-1);
     }
-  }, []);
+  }, [rangeStart, rangeEnd]);
 
   // Load instrument transposition semitones and apply instrument-specific tracker params.
   const [transpSemitones, setTranspSemitones] = useState(0);
