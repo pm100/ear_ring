@@ -8,7 +8,7 @@ import ResultsScreen from './components/ResultsScreen';
 import ProgressScreen from './components/ProgressScreen';
 import SettingsScreen from './components/SettingsScreen';
 import HelpScreen from './components/HelpScreen';
-import BottomNavBar from './components/BottomNavBar';
+import Sidebar from './components/Sidebar';
 
 const defaultSettings: ExerciseSettings = (() => {
   const rootNote = 0;
@@ -185,6 +185,10 @@ export default function App() {
 
   return (
     <div className="app-container">
+      {showNav && (
+        <Sidebar currentScreen={screen} onNavigate={setScreen} />
+      )}
+      <div className="main-content">
       {screen === 'home' && (
         <HomeScreen
           settings={settings}
@@ -234,9 +238,7 @@ export default function App() {
       {screen === 'help' && (
         <HelpScreen onBack={() => setScreen('home')} />
       )}
-      {showNav && (
-        <BottomNavBar currentScreen={screen} onNavigate={setScreen} />
-      )}
+      </div>
     </div>
   );
 }

@@ -7,6 +7,7 @@ interface Tab {
   label: string;
 }
 
+// Mirrors the iPad sidebar's tab list (see ios/earring/ContentView.swift tabItems).
 const TABS: Tab[] = [
   { screen: 'home',     icon: '🏠', label: 'Home' },
   { screen: 'setup',    icon: '🎙', label: 'Mic' },
@@ -20,18 +21,19 @@ interface Props {
   onNavigate: (screen: Screen) => void;
 }
 
-export default function BottomNavBar({ currentScreen, onNavigate }: Props) {
+export default function Sidebar({ currentScreen, onNavigate }: Props) {
   return (
-    <nav className="bottom-nav">
+    <nav className="sidebar">
+      <div className="sidebar-title">Ear Ring</div>
       {TABS.map(tab => (
         <button
           key={tab.screen}
-          className={`bottom-nav-item${currentScreen === tab.screen ? ' bottom-nav-item--active' : ''}`}
+          className={`sidebar-item${currentScreen === tab.screen ? ' sidebar-item--active' : ''}`}
           onClick={() => onNavigate(tab.screen)}
           type="button"
         >
-          <span className="bottom-nav-icon">{tab.icon}</span>
-          <span className="bottom-nav-label">{tab.label}</span>
+          <span className="sidebar-icon">{tab.icon}</span>
+          <span className="sidebar-label">{tab.label}</span>
         </button>
       ))}
     </nav>

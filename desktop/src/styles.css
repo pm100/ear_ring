@@ -27,21 +27,30 @@ body {
   line-height: 1.5;
 }
 
+/* Landscape shell: sidebar nav (like the iPad NavigationSplitView) + content pane. */
+html, body, #root {
+  height: 100%;
+}
+
 .app-container {
-  max-width: 600px;
-  margin: 0 auto;
-  min-height: 100vh;
+  display: flex;
+  flex-direction: row;
+  height: 100vh;
   background: var(--bg);
 }
 
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
 .screen {
-  max-width: 480px;
+  max-width: 640px;
   margin: 0 auto;
-  padding: 16px;
-  padding-bottom: 72px;
+  padding: 24px 32px;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  min-height: 100%;
 }
 
 /* Header */
@@ -508,53 +517,60 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* Bottom navigation bar */
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 600px;
-  height: 56px;
+/* Sidebar navigation — icons + labels down the left margin, mirroring the
+   iPad NavigationSplitView sidebar (see ios/earring/ContentView.swift). */
+.sidebar {
+  flex-shrink: 0;
+  width: 220px;
+  height: 100%;
+  overflow-y: auto;
   background: var(--surface);
-  border-top: 1px solid var(--border);
-  display: flex;
-  align-items: stretch;
-  z-index: 100;
-  box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
-}
-
-.bottom-nav-item {
-  flex: 1;
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  padding: 12px;
   gap: 2px;
+}
+
+.sidebar-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  padding: 8px 12px 16px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   background: none;
   border: none;
+  border-radius: 8px;
   cursor: pointer;
-  padding: 6px 0;
-  color: var(--text-secondary);
-  transition: color 0.15s;
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-size: 15px;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
 }
 
-.bottom-nav-item--active {
+.sidebar-item--active {
   color: var(--primary);
+  background: rgba(63, 81, 181, 0.12);
+  font-weight: 600;
 }
 
-.bottom-nav-item:hover {
-  color: var(--primary);
-  background: rgba(63, 81, 181, 0.05);
+.sidebar-item:hover:not(.sidebar-item--active) {
+  background: rgba(0, 0, 0, 0.04);
 }
 
-.bottom-nav-icon {
+.sidebar-icon {
   font-size: 20px;
   line-height: 1;
+  width: 24px;
+  text-align: center;
 }
 
-.bottom-nav-label {
-  font-size: 10px;
-  font-weight: 600;
+.sidebar-label {
+  font-weight: 500;
 }

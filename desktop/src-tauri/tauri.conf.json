@@ -32,12 +32,10 @@
     "windows": [
       {
         "fullscreen": false,
-        "resizable": true,
+        "resizable": false,
         "title": "Ear Ring",
-        "width": 480,
-        "height": 820,
-        "minWidth": 400,
-        "minHeight": 700,
+        "width": 1100,
+        "height": 720,
         "fileDropEnabled": false
       }
     ],
