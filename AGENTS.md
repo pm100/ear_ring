@@ -342,7 +342,8 @@ MusicStaff            — 160dp tall, shows rolling note history left to right
                         Notes are placed at fixed 44dp spacing from the LEFT end of the staff
                         Each newly stable note is appended on the right
                         When staff is full (8 notes), oldest scrolls off left, new note appears right
-                        Only notes within the selected range are added
+                        Only notes within the selected range are added — read as "where am I
+                        in my configured range", not "what can the mic hear"
                         Max 8 notes visible; history capped at 8
                         Most recent note: ACTIVE colour (blue)
                         Previous notes: EXPECTED colour (filled dark)
@@ -352,7 +353,12 @@ MusicStaff            — 160dp tall, shows rolling note history left to right
 [8dp space]
 Large note name       — 72sp bold, primary colour when detected, muted "—" when silent
                         (use 56sp if label is 3+ chars, e.g. "C#4")
+                        Shows ANY confirmed note regardless of the configured range — unlike
+                        the staff, this is not filtered, so it always reflects the truth
 Hz display            — bodyMedium, muted, shown only when pitch detected
+                        The actual measured frequency from the same tracker frame that
+                        produced the note (not recomputed from the displayed MIDI) — a
+                        mislabeled note will show a Hz value that disagrees with the label
 
 [24dp space]
 PitchMeter            — 90dp circle
@@ -420,23 +426,24 @@ Layout: vertically scrollable column, 16dp padding.
 Streak card:
   🔥 N day streak     — prominent display
 
-Session history:
-  If empty: "No sessions yet. Complete an exercise to see your progress!"
-  Otherwise: list of SessionRecord cards showing:
-    Scale name + root note
-    Score percentage
-    Date
-    Sequence length
-
 Recorded tests summary:
   Show total recorded test count and average test score
 
-Recent tests:
-  Show recent TestRecord rows/cards with:
+Session history:
+  If empty: "No sessions yet. Complete an exercise to see your progress!"
+  Otherwise: list of tappable SessionRecord cards showing:
     Scale name + root note
-    Date/time
-    Pass/fail summary with attempts used
     Score percentage
+    Date, test count, sequence length (one line)
+
+  Tapping a session drills into a detail view listing that session's individual
+  TestRecords (matched via SessionRecord.sessionId == TestRecord.sessionId), each
+  showing scale name + root note, date/time, pass/fail summary with attempts used,
+  expected/detected notes, and score percentage. A back affordance returns to the
+  session list. There is no separate always-visible "Recent Tests" list — test
+  detail only appears inside a session's drill-down. Sessions persisted before
+  sessionId existed have no matching tests; their detail view shows "No individual
+  test details recorded for this session."
 ```
 
 ---

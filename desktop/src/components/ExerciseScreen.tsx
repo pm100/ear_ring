@@ -31,6 +31,7 @@ function appendSessionRecord(exercise: ExerciseState, score: number) {
     score,
     length: exercise.sequenceLength,
     testsCompleted: exercise.testsCompleted,
+    sessionId: exercise.sessionId,
   });
   localStorage.setItem('ear_ring_sessions', JSON.stringify(existing.slice(0, 200)));
 }
@@ -292,6 +293,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         passed,
         expectedNotes: sequenceRef.current.map(midiToLabel),
         detectedNotes: attemptNotes.map(note => midiToLabel(note.midi)),
+        sessionId: exercise.sessionId,
       });
       setTestsCompleted(prev => prev + 1);
       setCumulativeScorePercent(prev => prev + testScore);
@@ -302,7 +304,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         }
       }, exercise.wrongNotePauseMs);
     });
-  }, [exercise.scaleId, exercise.rootNote, exercise.sequenceLength, exercise.maxRetries, exercise.wrongNotePauseMs, schedule, startFreshTest]);
+  }, [exercise.scaleId, exercise.rootNote, exercise.sequenceLength, exercise.maxRetries, exercise.wrongNotePauseMs, exercise.sessionId, schedule, startFreshTest]);
 
   // The audio frame handler — confirmed MIDI comes from the Rust tracker.
   handleFrameRef.current = async (frame: TrackerFrame) => {

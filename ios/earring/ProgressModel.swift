@@ -8,6 +8,10 @@ struct SessionRecord: Codable, Identifiable {
     var score: Int
     var length: Int
     var testsCompleted: Int
+    /// Correlates to TestRecord.sessionId — links this session to its individual tests.
+    /// Optional so older, already-persisted records (from before this field existed)
+    /// decode fine and just show no drill-down detail.
+    var sessionId: UUID? = nil
 }
 
 struct TestRecord: Codable, Identifiable {
@@ -22,6 +26,8 @@ struct TestRecord: Codable, Identifiable {
     var length: Int
     var expectedNotes: [String]
     var detectedNotes: [String]
+    /// Correlates to SessionRecord.sessionId — which session this test belongs to.
+    var sessionId: UUID? = nil
 }
 
 enum ProgressStore {

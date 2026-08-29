@@ -11,6 +11,9 @@ export default function ProgressScreen({ onBack, onClearProgress }: Props) {
   const [tests, setTests] = useState<TestRecord[]>([]);
   const [streak, setStreak] = useState(0);
   const [confirmingClear, setConfirmingClear] = useState(false);
+  // Drill-down: clicking a session shows just that session's individual test records
+  // instead of a separate always-visible "Recent Tests" list.
+  const [selectedSessionIndex, setSelectedSessionIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const sessionRaw = localStorage.getItem('ear_ring_sessions');
@@ -38,6 +41,46 @@ export default function ProgressScreen({ onBack, onClearProgress }: Props) {
   const avgTestScore = tests.length > 0
     ? Math.round(tests.reduce((sum, t) => sum + t.score, 0) / tests.length)
     : 0;
+
+  const selectedSession = selectedSessionIndex !== null ? sessions[selectedSessionIndex] : null;
+  if (selectedSession) {
+    const sessionTests = tests.filter(
+      t => t.sessionId !== undefined && t.sessionId === selectedSession.sessionId
+    );
+    return (
+      <div className="screen">
+        <div className="screen-header">
+          <button className="btn-back" onClick={() => setSelectedSessionIndex(null)}>← Back</button>
+          <span className="screen-title">{selectedSession.root} {selectedSession.scale}</span>
+        </div>
+
+        <div className="card">
+          {sessionTests.length === 0 ? (
+            <p className="empty-state">No individual test details recorded for this session.</p>
+          ) : (
+            sessionTests.map((test, i) => (
+              <div key={i} className="session-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                  <div className="session-info">
+                    <span className="session-scale">{test.root} {test.scale}</span>
+                    <span className="session-date">{new Date(test.date).toLocaleString()}</span>
+                    <span className="session-date">
+                      {test.passed ? `Passed in ${test.attemptsUsed}/${test.maxAttempts}` : `Failed after ${test.maxAttempts}`}
+                    </span>
+                  </div>
+                  <div className={`session-score ${test.score >= 80 ? 'score-good' : test.score >= 50 ? 'score-ok' : 'score-bad'}`}>
+                    {test.score}%
+                  </div>
+                </div>
+                <div style={{ fontSize: 13, marginTop: 4 }}>Expected: {test.expectedNotes.join(', ')}</div>
+                <div style={{ fontSize: 13, color: '#757575' }}>Detected: {test.detectedNotes.join(', ')}</div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="screen">
@@ -81,41 +124,26 @@ export default function ProgressScreen({ onBack, onClearProgress }: Props) {
           <p className="empty-state">No sessions yet. Complete an exercise to see history!</p>
         ) : (
           sessions.map((s, i) => (
-              <div key={i} className="session-row">
+              <div
+                key={i}
+                className="session-row"
+                onClick={() => setSelectedSessionIndex(i)}
+                style={{ cursor: 'pointer' }}
+              >
                 <div className="session-info">
                   <span className="session-scale">{s.root} {s.scale}</span>
-                  <span className="session-date">{new Date(s.date).toLocaleDateString()}</span>
-                  {s.testsCompleted !== undefined && (
-                    <span className="session-date">{s.testsCompleted} tests</span>
-                  )}
+                  <span className="session-date">
+                    {new Date(s.date).toLocaleDateString()}
+                    {s.testsCompleted !== undefined ? `  •  ${s.testsCompleted} tests` : ''}
+                    {`  •  ${s.length} notes`}
+                  </span>
                 </div>
                 <div className={`session-score ${s.score >= 80 ? 'score-good' : s.score >= 50 ? 'score-ok' : 'score-bad'}`}>
                   {s.score}%
                 </div>
+                <span style={{ marginLeft: 8, color: '#9e9e9e' }}>›</span>
               </div>
             ))
-        )}
-      </div>
-
-      <div className="card" style={{ marginTop: 16 }}>
-        <h3 className="section-label">Recent Tests</h3>
-        {tests.length === 0 ? (
-          <p className="empty-state">No tests recorded yet.</p>
-        ) : (
-          tests.slice(0, 10).map((test, i) => (
-            <div key={i} className="session-row">
-              <div className="session-info">
-                <span className="session-scale">{test.root} {test.scale}</span>
-                <span className="session-date">{new Date(test.date).toLocaleString()}</span>
-                <span className="session-date">
-                  {test.passed ? `Passed in ${test.attemptsUsed}/${test.maxAttempts}` : `Failed after ${test.maxAttempts}`}
-                </span>
-              </div>
-              <div className={`session-score ${test.score >= 80 ? 'score-good' : test.score >= 50 ? 'score-ok' : 'score-bad'}`}>
-                {test.score}%
-              </div>
-            </div>
-          ))
         )}
       </div>
 

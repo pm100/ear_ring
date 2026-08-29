@@ -5,9 +5,37 @@ All notable changes to Ear Ring are documented here.
 ## [Unreleased]
 
 ### Fixed
+- **Progress screen never showed the current session's results (Android)** —
+  `ProgressViewModel` only loaded from storage once, at app-launch time, so
+  tests/sessions completed during the running session never appeared until the
+  app restarted. It now reloads every time the Progress screen is opened.
+- **Mic Setup silently dropped notes outside the exercise's configured range**
+  — a correct detection outside `rangeStart`–`rangeEnd` (e.g. testing notes
+  above/below your instrument's configured range) was discarded entirely
+  rather than shown. Text/Hz now always reflect what was actually detected;
+  only the staff view stays confined to the configured range. All three
+  platforms (Android, iOS, Tauri/desktop).
+- **Mic Setup's Hz reading was fake** — it was recomputed from the displayed
+  (possibly wrong) note name instead of showing the actual measured
+  frequency, so it could never help diagnose a detection problem. Now shows
+  the real Hz from the same tracker frame that produced the note. All three
+  platforms.
+- **Piano's tracker `grace_frames` was the tightest of any instrument**
+  (1, vs. 3 for winds and 5 for Guitar) despite Piano and Guitar being the
+  only two decaying-envelope instruments in the table — a quieter or higher
+  note could dip below the silence threshold before enough consecutive
+  matching frames accumulated, so nothing ever confirmed. Raised to 3.
 - **Note-duration display on Android and iOS staffs** — melody snippets now render
   open noteheads (whole/half), augmentation dots, and eighth/sixteenth flags on all
   platforms, matching the existing desktop implementation
+
+### Changed
+- **Progress screen redesign** — session history cards now show the number of
+  tests in that session and are tappable, drilling into that session's
+  individual test records (previously a separate, always-visible "Recent
+  Tests" list disconnected from any specific session). Each session now
+  carries a `sessionId` correlating it to its `TestRecord`s. All three
+  platforms.
 
 ### Added
 - **Diatonic Arpeggios** — two new test types: *Diatonic Arpeggios (ascend)* and *Diatonic Arpeggios (desc)*

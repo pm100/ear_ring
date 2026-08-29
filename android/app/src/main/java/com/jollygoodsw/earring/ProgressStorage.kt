@@ -13,7 +13,9 @@ data class SessionRecord(
     val score: Float,
     val sequenceLength: Int,
     val testsCompleted: Int = 0,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    /** Correlates to TestRecord.sessionId — links this session to its individual tests. */
+    val sessionId: Long = 0
 ) {
     val dateString: String get() {
         val sdf = SimpleDateFormat("MMM d, yyyy HH:mm", Locale.getDefault())
@@ -32,7 +34,9 @@ data class TestRecord(
     val sequenceLength: Int,
     val expectedNotes: List<String>,
     val detectedNotes: List<String>,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    /** Correlates to SessionRecord.sessionId — which session this test belongs to. */
+    val sessionId: Long = 0
 ) {
     val dateString: String get() {
         val sdf = SimpleDateFormat("MMM d, yyyy HH:mm", Locale.getDefault())

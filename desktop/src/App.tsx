@@ -58,6 +58,7 @@ const defaultExercise: ExerciseState = {
   testsCompleted: 0,
   cumulativeScorePercent: 0,
   sessionRunning: false,
+  sessionId: 0,
 };
 
 const SETTINGS_KEY = 'ear_ring_settings';
@@ -132,6 +133,7 @@ export default function App() {
       testsCompleted: 0,
       cumulativeScorePercent: 0,
       sessionRunning: true,
+      sessionId: Date.now(),
     };
     if (testType === 1 || testType === 2 || testType === 3) {
       // Melody mode and diatonic mode: let ExerciseScreen generate each sequence

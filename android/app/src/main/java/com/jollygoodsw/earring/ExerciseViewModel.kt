@@ -47,6 +47,8 @@ data class ExerciseState(
     val testsCompleted: Int = 0,
     val cumulativeScorePercent: Int = 0,
     val sessionRunning: Boolean = false,
+    /** Set once per startExercise() call — correlates persisted TestRecords to their SessionRecord. */
+    val sessionId: Long = 0,
     val melodyDurations: List<Float> = emptyList(),
     val melodyDeck: List<Int> = emptyList(),
     val melodyDeckCursor: Int = 0,
@@ -247,7 +249,8 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             maxAttempts = _state.value.maxRetries,
             testsCompleted = 0,
             cumulativeScorePercent = 0,
-            sessionRunning = true
+            sessionRunning = true,
+            sessionId = System.currentTimeMillis()
         )
         // If melody mode, initialise shuffle deck
         if (_state.value.testType == 1) {
@@ -504,7 +507,8 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             passed = passed,
             sequenceLength = state.sequenceLength,
             expectedNotes = state.sequence.map(MusicTheory::midiToLabel),
-            detectedNotes = attemptNotes.map { MusicTheory.midiToLabel(it.midi) }
+            detectedNotes = attemptNotes.map { MusicTheory.midiToLabel(it.midi) },
+            sessionId = state.sessionId
         )
         ProgressStorage.appendTest(context, record)
     }
@@ -521,7 +525,8 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
                 rootLabel = "${MusicTheory.NOTE_NAMES[state.rootNote]} ${state.rangeLabel}",
                 score = state.averageScorePercent / 100f,
                 sequenceLength = state.sequenceLength,
-                testsCompleted = state.testsCompleted
+                testsCompleted = state.testsCompleted,
+                sessionId = state.sessionId
             )
         )
         sessionPersisted = true

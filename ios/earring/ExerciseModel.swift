@@ -132,6 +132,8 @@ class ExerciseModel: ObservableObject {
 
     private var cumulativeScore: Int = 0
     private var sessionPersisted = false
+    /// Set once per startExerciseSession() call — correlates persisted TestRecords to their SessionRecord.
+    private var sessionId = UUID()
     private var diagFrameCount: Int = 0
 
     private var melodyDeck: [Int] = []
@@ -152,6 +154,7 @@ class ExerciseModel: ObservableObject {
     func startExerciseSession() {
         cleanup()
         sessionPersisted = false
+        sessionId = UUID()
         cumulativeScore = 0
         testsCompleted = 0
         score = 0
@@ -439,7 +442,8 @@ class ExerciseModel: ObservableObject {
                 passed: passed,
                 length: sequenceLength,
                 expectedNotes: sequence.map(MusicTheory.midiToLabel),
-                detectedNotes: attemptNotes.map { MusicTheory.midiToLabel($0.midi) }
+                detectedNotes: attemptNotes.map { MusicTheory.midiToLabel($0.midi) },
+                sessionId: sessionId
             )
         )
     }
@@ -454,7 +458,8 @@ class ExerciseModel: ObservableObject {
                 rootLabel: rangeLabel,
                 score: score,
                 length: sequenceLength,
-                testsCompleted: testsCompleted
+                testsCompleted: testsCompleted,
+                sessionId: sessionId
             )
         )
         sessionPersisted = true

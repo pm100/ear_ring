@@ -61,6 +61,8 @@ export interface ExerciseState {
   testsCompleted: number;
   cumulativeScorePercent: number;
   sessionRunning: boolean;
+  /** Set once per startExercise() call — correlates persisted TestRecords to their SessionRecord. */
+  sessionId: number;
 }
 
 export interface SessionRecord {
@@ -70,6 +72,9 @@ export interface SessionRecord {
   score: number;
   length: number;
   testsCompleted?: number;
+  /** Correlates to TestRecord.sessionId. Optional — older, already-persisted records
+   *  predate this field and just show no drill-down detail. */
+  sessionId?: number;
 }
 
 export interface TestRecord {
@@ -83,4 +88,6 @@ export interface TestRecord {
   passed: boolean;
   expectedNotes: string[];
   detectedNotes: string[];
+  /** Correlates to SessionRecord.sessionId — which session this test belongs to. */
+  sessionId?: number;
 }

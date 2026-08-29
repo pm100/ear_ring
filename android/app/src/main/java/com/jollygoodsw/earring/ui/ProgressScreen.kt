@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
@@ -28,7 +30,27 @@ fun ProgressScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
-    BackHandler { onBack() }
+    // ProgressViewModel lives at app scope and only loads once at creation — without this,
+    // tests/sessions completed just now wouldn't show up until the app restarts.
+    LaunchedEffect(Unit) { viewModel.refresh() }
+
+    // Drill-down: tapping a session shows just that session's individual test records
+    // instead of a separate always-visible "Recent Tests" list.
+    var selectedSession by remember { mutableStateOf<SessionRecord?>(null) }
+
+    BackHandler {
+        if (selectedSession != null) selectedSession = null else onBack()
+    }
+
+    val session = selectedSession
+    if (session != null) {
+        SessionDetailScreen(
+            session = session,
+            tests = state.tests.filter { it.sessionId == session.sessionId },
+            onBack = { selectedSession = null }
+        )
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -114,7 +136,7 @@ fun ProgressScreen(
             }
         }
 
-        // Session history
+        // Session history — tap a session to see its individual test details.
         Spacer(Modifier.height(20.dp))
         Text("Session History", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
@@ -126,25 +148,8 @@ fun ProgressScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
-            state.sessions.forEach { session ->
-                SessionCard(session)
-                Spacer(Modifier.height(8.dp))
-            }
-        }
-
-        Spacer(Modifier.height(20.dp))
-        Text("Recent Tests", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(8.dp))
-
-        if (state.tests.isEmpty()) {
-            Text(
-                "No tests recorded yet.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            state.tests.take(10).forEach { test ->
-                TestCard(test)
+            state.sessions.forEach { s ->
+                SessionCard(s, onClick = { selectedSession = s })
                 Spacer(Modifier.height(8.dp))
             }
         }
@@ -180,8 +185,57 @@ fun ProgressScreen(
 }
 
 @Composable
-private fun SessionCard(session: SessionRecord) {
+private fun SessionDetailScreen(
+    session: SessionRecord,
+    tests: List<TestRecord>,
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+            Spacer(Modifier.width(4.dp))
+            Column {
+                Text(
+                    "${session.rootLabel}  ${session.scaleName}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    session.dateString,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        if (tests.isEmpty()) {
+            Text(
+                "No individual test details recorded for this session.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            tests.forEach { test ->
+                TestCard(test)
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionCard(session: SessionRecord, onClick: () -> Unit) {
     Card(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -196,7 +250,7 @@ private fun SessionCard(session: SessionRecord) {
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    "${session.dateString}  •  ${session.sequenceLength} notes",
+                    "${session.dateString}  •  ${session.testsCompleted} tests  •  ${session.sequenceLength} notes",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

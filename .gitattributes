@@ -1,1 +1,4 @@
 *.pbxproj -text
+# Shell scripts run on macOS (iOS build phases) — a CRLF shebang breaks them there.
+# Force LF regardless of a Windows checkout's core.autocrlf setting.
+*.sh text eol=lf

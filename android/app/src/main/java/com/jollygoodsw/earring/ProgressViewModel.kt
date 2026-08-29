@@ -23,6 +23,16 @@ class ProgressViewModel(application: Application) : AndroidViewModel(application
         loadSessions()
     }
 
+    /**
+     * Reload from storage. ProgressViewModel is created once at app scope (see EarRingApp),
+     * so its initial load only sees whatever was recorded before the app launched — tests/
+     * sessions completed during this run never appear until this is called again. The
+     * Progress screen calls this every time it's navigated to.
+     */
+    fun refresh() {
+        loadSessions()
+    }
+
     private fun loadSessions() {
         val context = getApplication<Application>()
         updateState(
