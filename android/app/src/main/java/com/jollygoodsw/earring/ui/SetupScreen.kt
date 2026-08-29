@@ -19,11 +19,16 @@ import com.jollygoodsw.earring.ui.components.StaffNote
 @Composable
 fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, rootChroma: Int = 0, keySignatureMode: Int = 0, silenceThreshold: Float = 0.003f, framesToConfirm: Int = 3, warmupFrames: Int = 4, instrumentIndex: Int = 0) {
     val noteStepDp = 44.dp
-    val midiMin = rangeStart
-    val midiMax = rangeEnd
+    // Mic Setup exists to test what the mic can hear, independent of whatever
+    // range the exercise happens to be configured for right now — a narrow
+    // exercise range (e.g. the default one-octave Piano range) must not make
+    // notes outside it silently vanish here.
+    val midiMin = 0
+    val midiMax = 127
     val maxHistory = 8
 
     var concertMidi by remember { mutableIntStateOf(-1) }
+    var concertHz by remember { mutableFloatStateOf(0f) }
     val concertHistory = remember { mutableStateListOf<Int>() }
 
     // Shared pitch detection — identical pipeline to ExerciseScreen.
@@ -35,8 +40,9 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, ro
         framesToConfirm = framesToConfirm,
         instrumentIndex = instrumentIndex,
         warmupFrames = warmupFrames,
-        onConfirmed = { midi, _ ->
+        onConfirmed = { midi, hz ->
             concertMidi = midi
+            concertHz = hz
             concertHistory.add(midi)
             if (concertHistory.size > maxHistory) concertHistory.removeAt(0)
         }
@@ -98,9 +104,11 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, ro
         )
         Spacer(Modifier.height(8.dp))
 
-        // Large note name + Hz
+        // Large note name + Hz. noteHz is the actual measured frequency (not
+        // recomputed from displayMidi) so it can reveal a mislabeled note
+        // instead of just parroting back whatever label was chosen.
         val noteLabel = if (displayMidi >= 0) MusicTheory.midiToLabel(displayMidi) else "—"
-        val noteHz = if (displayMidi >= 0) 440.0 * Math.pow(2.0, (displayMidi - 69) / 12.0) else 0.0
+        val noteHz = if (displayMidi >= 0) concertHz.toDouble() else 0.0
         Text(
             noteLabel,
             fontSize = if (noteLabel.length >= 3) 56.sp else 72.sp,

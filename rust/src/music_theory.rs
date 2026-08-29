@@ -784,7 +784,7 @@ pub struct InstrumentInfo {
 }
 
 pub const INSTRUMENTS: &[InstrumentInfo] = &[
-    InstrumentInfo { name: "Piano",             semitones:  0, range_start: 60, range_end: 72, grace_frames: 1, octave_correction: false },
+    InstrumentInfo { name: "Piano",             semitones:  0, range_start: 60, range_end: 72, grace_frames: 3, octave_correction: false },
     InstrumentInfo { name: "Guitar",            semitones:  0, range_start: 52, range_end: 64, grace_frames: 5, octave_correction: true  },
     InstrumentInfo { name: "Transposed Guitar", semitones: 12, range_start: 52, range_end: 64, grace_frames: 5, octave_correction: true  },
     InstrumentInfo { name: "Soprano Sax",       semitones:  2, range_start: 58, range_end: 70, grace_frames: 3, octave_correction: false },

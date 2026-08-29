@@ -87,6 +87,10 @@ class ExerciseModel: ObservableObject {
     @Published var score: Int = 0
     @Published var liveMidi: Int? = nil
     @Published var liveCents: Int = 0
+    /// Actual measured Hz at the moment a note was confirmed — captured alongside
+    /// confirmedLiveMidi so callers can show the real detection instead of a value
+    /// recomputed from the (possibly wrong) confirmed MIDI.
+    @Published var confirmedHz: Float = 0
     /// Set each time a new stable note is confirmed by the shared detection pipeline.
     /// SetupView observes confirmedNoteSeq (which always increments) so it fires even
     /// when the same MIDI value is confirmed twice in a row.
@@ -367,7 +371,8 @@ class ExerciseModel: ObservableObject {
             liveCents = 0
         }
         if frame.confirmedMidi >= 0 {
-            print("[EAR] confirmed midi=\(frame.confirmedMidi) (\(MusicTheory.midiToLabel(frame.confirmedMidi))) status=\(status)")
+            print("[EAR] confirmed midi=\(frame.confirmedMidi) (\(MusicTheory.midiToLabel(frame.confirmedMidi))) hz=\(frame.liveHz) status=\(status)")
+            confirmedHz = frame.liveHz
             confirmedNoteSeq += 1
             confirmedLiveMidi = frame.confirmedMidi
         }

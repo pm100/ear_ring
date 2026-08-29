@@ -68,8 +68,8 @@ struct SetupView: View {
                         .foregroundColor(displayMidi >= 0
                             ? Color(red: 0.247, green: 0.318, blue: 0.710)
                             : Color.secondary)
-                    if displayMidi >= 0, let liveHz = approximateHz(midi: concertMidi) {
-                        Text(String(format: "%.1f Hz", liveHz))
+                    if displayMidi >= 0, model.confirmedHz > 0 {
+                        Text(String(format: "%.1f Hz", model.confirmedHz))
                             .font(.body)
                             .foregroundColor(.secondary)
                     }
@@ -101,8 +101,9 @@ struct SetupView: View {
         }
         .onChange(of: model.confirmedNoteSeq) { _ in
             guard let midi = model.confirmedLiveMidi else { return }
-            // Only display notes within the configured range on the Mic Setup staff.
-            guard midi >= model.rangeStart && midi <= model.rangeEnd else { return }
+            // Mic Setup exists to test what the mic can hear, independent of whatever
+            // range the exercise happens to be configured for — do not filter by
+            // model.rangeStart/rangeEnd here, or notes outside it silently vanish.
             concertMidi = midi
             var h = concertHistory + [midi]
             if h.count > 8 { h.removeFirst() }
@@ -129,12 +130,6 @@ struct SetupView: View {
             return
         }
         transpSemitones = (arr[model.instrumentIndex]["semitones"] as? Int) ?? 0
-    }
-
-    /// Approximate Hz from concert MIDI for display purposes.
-    private func approximateHz(midi: Int) -> Double? {
-        guard midi >= 0 else { return nil }
-        return 440.0 * pow(2.0, Double(midi - 69) / 12.0)
     }
 }
 

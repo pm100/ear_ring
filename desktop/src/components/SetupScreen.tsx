@@ -28,30 +28,31 @@ interface Props {
 export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma = 0, scaleId = 0, keySignatureMode = 0, silenceThreshold = 0.003, framesToConfirm = 3, warmupFrames = 4, instrumentIndex = 0 }: Props) {
   const [hz, setHz] = useState(0);
   const [currentMidi, setCurrentMidi] = useState<number>(-1);
+  const [currentHz, setCurrentHz] = useState<number>(0);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
   const { start, stop, destroy } = useAudioCapture();
 
   const NOTE_STEP = 44;
-  const midiMin = rangeStart;
-  const midiMax = rangeEnd;
+  // Mic Setup exists to test what the mic can hear, independent of whatever range
+  // the exercise happens to be configured for right now — do not gate on
+  // rangeStart/rangeEnd here, or notes outside it silently vanish.
 
   const handleFrame = useCallback(async (frame: TrackerFrame) => {
     setHz(frame.liveHz);
     if (frame.confirmedMidi >= 0) {
       const midi = frame.confirmedMidi;
-      if (midi >= midiMin && midi <= midiMax) {
-        setCurrentMidi(midi);
-        setNoteHistory(prev => {
-          const next = [...prev, midi];
-          if (next.length > 8) next.shift();
-          return next;
-        });
-      }
+      setCurrentMidi(midi);
+      setCurrentHz(frame.liveHz);
+      setNoteHistory(prev => {
+        const next = [...prev, midi];
+        if (next.length > 8) next.shift();
+        return next;
+      });
     } else if (frame.liveMidi < 0) {
       // Silent frame: clear the live display only (history remains)
       setCurrentMidi(-1);
     }
-  }, [midiMin, midiMax]);
+  }, []);
 
   // Load instrument transposition semitones and apply instrument-specific tracker params.
   const [transpSemitones, setTranspSemitones] = useState(0);
@@ -83,7 +84,9 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
   const instrKeyTranspose = ((transpSemitones % 12) + 12) % 12;
   const effChroma = (effectiveKeyChroma(rootChroma, scaleId) + instrKeyTranspose) % 12;
   const noteLabel = displayMidi >= 0 ? preferredMidiLabel(displayMidi, effChroma) : '—';
-  const noteHz = currentMidi >= 0 ? (440 * Math.pow(2, (currentMidi - 69) / 12)) : null;
+  // The actual measured frequency (not recomputed from currentMidi) so it can
+  // reveal a mislabeled note instead of just parroting back whatever label was chosen.
+  const noteHz = currentMidi >= 0 ? currentHz : null;
 
   return (
     <div className="screen">
