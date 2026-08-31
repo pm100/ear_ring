@@ -22,7 +22,7 @@ const defaultSettings: ExerciseSettings = (() => {
     rangeStart,
     rangeEnd: rangeStart + 12,
     scaleId: 0,
-    sequenceLength: 4,
+    sequenceLength: 1,
     tempoBpm: 100,
     showTestNotes: false,
     keySignatureMode: 0,

@@ -164,7 +164,7 @@ impl ScaleType {
     pub fn display_name(self) -> &'static str {
         match self {
             ScaleType::Major => "Major",
-            ScaleType::NaturalMinor => "Relative Minor",
+            ScaleType::NaturalMinor => "Natural Minor",
             ScaleType::Dorian => "Dorian",
             ScaleType::Mixolydian => "Mixolydian",
             ScaleType::Locrian => "Locrian",
@@ -201,8 +201,8 @@ pub fn scale_notes(root: Note, scale: ScaleType) -> Vec<Note> {
 /// Generate a random sequence of `length` notes drawn from the given scale,
 /// restricted to MIDI notes within [range_start, range_end].
 /// Uses a simple LCG seeded by the provided `seed` for reproducibility.
-/// The scale root is shifted to the mode's degree within the parent major key.
-/// e.g. root=C + NaturalMinor → uses A as the filter root (A Natural Minor = Relative Minor of C).
+/// The scale is built directly on `root_chroma` — e.g. root=C + NaturalMinor
+/// tests in C Natural Minor (C D Eb F G Ab Bb), not its relative major's minor mode.
 ///
 /// `avoid_first_midi`, when `Some`, is normally the first note of the *previous* test —
 /// the very first note of this sequence (index 0 only) will never match it, so back-to-back
@@ -219,10 +219,10 @@ pub fn generate_sequence(
 ) -> Vec<Note> {
     use std::collections::HashSet;
     let intervals: HashSet<u8> = scale.intervals().iter().copied().collect();
-    let mode_root = ((root_chroma as u16 + mode_root_offset(scale) as u16) % 12) as u8;
+    let root_chroma = root_chroma % 12;
     let notes: Vec<Note> = (range_start..=range_end)
         .filter(|&m| {
-            let interval = (m + 12 - mode_root) % 12;
+            let interval = (m + 12 - root_chroma) % 12;
             intervals.contains(&interval)
         })
         .map(Note::from_midi)
@@ -569,7 +569,7 @@ pub fn written_midi_label(concert_midi: u8, instrument_index: usize) -> String {
 pub fn scale_name(scale_id: u8) -> &'static str {
     match scale_id {
         0 => "Major",
-        1 => "Relative Minor",
+        1 => "Natural Minor",
         2 => "Dorian",
         3 => "Mixolydian",
         4 => "Locrian",
@@ -578,42 +578,53 @@ pub fn scale_name(scale_id: u8) -> &'static str {
 }
 
 /// Returns the effective major key chroma for key-signature display.
-/// All modes of a major key share the same key signature as that major key.
-/// e.g. root_chroma=0 (C), any scale → 0 (C major key sig).
-pub fn effective_key_chroma(root_chroma: u8, _scale_id: u8) -> u8 {
-    root_chroma
-}
-
-/// Semitones from the major key root to the mode's starting degree within that key.
-/// Major = 0 (root); NaturalMinor = 9th semitone (6th degree); etc.
-fn mode_root_offset(scale: ScaleType) -> u8 {
-    match scale {
-        ScaleType::Major => 0,
-        ScaleType::NaturalMinor => 9,   // 6th degree (Aeolian / Relative Minor)
-        ScaleType::Dorian => 2,          // 2nd degree
-        ScaleType::Mixolydian => 7,      // 5th degree
-        ScaleType::Locrian => 11,        // 7th degree
+/// For Major this is the root itself; for modal/minor scales returns the implied
+/// major key chroma (the major key sharing this scale's pitch classes).
+/// e.g. root_chroma=0 (C), scale_id=1 (Natural Minor) → 3 (Eb major).
+pub fn effective_key_chroma(root_chroma: u8, scale_id: u8) -> u8 {
+    let scale = match scale_type_from_id(scale_id) {
+        Some(s) => s,
+        None => return root_chroma,
+    };
+    match implied_major_offset(scale) {
+        None => root_chroma,
+        Some(offset) => ((root_chroma as u16 + offset as u16) % 12) as u8,
     }
 }
 
-/// Full display label for a scale, annotated with the mode's starting note.
-/// e.g. root_chroma=0 (C), scale_id=1 (Natural Minor) → "Relative Minor (A-)"
-/// e.g. root_chroma=0 (C), scale_id=2 (Dorian)        → "Dorian (D)"
-/// e.g. root_chroma=0 (C), scale_id=4 (Locrian)       → "Locrian (B)"
+/// Semitones to add to the scale root to reach the root of its "implied major key" —
+/// the major key that shares this scale's exact pitch classes (e.g. C Natural Minor's
+/// notes are exactly Eb major's notes). The scale itself is always built directly on
+/// the chosen root_chroma; this offset is used only for display (key signature,
+/// scale label) — never to shift which notes are actually played.
+/// Returns `None` for Major (a major scale is its own implied major key).
+fn implied_major_offset(scale: ScaleType) -> Option<u8> {
+    match scale {
+        ScaleType::Major => None,
+        ScaleType::NaturalMinor => Some(3),  // C Natural Minor → Eb major
+        ScaleType::Dorian => Some(10),        // C Dorian → Bb major
+        ScaleType::Mixolydian => Some(5),     // C Mixolydian → F major
+        ScaleType::Locrian => Some(1),        // C Locrian → Db major
+    }
+}
+
+/// Full display label for a scale, annotated with its implied major key.
+/// e.g. root_chroma=0 (C), scale_id=1 (Natural Minor) → "Natural Minor (of Eb)"
+/// e.g. root_chroma=0 (C), scale_id=2 (Dorian)        → "Dorian (of Bb)"
+/// e.g. root_chroma=0 (C), scale_id=4 (Locrian)       → "Locrian (of Db)"
 pub fn scale_label(root_chroma: u8, scale_id: u8) -> String {
     let scale = match scale_type_from_id(scale_id) {
         Some(s) => s,
         None => return "?".to_string(),
     };
-    let offset = mode_root_offset(scale);
-    if offset == 0 {
-        return scale.display_name().to_string();
+    match implied_major_offset(scale) {
+        None => scale.display_name().to_string(),
+        Some(offset) => {
+            let implied_chroma = ((root_chroma as u16 + offset as u16) % 12) as u8;
+            let key_name = NoteName::from_chroma(implied_chroma).display_name();
+            format!("{} (of {})", scale.display_name(), key_name)
+        }
     }
-    let mode_root_chroma = ((root_chroma as u16 + offset as u16) % 12) as u8;
-    let mode_root_name = NoteName::from_chroma(mode_root_chroma).display_name();
-    // Natural Minor is "Relative Minor" — append "-" to show it is a minor mode.
-    let dash = if matches!(scale, ScaleType::NaturalMinor) { "-" } else { "" };
-    format!("{} ({}{})", scale.display_name(), mode_root_name, dash)
 }
 
 /// Like `scale_label` but uses written (transposed) pitch for the mode root annotation.
@@ -623,13 +634,13 @@ pub fn written_scale_label(concert_root_chroma: u8, scale_id: u8, instrument_ind
     scale_label(written_chroma, scale_id)
 }
 
-/// MIDI note of the mode's starting degree, at or just below `range_start`.
-/// Used for the intro chord root when in a non-Major scale mode.
-/// e.g. root_chroma=C, scale_id=NaturalMinor, range_start=72 (C5) → 69 (A4).
-pub fn effective_intro_root_midi(root_chroma: u8, scale_id: u8, range_start: u8) -> u8 {
-    let scale = scale_type_from_id(scale_id).unwrap_or(ScaleType::Major);
-    let mode_root_chroma = ((root_chroma as u16 + mode_root_offset(scale) as u16) % 12) as u8;
-    let offset = (range_start + 12 - mode_root_chroma) % 12;
+/// MIDI note of the scale root, at or just below `range_start`.
+/// Used for the intro chord root — the scale is always built directly on `root_chroma`,
+/// regardless of scale type, so this just finds the nearest occurrence of that pitch class.
+/// e.g. root_chroma=C, range_start=72 (C5) → 72 (C5).
+pub fn effective_intro_root_midi(root_chroma: u8, _scale_id: u8, range_start: u8) -> u8 {
+    let root_chroma = root_chroma % 12;
+    let offset = (range_start + 12 - root_chroma) % 12;
     range_start - offset
 }
 
@@ -1005,23 +1016,23 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_sequence_relative_minor() {
-        // Key=C, Relative Minor → A Natural Minor (pitch classes 0,2,3,5,7,8,10 from A=9)
-        // i.e. A(9), B(11), C(0), D(2), E(4), F(5), G(7)
-        let a_minor_pcs: std::collections::HashSet<u8> = [0,2,3,5,7,9,11].iter().copied().collect();
+    fn test_generate_sequence_natural_minor() {
+        // Key=C, Natural Minor → built directly on C (pitch classes 0,2,3,5,7,8,10),
+        // not the relative major's minor mode.
+        let c_minor_pcs: std::collections::HashSet<u8> = [0,2,3,5,7,8,10].iter().copied().collect();
         let seq = generate_sequence(0, ScaleType::NaturalMinor, 57, 84, 20, 77, None);
         for note in &seq {
-            assert!(a_minor_pcs.contains(&(note.midi() % 12)), "Note {:?} not in A minor", note);
+            assert!(c_minor_pcs.contains(&(note.midi() % 12)), "Note {:?} not in C natural minor", note);
         }
     }
 
     #[test]
     fn test_generate_sequence_locrian() {
-        // Key=C, Locrian → B Locrian (pitch classes from B=11: 11,0,2,4,5,7,9)
-        let b_locrian_pcs: std::collections::HashSet<u8> = [11,0,2,4,5,7,9].iter().copied().collect();
+        // Key=C, Locrian → built directly on C (pitch classes 0,1,3,5,6,8,10)
+        let c_locrian_pcs: std::collections::HashSet<u8> = [0,1,3,5,6,8,10].iter().copied().collect();
         let seq = generate_sequence(0, ScaleType::Locrian, 59, 84, 20, 13, None);
         for note in &seq {
-            assert!(b_locrian_pcs.contains(&(note.midi() % 12)), "Note {:?} not in B Locrian", note);
+            assert!(c_locrian_pcs.contains(&(note.midi() % 12)), "Note {:?} not in C Locrian", note);
         }
     }
 
@@ -1053,20 +1064,21 @@ mod tests {
 
     #[test]
     fn test_effective_key_chroma_all_scales() {
-        // All scales for root=C should return 0 (C major key sig shared by all modes of C)
-        assert_eq!(effective_key_chroma(0, 0), 0); // C Major
-        assert_eq!(effective_key_chroma(0, 1), 0); // C → Relative Minor (A minor = C major key sig)
-        assert_eq!(effective_key_chroma(0, 2), 0); // C → Dorian (D Dorian = C major key sig)
-        assert_eq!(effective_key_chroma(0, 3), 0); // C → Mixolydian (G Mixolydian = C major key sig)
+        // Each scale is built directly on root=C, so its key signature is that of the
+        // major key sharing its pitch classes (its "implied major key").
+        assert_eq!(effective_key_chroma(0, 0), 0);  // C Major → C major key sig
+        assert_eq!(effective_key_chroma(0, 1), 3);  // C Natural Minor → Eb major key sig
+        assert_eq!(effective_key_chroma(0, 2), 10); // C Dorian → Bb major key sig
+        assert_eq!(effective_key_chroma(0, 3), 5);  // C Mixolydian → F major key sig
     }
 
     #[test]
-    fn test_scale_label_relative_minor() {
-        assert_eq!(scale_label(0, 1), "Relative Minor (A-)"); // C → A minor
-        assert_eq!(scale_label(7, 1), "Relative Minor (E-)"); // G → E minor
-        assert_eq!(scale_label(0, 2), "Dorian (D)");          // C → D Dorian
-        assert_eq!(scale_label(0, 3), "Mixolydian (G)");      // C → G Mixolydian
-        assert_eq!(scale_label(0, 4), "Locrian (B)");         // C → B Locrian
+    fn test_scale_label_implied_major_key() {
+        assert_eq!(scale_label(0, 1), "Natural Minor (of Eb)"); // C Natural Minor
+        assert_eq!(scale_label(7, 1), "Natural Minor (of Bb)"); // G Natural Minor
+        assert_eq!(scale_label(0, 2), "Dorian (of Bb)");         // C Dorian
+        assert_eq!(scale_label(0, 3), "Mixolydian (of F)");      // C Mixolydian
+        assert_eq!(scale_label(0, 4), "Locrian (of Db)");        // C Locrian
     }
 
     #[test]
@@ -1091,18 +1103,16 @@ mod tests {
 
     #[test]
     fn test_effective_intro_root_midi() {
-        // Key=C (chroma 0), Relative Minor (scale_id=1), range_start=60 (C4)
-        // mode root = A, MIDI at or just below 60 = A3 = 57
-        assert_eq!(effective_intro_root_midi(0, 1, 60), 57);
-        // Key=C (chroma 0), Major (scale_id=0), range_start=60
-        // mode root = C, MIDI at or just below 60 = 60
+        // The scale is always built directly on root_chroma, regardless of scale_id —
+        // this just finds the nearest occurrence of that pitch class at or below range_start.
+        // Key=C (chroma 0), Natural Minor (scale_id=1), range_start=60 (C4) → C4 = 60
+        assert_eq!(effective_intro_root_midi(0, 1, 60), 60);
+        // Key=C (chroma 0), Major (scale_id=0), range_start=60 → C4 = 60
         assert_eq!(effective_intro_root_midi(0, 0, 60), 60);
-        // Key=C, Dorian (scale_id=2), range_start=62 (D4)
-        // mode root = D, MIDI at or just below 62 = 62
-        assert_eq!(effective_intro_root_midi(0, 2, 62), 62);
-        // Key=C, Locrian (scale_id=4), range_start=72 (C5)
-        // mode root = B, MIDI at or just below 72 = 71 (B4)
-        assert_eq!(effective_intro_root_midi(0, 4, 72), 71);
+        // Key=C, Dorian (scale_id=2), range_start=62 (D4) → nearest C at/below = C4 = 60
+        assert_eq!(effective_intro_root_midi(0, 2, 62), 60);
+        // Key=C, Locrian (scale_id=4), range_start=72 (C5) → C5 = 72
+        assert_eq!(effective_intro_root_midi(0, 4, 72), 72);
     }
 
     #[test]

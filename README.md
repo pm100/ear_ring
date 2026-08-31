@@ -39,7 +39,7 @@ The Rust core handles all music logic and is shared across platforms:
 ## Features
 
 - Two live test types: Random Notes and Diatonic Arpeggios (ascending/descending triads and seventh chords). A third, Melody Snippets (~50 public-domain tunes with rhythmic playback), is fully built but currently disabled in the UI — see `docs/roadmap.md`
-- 5 scale types: Major, Natural Minor, Dorian, Mixolydian, Locrian — the opening triad's quality (major/minor/diminished) follows the selected scale
+- 4 selectable scale types: Major, Natural Minor, Dorian, Mixolydian, each built directly on the chosen root (e.g. C + Natural Minor tests C Natural Minor, not its relative A minor) — the opening triad's quality (major/minor/diminished) follows the selected scale. Locrian is implemented in the Rust core but not currently offered in the picker.
 - 12 root notes, interactive piano range picker, sequence length 2–8 notes
 - Real-time pitch detection with cents accuracy
 - Visual music staff with key signatures, duration-aware note symbols, and animated highlighting

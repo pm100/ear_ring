@@ -24,7 +24,7 @@ data class ExerciseState(
     val rangeStart: Int = 60,   // MIDI of range low bound (default C4)
     val rangeEnd: Int = 72,     // MIDI of range high bound (default C5)
     val scaleId: Int = 0,
-    val sequenceLength: Int = 4,
+    val sequenceLength: Int = 1,
     val tempoBpm: Int = 100,
     val showTestNotes: Boolean = false,
     val keySignatureMode: Int = 0,  // 0=inline accidentals, 1=key signature
@@ -123,7 +123,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             rangeStart = prefs.getInt(PREF_RANGE_START, defaultRange.first),
             rangeEnd = prefs.getInt(PREF_RANGE_END, defaultRange.second),
             scaleId = prefs.getInt(PREF_SCALE_ID, 0),
-            sequenceLength = prefs.getInt(PREF_SEQUENCE_LENGTH, 4),
+            sequenceLength = prefs.getInt(PREF_SEQUENCE_LENGTH, 1),
             tempoBpm = prefs.getInt(PREF_TEMPO_BPM, 100),
             showTestNotes = prefs.getBoolean(PREF_SHOW_TEST_NOTES, false),
             keySignatureMode = prefs.getInt(PREF_KEY_SIG_MODE, 0),

@@ -90,7 +90,7 @@ struct EarRingCore {
         return String(cString: buf)
     }
 
-    /// Display label for a scale with the implied major key, e.g. "Natural Minor (Eb)".
+    /// Display label for a scale with the implied major key, e.g. "Natural Minor (of Eb)".
     static func scaleLabel(rootChroma: Int, scaleId: Int) -> String {
         var buf = [CChar](repeating: 0, count: 48)
         ear_ring_scale_label(UInt8(rootChroma), UInt8(scaleId), &buf, 48)

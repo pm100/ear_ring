@@ -138,7 +138,7 @@ int32_t ear_ring_written_midi_label(uint8_t concert_midi, uint32_t instrument_in
 int32_t ear_ring_scale_name(uint8_t scale_id, char *out_buf, uint32_t buf_len);
 
 /// Display label for a scale with the implied major key in parentheses for non-major scales.
-/// e.g. root_chroma=0 (C), scale_id=1 (Natural Minor) → "Natural Minor (Eb)"
+/// e.g. root_chroma=0 (C), scale_id=1 (Natural Minor) → "Natural Minor (of Eb)"
 /// Writes a null-terminated string into out_buf.
 /// Returns bytes written (excluding null), or -1 on error.
 int32_t ear_ring_scale_label(uint8_t root_chroma, uint8_t scale_id, char *out_buf, uint32_t buf_len);

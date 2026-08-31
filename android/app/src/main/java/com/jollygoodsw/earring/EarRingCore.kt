@@ -158,13 +158,17 @@ object EarRingCore {
             else {
                 val flat = listOf("C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B")
                 val key = flat[(rootChroma + offset) % 12]
-                "$base ($key)"
+                "$base (of $key)"
             }
         }
 
     fun effectiveKeyChroma(rootChroma: Int, scaleId: Int): Int =
         if (loaded) nativeEffectiveKeyChroma(rootChroma, scaleId)
-        else rootChroma  // All modes share the major key's key signature
+        else {
+            val offsets = listOf(null, 3, 10, 5, 1)
+            val offset = offsets.getOrElse(scaleId) { null }
+            if (offset == null) rootChroma else (rootChroma + offset) % 12
+        }
 
     fun isSharpKey(rootChroma: Int): Boolean =
         if (loaded) nativeIsSharpKey(rootChroma) != 0

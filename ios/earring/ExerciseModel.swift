@@ -31,7 +31,7 @@ class ExerciseModel: ObservableObject {
     @Published var scaleId: Int = ud.object(forKey: "scaleId") != nil ? ud.integer(forKey: "scaleId") : 0 {
         didSet { UserDefaults.standard.set(scaleId, forKey: "scaleId") }
     }
-    @Published var sequenceLength: Int = ud.object(forKey: "sequenceLength") != nil ? ud.integer(forKey: "sequenceLength") : 4 {
+    @Published var sequenceLength: Int = ud.object(forKey: "sequenceLength") != nil ? ud.integer(forKey: "sequenceLength") : 1 {
         didSet { UserDefaults.standard.set(sequenceLength, forKey: "sequenceLength") }
     }
     @Published var tempoBpm: Int = ud.object(forKey: "tempoBpm") != nil ? ud.integer(forKey: "tempoBpm") : 100 {
@@ -479,7 +479,7 @@ class ExerciseModel: ObservableObject {
         rangeStart = 60
         rangeEnd = 72
         scaleId = 0
-        sequenceLength = 4
+        sequenceLength = 1
         tempoBpm = 100
         showTestNotes = false
         keySignatureMode = 0

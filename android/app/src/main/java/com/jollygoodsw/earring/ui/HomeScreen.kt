@@ -179,7 +179,7 @@ fun HomeScreen(
                         expanded = scaleExpanded,
                         onDismissRequest = { scaleExpanded = false }
                     ) {
-                        MusicTheory.SCALE_NAMES.forEachIndexed { index, _ ->
+                        MusicTheory.SELECTABLE_SCALE_IDS.forEach { index ->
                             DropdownMenuItem(
                                 text = { Text(EarRingCore.writtenScaleLabel(state.rootNote, index, state.instrumentIndex)) },
                                 onClick = {

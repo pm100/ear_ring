@@ -189,7 +189,7 @@ struct HomeView: View {
                             get: { model.scaleId },
                             set: { model.scaleId = $0 }
                         )) {
-                            ForEach(0..<MusicTheory.SCALE_NAMES.count, id: \.self) { i in
+                            ForEach(MusicTheory.SELECTABLE_SCALE_IDS, id: \.self) { i in
                                 Text(EarRingCore.writtenScaleLabel(concertRootChroma: model.rootNote, scaleId: i, instrumentIndex: model.instrumentIndex)).tag(i)
                             }
                         }

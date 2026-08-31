@@ -9,9 +9,13 @@ interface Props {
 }
 
 const NOTE_NAMES = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
-const SCALE_NAMES = ['Major', 'Relative Minor', 'Dorian', 'Mixolydian', 'Locrian'];
+// Locrian (id 4) stays in this array for indexing symmetry with the Rust core, but is
+// excluded from SELECTABLE_SCALE_IDS below — not offered as a scale choice in the UI.
+const SCALE_NAMES = ['Major', 'Natural Minor', 'Dorian', 'Mixolydian', 'Locrian'];
 // Semitones to add to root chroma to get implied major key; null = no parenthetical (Major).
 const IMPLIED_MAJOR_OFFSETS: (number | null)[] = [null, 3, 10, 5, 1];
+// Scale ids offered in the picker. Locrian (4) is deliberately dropped for now.
+const SELECTABLE_SCALE_IDS = [0, 1, 2, 3];
 
 function scaleLabel(rootNote: number, scaleId: number): string {
   const base = SCALE_NAMES[scaleId];
@@ -19,7 +23,7 @@ function scaleLabel(rootNote: number, scaleId: number): string {
   const offset = IMPLIED_MAJOR_OFFSETS[scaleId];
   if (offset === null || offset === undefined) return base;
   const keyName = NOTE_NAMES[(rootNote + offset) % 12];
-  return `${base} (${keyName})`;
+  return `${base} (of ${keyName})`;
 }
 
 const PIANO_MIDI_MIN = 36;
@@ -228,9 +232,9 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
   }, [settings.instrumentIndex]);
 
   // Scale labels in written pitch for the selected instrument
-  const [scaleLabels, setScaleLabels] = useState<string[]>(['Major', 'Relative Minor', 'Dorian', 'Mixolydian', 'Locrian']);
+  const [scaleLabels, setScaleLabels] = useState<string[]>(['Major', 'Natural Minor', 'Dorian', 'Mixolydian', 'Locrian']);
   useEffect(() => {
-    Promise.all([0, 1, 2, 3, 4].map(i =>
+    Promise.all(SELECTABLE_SCALE_IDS.map(i =>
       invoke<string>('cmd_written_scale_label', {
         concertRootChroma: settings.rootNote,
         scaleId: i,
@@ -298,7 +302,7 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
             onChange={e => onUpdateSettings(prev => ({ ...prev, scaleId: Number(e.target.value) }))}
             style={{ width: '100%', padding: '8px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #ccc', marginBottom: 4 }}
           >
-            {SCALE_NAMES.map((_, i) => (
+            {SELECTABLE_SCALE_IDS.map(i => (
               <option key={i} value={i}>{scaleLabels[i] ?? '?'}</option>
             ))}
           </select>

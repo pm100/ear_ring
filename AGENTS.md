@@ -150,12 +150,19 @@ Row (equal width, 8dp gap):
               Dropdown (outlined, full width of column): C  C#  D  D#  E  F  F#  G  G#  A  A#  B
                 — Selecting a new key auto-resets the range to one octave from the new key closest to middle C
   Right half — Section label: "Scale"
-               Dropdown (outlined, full width of column): Major | Natural Minor | Dorian | Mixolydian | Locrian
-                 — Scale IDs: 0=Major, 1=Natural Minor, 2=Dorian, 3=Mixolydian, 4=Locrian (Harmonic Minor removed)
-                 — Non-major scales show the mode's own tonic note in parentheses, using the major key
-                   selected by "Key" as the parent key, e.g. "Relative Minor (A-)" when key=C (dash denotes
-                   minor), "Dorian (D)", "Mixolydian (G)", "Locrian (B)". The label updates dynamically as
-                   the Key dropdown changes.
+               Dropdown (outlined, full width of column): Major | Natural Minor | Dorian | Mixolydian
+                 — Scale IDs: 0=Major, 1=Natural Minor, 2=Dorian, 3=Mixolydian (Harmonic Minor removed).
+                   Locrian (id 4) is still fully implemented in the Rust core (intervals, sequence
+                   generation, key-sig math) but is deliberately not offered in this dropdown for now.
+                 — Every scale is built **directly on the selected root** (a "parallel" mode, not
+                   relative) — e.g. key=C + Natural Minor tests C Natural Minor (C D Eb F G Ab Bb), not
+                   the relative A Natural Minor. This applies to test-note generation, the opening triad,
+                   and diatonic arpeggios alike.
+                 — Non-major scales show their **implied major key** in parentheses — the major key that
+                   shares the scale's exact pitch classes — e.g. "Natural Minor (of Eb)" when key=C (C Natural
+                   Minor's notes are exactly Eb major's notes), "Dorian (of Bb)", "Mixolydian (of F)". This
+                   implied key also drives the staff key signature and note spelling. The label updates
+                   dynamically as the Key dropdown changes.
                  — **Disabled (opacity 0.38)** when Test Type = Melody Snippets or Diatonic Arpeggios
 
 [16dp space]

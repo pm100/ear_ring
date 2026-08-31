@@ -5,6 +5,20 @@ All notable changes to Ear Ring are documented here.
 ## [Unreleased]
 
 ### Fixed
+- **Scale selection tested the wrong notes for every non-Major scale** — picking
+  key=C + Natural Minor generated test notes in A Natural Minor (C major's relative
+  minor) instead of C Natural Minor. A prior "transpose fixes" commit had silently
+  changed scale generation to shift the note pool to the mode's degree within the
+  root's major key ("relative mode"), instead of building the scale directly on the
+  chosen root ("parallel mode") as originally designed and as the FFI header/UI label
+  code still documented. Restored direct construction for sequence generation, the
+  opening triad's root octave, and key-signature/label display (now shows the scale's
+  *implied* major key, e.g. "Natural Minor (of Eb)" for C, not "Relative Minor (A-)").
+  Renamed the "Relative Minor" scale label back to "Natural Minor" everywhere, and
+  dropped Locrian from the Scale picker on all platforms (Android/iOS/Desktop) — its
+  intervals, sequence generation, and key-sig math stay in the Rust core (scale id 4)
+  for later re-enabling. Also fixed the Desktop Results screen's scale-name list,
+  which was still off-by-one from a stale "Harmonic Minor" entry removed elsewhere.
 - **Progress screen never showed the current session's results (Android)** —
   `ProgressViewModel` only loaded from storage once, at app-launch time, so
   tests/sessions completed during the running session never appeared until the

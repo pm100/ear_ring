@@ -12,10 +12,16 @@ interface Props {
   onStop: () => void;
 }
 
-const SCALE_NAMES = ['Major','Relative Minor','Dorian','Mixolydian','Locrian'];
+const SCALE_NAMES = ['Major','Natural Minor','Dorian','Mixolydian','Locrian'];
+// Semitones to add to root chroma to get the implied major key (the major key sharing
+// the scale's pitch classes) — mirrors ScaleType::implied_major_offset in music_theory.rs.
+// null = no shift (a major scale is its own implied major key).
+const IMPLIED_MAJOR_OFFSETS: (number | null)[] = [null, 3, 10, 5, 1];
 
-function effectiveKeyChroma(rootNote: number, _scaleId: number): number {
-  return rootNote;
+function effectiveKeyChroma(rootNote: number, scaleId: number): number {
+  const offset = IMPLIED_MAJOR_OFFSETS[scaleId];
+  if (offset === null || offset === undefined) return rootNote;
+  return (rootNote + offset) % 12;
 }
 
 function averageScore(cumulativeScorePercent: number, testsCompleted: number): number {

@@ -6,6 +6,10 @@ struct MusicTheory {
 
     static var SCALE_NAMES: [String] { (0..<5).map { EarRingCore.scaleName(scaleId: $0) } }
 
+    /// Scale ids offered in the Scale picker. Locrian (id 4) stays supported by the
+    /// Rust core and SCALE_NAMES above, but is deliberately not offered as a choice yet.
+    static let SELECTABLE_SCALE_IDS: [Int] = [0, 1, 2, 3]
+
     static func scaleLabel(rootChroma: Int, scaleId: Int) -> String {
         return EarRingCore.scaleLabel(rootChroma: rootChroma, scaleId: scaleId)
     }
