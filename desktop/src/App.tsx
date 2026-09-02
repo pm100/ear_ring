@@ -34,6 +34,7 @@ const defaultSettings: ExerciseSettings = (() => {
     wrongNotePauseMs: 3000,
     instrumentIndex: 0,
     testType: 0,
+    playPassFailSounds: true,
   };
 })();
 
@@ -124,6 +125,7 @@ export default function App() {
       postChordGapMs: settings.postChordGapMs,
       wrongNotePauseMs: settings.wrongNotePauseMs,
       instrumentIndex: settings.instrumentIndex,
+      playPassFailSounds: settings.playPassFailSounds,
       detected: [] as typeof defaultExercise.detected,
       status: 'playing' as const,
       currentNoteIndex: 0,

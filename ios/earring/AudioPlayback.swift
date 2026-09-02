@@ -224,5 +224,68 @@ class AudioPlayback {
         }
         try? await Task.sleep(nanoseconds: holdMs * 1_000_000)
     }
+
+    // MARK: - Pass/fail feedback tones
+
+    // Plain synthesized sine tones (not the sampled piano) so they play instantly with
+    // no network/sample-load dependency. notes: (midi, startMs, durationMs) triples.
+    private let chimeSampleRate = 44100.0
+
+    private func makeChimeBuffer(notes: [(midi: Int, startMs: Double, durationMs: Double)]) -> AVAudioPCMBuffer? {
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: chimeSampleRate, channels: 1) else { return nil }
+        let totalMs = (notes.map { $0.startMs + $0.durationMs }.max() ?? 0) + 20
+        let totalSamples = AVAudioFrameCount(chimeSampleRate * totalMs / 1000.0)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: totalSamples),
+              let data = buffer.floatChannelData?[0] else { return nil }
+        buffer.frameLength = totalSamples
+        for note in notes {
+            let freq = 440.0 * pow(2.0, Double(note.midi - 69) / 12.0)
+            let startSample = Int(chimeSampleRate * note.startMs / 1000.0)
+            let numSamples = Int(chimeSampleRate * note.durationMs / 1000.0)
+            let fadeSamples = min(numSamples / 3, Int(chimeSampleRate * 0.015))
+            for i in 0..<numSamples {
+                let idx = startSample + i
+                guard idx < Int(totalSamples) else { break }
+                // Quick linear fade in/out avoids the click a hard on/off edge would cause.
+                let envelope: Float
+                if i < fadeSamples { envelope = Float(i) / Float(fadeSamples) }
+                else if i > numSamples - fadeSamples { envelope = Float(numSamples - i) / Float(fadeSamples) }
+                else { envelope = 1.0 }
+                let sample = Float(sin(2.0 * Double.pi * freq * Double(i) / chimeSampleRate)) * envelope * 0.3
+                data[idx] += sample
+            }
+        }
+        return buffer
+    }
+
+    private func playChime(notes: [(midi: Int, startMs: Double, durationMs: Double)]) {
+        guard let buffer = makeChimeBuffer(notes: notes) else { return }
+        let player = AVAudioPlayerNode()
+        engine.attach(player)
+        engine.connect(player, to: engine.mainMixerNode, format: buffer.format)
+        guard (try? ensureEngineRunning()) != nil else {
+            engine.detach(player)
+            return
+        }
+        player.scheduleBuffer(buffer, at: nil) { [weak self, weak player] in
+            guard let self, let player else { return }
+            Task { @MainActor [weak self, weak player] in
+                guard let self, let player else { return }
+                self.engine.detach(player)
+            }
+        }
+        player.play()
+    }
+
+    /// Bright ascending major arpeggio (C6 E6 G6) — a test passed.
+    func playPassSound() {
+        playChime(notes: [(84, 0, 110), (88, 90, 110), (91, 180, 160)])
+    }
+
+    /// Soft descending major third (A4 F4) — a test failed. Lower register and a falling
+    /// contour make it easy to tell apart from the pass chime by ear alone.
+    func playFailSound() {
+        playChime(notes: [(69, 0, 140), (65, 120, 220)])
+    }
 }
 

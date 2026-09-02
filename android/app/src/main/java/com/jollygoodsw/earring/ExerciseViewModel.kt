@@ -36,6 +36,7 @@ data class ExerciseState(
     val wrongNotePauseMs: Long = DEFAULT_WRONG_NOTE_PAUSE_MS,
     val instrumentIndex: Int = 0,
     val testType: Int = 0,               // 0=Random, 1=Melody, 2=DiatonicTriads(stub)
+    val playPassFailSounds: Boolean = true,  // chime on test pass/fail
     val sequence: List<Int> = emptyList(),
     val detected: List<DetectedNote> = emptyList(),
     val status: ExerciseStatus = ExerciseStatus.STOPPED,
@@ -92,6 +93,7 @@ private const val PREF_SCALE_ID = "scaleId"
 private const val PREF_SEQUENCE_LENGTH = "sequenceLength"
 private const val PREF_TEMPO_BPM = "tempoBpm"
 private const val PREF_SHOW_TEST_NOTES = "showTestNotes"
+private const val PREF_PLAY_PASS_FAIL_SOUNDS = "playPassFailSounds"
 private const val PREF_KEY_SIG_MODE = "keySignatureMode"
 private const val PREF_MAX_RETRIES = "maxRetries"
 private const val PREF_SILENCE_THRESHOLD = "silenceThreshold"
@@ -126,6 +128,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             sequenceLength = prefs.getInt(PREF_SEQUENCE_LENGTH, 1),
             tempoBpm = prefs.getInt(PREF_TEMPO_BPM, 100),
             showTestNotes = prefs.getBoolean(PREF_SHOW_TEST_NOTES, false),
+            playPassFailSounds = prefs.getBoolean(PREF_PLAY_PASS_FAIL_SOUNDS, true),
             keySignatureMode = prefs.getInt(PREF_KEY_SIG_MODE, 0),
             maxRetries = prefs.getInt(PREF_MAX_RETRIES, DEFAULT_MAX_ATTEMPTS),
             silenceThreshold = prefs.getFloat(PREF_SILENCE_THRESHOLD, DEFAULT_SILENCE_THRESHOLD),
@@ -148,6 +151,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putInt(PREF_SEQUENCE_LENGTH, state.sequenceLength)
             .putInt(PREF_TEMPO_BPM, state.tempoBpm)
             .putBoolean(PREF_SHOW_TEST_NOTES, state.showTestNotes)
+            .putBoolean(PREF_PLAY_PASS_FAIL_SOUNDS, state.playPassFailSounds)
             .putInt(PREF_KEY_SIG_MODE, state.keySignatureMode)
             .putInt(PREF_MAX_RETRIES, state.maxRetries)
             .putFloat(PREF_SILENCE_THRESHOLD, state.silenceThreshold)
@@ -174,6 +178,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putInt(PREF_SEQUENCE_LENGTH, defaults.sequenceLength)
             .putInt(PREF_TEMPO_BPM, defaults.tempoBpm)
             .putBoolean(PREF_SHOW_TEST_NOTES, defaults.showTestNotes)
+            .putBoolean(PREF_PLAY_PASS_FAIL_SOUNDS, defaults.playPassFailSounds)
             .putInt(PREF_KEY_SIG_MODE, defaults.keySignatureMode)
             .putInt(PREF_MAX_RETRIES, defaults.maxRetries)
             .putFloat(PREF_SILENCE_THRESHOLD, defaults.silenceThreshold)
@@ -213,6 +218,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     fun setSequenceLength(len: Int) { _state.value = _state.value.copy(sequenceLength = len); saveSettings(_state.value) }
     fun setTempoBpm(bpm: Int) { _state.value = _state.value.copy(tempoBpm = bpm); saveSettings(_state.value) }
     fun setShowTestNotes(show: Boolean) { _state.value = _state.value.copy(showTestNotes = show); saveSettings(_state.value) }
+    fun setPlayPassFailSounds(play: Boolean) { _state.value = _state.value.copy(playPassFailSounds = play); saveSettings(_state.value) }
     fun setKeySignatureMode(mode: Int) { _state.value = _state.value.copy(keySignatureMode = mode); saveSettings(_state.value) }
     fun setMaxRetries(n: Int) { _state.value = _state.value.copy(maxRetries = n); saveSettings(_state.value) }
     fun setSilenceThreshold(v: Float) { _state.value = _state.value.copy(silenceThreshold = v); saveSettings(_state.value) }
@@ -464,6 +470,9 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
 
     private fun completeTest(passed: Boolean, attemptNotes: List<DetectedNote>, attemptsUsed: Int) {
         val state = _state.value
+        if (state.playPassFailSounds) {
+            if (passed) audioPlayback.playPassSound() else audioPlayback.playFailSound()
+        }
         val scorePercent = EarRingCore.testScore(state.maxAttempts, attemptsUsed, passed)
         persistTestRecord(state, attemptNotes, attemptsUsed, passed, scorePercent)
         _state.value = state.copy(

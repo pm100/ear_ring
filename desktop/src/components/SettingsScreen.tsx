@@ -81,6 +81,18 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
         ))}
       </div>
 
+      <SectionTitle>Sound</SectionTitle>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginTop: 0 }}>
+        <input
+          type="checkbox"
+          checked={settings.playPassFailSounds}
+          onChange={e => set('playPassFailSounds', e.target.checked)}
+          style={{ width: 18, height: 18, cursor: 'pointer' }}
+        />
+        <span className="section-label" style={{ margin: 0 }}>Play Pass/Fail Sounds</span>
+      </label>
+      <p style={{ fontSize: 12, color: '#757575', marginTop: 4, marginBottom: 0 }}>A chime when a test is passed, a different tone when it fails</p>
+
       <SectionTitle>Exercise</SectionTitle>
       <span className="section-label" style={{ marginTop: 0 }}>Max Retries</span>
       <p style={{ fontSize: 12, color: '#757575', marginBottom: 6 }}>Attempts per test before moving on</p>

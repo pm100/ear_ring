@@ -75,6 +75,10 @@ class ExerciseModel: ObservableObject {
     }() {
         didSet { UserDefaults.standard.set(testType, forKey: "testType") }
     }
+    /// Chime on test pass/fail.
+    @Published var playPassFailSounds: Bool = ud.object(forKey: "playPassFailSounds") != nil ? ud.bool(forKey: "playPassFailSounds") : true {
+        didSet { UserDefaults.standard.set(playPassFailSounds, forKey: "playPassFailSounds") }
+    }
     /// Ad-free / paid entitlement. Not a user "setting" — deliberately excluded from
     /// resetSettings()'s key list below. Until real billing lands, nothing sets this true.
     @Published var isPremium: Bool = ud.object(forKey: "isPremium") != nil ? ud.bool(forKey: "isPremium") : false {
@@ -415,6 +419,9 @@ class ExerciseModel: ObservableObject {
     }
 
     private func completeTest(passed: Bool, attemptsUsed: Int, attemptNotes: [DetectedNote]) {
+        if playPassFailSounds {
+            if passed { audioPlayback.playPassSound() } else { audioPlayback.playFailSound() }
+        }
         let testScore = EarRingCore.testScore(maxAttempts: maxAttempts, attemptsUsed: attemptsUsed, passed: passed)
         cumulativeScore += testScore
         testsCompleted += 1
@@ -473,7 +480,7 @@ class ExerciseModel: ObservableObject {
         let keys = ["rootNote","rangeStart","rangeEnd","scaleId","sequenceLength","tempoBpm",
                     "showTestNotes","keySignatureMode","maxRetries","silenceThreshold",
                     "framesToConfirm","warmupFrames","postChordGapNs","wrongNotePauseNs",
-                    "instrumentIndex","testType","hasLaunched"]
+                    "instrumentIndex","testType","playPassFailSounds","hasLaunched"]
         keys.forEach { ud.removeObject(forKey: $0) }
         rootNote = 0
         rangeStart = 60
@@ -491,5 +498,6 @@ class ExerciseModel: ObservableObject {
         wrongNotePauseNanoseconds = 3_000_000_000
         instrumentIndex = 0
         testType = 0
+        playPassFailSounds = true
     }
 }

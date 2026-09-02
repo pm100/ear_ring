@@ -1,6 +1,9 @@
 package com.jollygoodsw.earring
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
 import android.media.MediaPlayer
 import android.media.PlaybackParams
 import android.util.Log
@@ -14,8 +17,11 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.net.URL
+import kotlin.math.PI
+import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 class AudioPlayback(private val context: Context) {
 
@@ -174,6 +180,88 @@ class AudioPlayback(private val context: Context) {
                 withContext(Dispatchers.Main) { onDone() }
             }
         }
+    }
+
+    // ── Pass/fail feedback tones ──────────────────────────────────────────────
+    // Plain synthesized sine tones (not the sampled piano) so they play instantly with
+    // no network/sample-load dependency. notes: (midi, startMs, durationMs) triples.
+
+    private val chimeSampleRate = 44100
+
+    private fun synthesizeChime(notes: List<Triple<Int, Long, Long>>): ShortArray {
+        val totalMs = notes.maxOf { (_, startMs, durMs) -> startMs + durMs } + 20
+        val totalSamples = (chimeSampleRate * totalMs / 1000).toInt()
+        val buffer = ShortArray(totalSamples)
+        for ((midi, startMs, durMs) in notes) {
+            val freq = 440.0 * 2.0.pow((midi - 69) / 12.0)
+            val startSample = (chimeSampleRate * startMs / 1000).toInt()
+            val numSamples = (chimeSampleRate * durMs / 1000).toInt()
+            val fadeSamples = min(numSamples / 3, chimeSampleRate * 15 / 1000)
+            for (i in 0 until numSamples) {
+                val idx = startSample + i
+                if (idx >= buffer.size) break
+                // Quick linear fade in/out avoids the click a hard on/off edge would cause.
+                val envelope = when {
+                    i < fadeSamples -> i.toFloat() / fadeSamples
+                    i > numSamples - fadeSamples -> (numSamples - i).toFloat() / fadeSamples
+                    else -> 1f
+                }
+                val sample = sin(2.0 * PI * freq * i / chimeSampleRate) * envelope * 0.3
+                val mixed = buffer[idx] + (sample * Short.MAX_VALUE).toInt()
+                buffer[idx] = mixed.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+            }
+        }
+        return buffer
+    }
+
+    private fun playPcm(samples: ShortArray) {
+        val track = AudioTrack.Builder()
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            .setAudioFormat(
+                AudioFormat.Builder()
+                    .setSampleRate(chimeSampleRate)
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .build()
+            )
+            .setBufferSizeInBytes(samples.size * 2)
+            .setTransferMode(AudioTrack.MODE_STATIC)
+            .build()
+        try {
+            track.write(samples, 0, samples.size)
+            track.play()
+        } catch (e: Exception) {
+            Log.e("AudioPlayback", "Error playing chime: ${e.message}")
+            track.release()
+            return
+        }
+        scope.launch {
+            delay(samples.size * 1000L / chimeSampleRate + 50L)
+            track.release()
+        }
+    }
+
+    /** Bright ascending major arpeggio (C6 E6 G6) — a test passed. */
+    fun playPassSound() {
+        playPcm(synthesizeChime(listOf(
+            Triple(84, 0L, 110L),
+            Triple(88, 90L, 110L),
+            Triple(91, 180L, 160L),
+        )))
+    }
+
+    /** Soft descending major third (A4 F4) — a test failed. Lower register and a falling
+     *  contour make it easy to tell apart from the pass chime by ear alone. */
+    fun playFailSound() {
+        playPcm(synthesizeChime(listOf(
+            Triple(69, 0L, 140L),
+            Triple(65, 120L, 220L),
+        )))
     }
 
     fun playChord(

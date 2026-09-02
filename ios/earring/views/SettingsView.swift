@@ -42,6 +42,16 @@ struct SettingsView: View {
                     model.tempoBpm = bpmOptions[idx]
                 }
 
+                sectionHeader("Sound").padding(.top, 16)
+                Toggle(isOn: Binding(
+                    get: { model.playPassFailSounds },
+                    set: { model.playPassFailSounds = $0 }
+                )) {
+                    Text("Play Pass/Fail Sounds")
+                }
+                Text("A chime when a test is passed, a different tone when it fails")
+                    .font(.caption).foregroundColor(.erMuted).padding(.bottom, 6)
+
                 sectionHeader("Exercise").padding(.top, 16)
                 sectionLabel("Max Retries").padding(.top, 8)
                 Text("Attempts per test before moving on")

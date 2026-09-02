@@ -102,6 +102,50 @@ export function useAudioPlayback() {
     });
   }, [getContext, loadSample]);
 
+  // Short synthesized tones for test pass/fail feedback — plain oscillators, not the
+  // sampled piano, so they play instantly with no network/sample-load dependency.
+  // note: MIDI number, startSec: offset from now, durationSec: how long it rings.
+  const playChime = useCallback((notes: { note: number; startSec: number; durationSec: number }[]) => {
+    const ctx = getContext();
+    if (ctx.state === 'suspended') void ctx.resume();
+    const now = ctx.currentTime;
+    notes.forEach(({ note, startSec, durationSec }) => {
+      const freq = 440 * Math.pow(2, (note - 69) / 12);
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const t0 = now + startSec;
+      const t1 = t0 + durationSec;
+      // Quick linear fade in/out avoids the click a hard on/off edge would cause.
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(0.35, t0 + 0.015);
+      gain.gain.linearRampToValueAtTime(0, t1);
+      osc.start(t0);
+      osc.stop(t1 + 0.02);
+    });
+  }, [getContext]);
+
+  // Bright ascending major arpeggio (C6 E6 G6) — a test passed.
+  const playPassSound = useCallback(() => {
+    playChime([
+      { note: 84, startSec: 0.00, durationSec: 0.11 },
+      { note: 88, startSec: 0.09, durationSec: 0.11 },
+      { note: 91, startSec: 0.18, durationSec: 0.16 },
+    ]);
+  }, [playChime]);
+
+  // Soft descending major third (A4 F4) — a test failed. Lower register and a falling
+  // contour make it easy to tell apart from the pass chime by ear alone.
+  const playFailSound = useCallback(() => {
+    playChime([
+      { note: 69, startSec: 0.00, durationSec: 0.14 },
+      { note: 65, startSec: 0.12, durationSec: 0.22 },
+    ]);
+  }, [playChime]);
+
   const cancelPlayback = useCallback(() => {
     cancelRef.current = true;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -167,5 +211,5 @@ export function useAudioPlayback() {
     await playNext();
   }, [loadSample, getContext]);
 
-  return { playNote, playChord, playSequence, cancelPlayback };
+  return { playNote, playChord, playSequence, playPassSound, playFailSound, cancelPlayback };
 }

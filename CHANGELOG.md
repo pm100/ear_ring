@@ -4,6 +4,15 @@ All notable changes to Ear Ring are documented here.
 
 ## [Unreleased]
 
+### Added
+- **Pass/fail sound effects** — a bright ascending chime (C6-E6-G6) plays when a test
+  is passed, and a softer descending tone (A4-F4) when it fails, on all three
+  platforms. Synthesized on the fly as short sine tones (Web Audio oscillators on
+  Desktop, `AudioTrack`-backed PCM synthesis on Android, an `AVAudioPCMBuffer` fed
+  through `AVAudioEngine` on iOS) rather than bundled audio files, so there's no
+  asset to ship or network sample to fetch. New "Play Pass/Fail Sounds" toggle in
+  Settings (default on) controls both sounds together.
+
 ### Fixed
 - **Scale selection tested the wrong notes for every non-Major scale** — picking
   key=C + Natural Minor generated test notes in A Natural Minor (C major's relative

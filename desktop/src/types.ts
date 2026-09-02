@@ -32,6 +32,7 @@ export interface ExerciseSettings {
   wrongNotePauseMs: number;   // default 3000
   instrumentIndex: number;    // default 0 (Piano)
   testType: number;           // 0=Random, 1=Melody, 2=DiatonicTriads(stub)
+  playPassFailSounds: boolean; // default true — chime on test pass/fail
 }
 
 export interface ExerciseState {
@@ -51,6 +52,7 @@ export interface ExerciseState {
   wrongNotePauseMs: number;
   instrumentIndex: number;
   testType: number;           // 0=Random, 1=Melody, 2=DiatonicTriads(stub)
+  playPassFailSounds: boolean;
   sequence: number[];// MIDI values
   detected: DetectedNote[];
   status: ExerciseStatus;

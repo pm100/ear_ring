@@ -80,7 +80,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   const startFreshGenRef = useRef(0);
 
   const { start: startCapture, stop: stopCapture, destroy: destroyCapture } = useAudioCapture();
-  const { playChord, playSequence, cancelPlayback } = useAudioPlayback();
+  const { playChord, playSequence, playPassSound, playFailSound, cancelPlayback } = useAudioPlayback();
 
   useEffect(() => { currentNoteIndexRef.current = currentNoteIndex; }, [currentNoteIndex]);
   useEffect(() => { detectedRef.current = detected; }, [detected]);
@@ -283,6 +283,9 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   }, [playPromptForSequence]);
 
   const completeTest = useCallback((passed: boolean, attemptNotes: DetectedNote[], attemptsUsed: number) => {
+    if (exercise.playPassFailSounds) {
+      if (passed) playPassSound(); else playFailSound();
+    }
     void invoke<number>('cmd_test_score', {
       maxAttempts: exercise.maxRetries,
       attemptsUsed,
@@ -310,7 +313,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         }
       }, exercise.wrongNotePauseMs);
     });
-  }, [exercise.scaleId, exercise.rootNote, exercise.sequenceLength, exercise.maxRetries, exercise.wrongNotePauseMs, exercise.sessionId, schedule, startFreshTest]);
+  }, [exercise.scaleId, exercise.rootNote, exercise.sequenceLength, exercise.maxRetries, exercise.wrongNotePauseMs, exercise.sessionId, exercise.playPassFailSounds, playPassSound, playFailSound, schedule, startFreshTest]);
 
   // The audio frame handler — confirmed MIDI comes from the Rust tracker.
   handleFrameRef.current = async (frame: TrackerFrame) => {
