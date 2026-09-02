@@ -1,4 +1,4 @@
-# Future Plans — Premium, Ads, and Detection R&D
+# Future Plans — Premium, Ads, UI/UX, and Detection R&D
 
 ## Status (2026-08-22)
 
@@ -123,6 +123,85 @@ setting for everyone.
 - **Adaptive difficulty auto-tuning** — session-to-session automatic adjustment of
   sequence length / retry count / tempo based on recent accuracy, lighter-weight than
   the full "AI analysis" idea above but same underlying data.
+
+---
+
+## Home / Progress Screen UI (not premium-specific)
+
+Requested 2026-09-01.
+
+### Range picker: move off the Home screen into a popup
+Home screen currently always shows the full interactive piano keyboard
+(`PianoRangePicker`) inline for range selection — desktop: a local component defined
+inside `HomeScreen.tsx` (not a separate file); Android: `ui/PianoRangePicker.kt`; iOS:
+`views/PianoRangePickerView.swift`. Replace the always-visible keyboard with a compact
+text label showing the current range (e.g. "C4–D5", reusing the existing
+`midiLabel`/`MusicTheory.midiToLabel` helpers already used to render range labels
+elsewhere), tappable/clickable to open the *same* picker in a popup instead — a modal
+on Desktop, an `AlertDialog`/bottom-sheet-wrapped composable on Android, a `.sheet`
+on iOS. No new range-picking logic needed: this is relocating the existing widget
+behind a trigger, not rebuilding it. Should also visibly shorten the Home screen,
+which is already a fairly tall scrolling form (Test Type, Key, Scale, Range, Sequence
+Length, two checkboxes, Start button).
+
+### Progress screen: graph of score over days
+Add a chart to `ProgressScreen`/`ProgressScreen.kt`/`ProgressScreen.swift` plotting
+score over time across days. The data already exists — `SessionRecord`'s `date` +
+`score` fields, already loaded into each Progress screen's state (desktop reads it
+straight from `localStorage.getItem('ear_ring_sessions')`; Android/iOS via
+`ProgressStorage.kt` / `ProgressModel.swift`) — so this is a new UI element consuming
+already-persisted history, not new data-model work. No charting library is shared
+across all three platforms today, so the approach differs per platform:
+- **iOS**: the native `Charts` framework (`import Charts`) needs no new dependency —
+  the project's `IPHONEOS_DEPLOYMENT_TARGET = 16.0` already meets its iOS 16 minimum.
+- **Android**: Compose has no built-in charting; either a hand-drawn `Canvas` line
+  chart or a small charting library (e.g. Vico) would be needed.
+- **Desktop**: no charting library in `desktop/package.json` currently — either add a
+  lightweight one or hand-draw an SVG line chart (data volume is small enough — a
+  handful of points per day — that a custom SVG is realistic without a dependency).
+
+Design question to settle before building: what counts as "a day" when someone
+completes multiple sessions in one day — average that day's scores into one point,
+plot every session as its own point, or both (per-session dots plus a daily trend
+line)?
+
+---
+
+## Melody Library Storage Format (not premium-specific)
+
+Requested 2026-09-01.
+
+### Convert `melodies.txt` to standard ABC notation
+`rust/src/melodies.txt` currently stores each melody in a bespoke project-specific
+format — a title line, then `semitone:duration,semitone:duration,...` — parsed by
+`parse_melodies`/`parse_notes_line` in `rust/src/music_theory.rs`. Replace it with
+standard ABC notation as the on-disk format instead.
+
+This is better-scoped than it sounds because most of the hard part already exists —
+just facing the wrong direction. `melody-manager` (the standalone curation tool, see
+`docs/melody-manager.md`) already works in ABC internally
+(`melody-manager/src/utils/abc.ts`, via the `abcjs` library): `parseAbcToNotes()` and
+`rawNotesToAbc()` give full bidirectional ABC ↔ note conversion already, and its
+Import/Search/Paste-ABC/inline-ABC-editor flows are all ABC-native. The *only* place it
+currently leaves ABC is its final "Export to melodies.txt" step, which down-converts
+back to the bespoke semitone:duration format purely because that's what the Rust core
+expects today. Flipping the storage format removes that down-conversion entirely —
+export would just write ABC text straight into `melodies.txt`, in the exact dialect
+`rawNotesToAbc` already emits: `X:1`/`T:`/`M:4/4`/`L:1/4`/`K:C` header block, `^` for
+sharps (no flats emitted), note-letter case for octave, `,`/`'` octave marks, and ABC
+duration suffixes for beat lengths.
+
+What's actually new work: `rust/src/music_theory.rs` needs an ABC *parser* to replace
+`parse_notes_line`, since there's no Rust equivalent of `abcjs` to reach for. It doesn't
+need to handle general ABC 2.1 — only the narrow dialect melody-manager's export already
+produces (single voice, no key signature/accidentals beyond inline `^` — plus maybe `_`
+flat and `=` natural for resilience against hand-edited files, no ties/slurs/repeats/
+chords/lyrics) — closer in scope to today's trivial `parse_notes_line` than to a general
+ABC implementation. `parseAbcToNotes()` in `abc.ts` is a solid reference for exactly
+which constructs need handling. The existing ~50 tunes in `melodies.txt` would need a
+one-time batch conversion — reusing `rawNotesToAbc` against their already-parsed
+semitone/duration data to generate the new file is more reliable than hand-converting
+each one.
 
 ---
 
