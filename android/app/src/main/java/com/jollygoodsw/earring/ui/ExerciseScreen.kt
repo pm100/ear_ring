@@ -190,6 +190,15 @@ fun ExerciseScreen(
             detectedHz = liveHz
         )
 
+        Spacer(Modifier.height(24.dp))
+
+        Button(
+            onClick = { exitSession() },
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+        ) {
+            Text("⏹ Stop Testing", color = MaterialTheme.colorScheme.onErrorContainer, fontSize = 17.sp)
+        }
 
         if (state.detected.isNotEmpty()) {
             Spacer(Modifier.height(20.dp))

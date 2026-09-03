@@ -249,9 +249,10 @@ Meta line             — bodyMedium, muted colour, centred
 PitchMeter            — 90dp circle (see Pitch Meter spec below)
 
 [24dp space]
-[⏹ Stop Testing]      — full-width filled ERROR colour, 52dp, 17sp — **desktop only**
-  - On Android & iOS: use the system back gesture instead (no on-screen Stop button)
-  - On desktop: on-screen button required (no system back gesture)
+[⏹ Stop Testing]      — full-width filled ERROR colour, 52dp, 17sp — **all platforms**
+  - On Android & iOS, the system back gesture/button also ends the session (same
+    exit path as the on-screen button) — but the on-screen button is shown too,
+    since it's not obvious from the UI that back-navigation exits an active test
   - Ends the continuous testing session immediately
   - Returns the user to Home
   - Saves the session summary if at least one test was completed
