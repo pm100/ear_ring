@@ -6,7 +6,6 @@ struct ExerciseView: View {
     @EnvironmentObject var progressModel: ProgressModel
     @Binding var path: NavigationPath
     @Environment(\.horizontalSizeClass) var hsc
-    @Environment(\.verticalSizeClass) var vsc
 
     private var isIPad: Bool { hsc == .regular }
     private var staffHeight: CGFloat { isIPad ? 220 : 160 }
@@ -44,15 +43,7 @@ struct ExerciseView: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
-            Group {
-                if isIPad && geo.size.width > geo.size.height {
-                    iPadLandscapeLayout
-                } else {
-                    portraitLayout
-                }
-            }
-        }
+        portraitLayout
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -183,7 +174,10 @@ struct ExerciseView: View {
         }
     }
 
-    // MARK: — Portrait layout (iPhone + iPad portrait)
+    // MARK: — Layout (iPhone + iPad, portrait and landscape)
+    // A single centred column, scaled up on iPad — matches HomeView's iPad treatment
+    // rather than a bespoke split layout, so this screen doesn't feel inconsistent
+    // with the rest of the app.
 
     private var portraitLayout: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -203,36 +197,8 @@ struct ExerciseView: View {
             Spacer()
         }
         .padding(.horizontal, 16)
-        .background(Color(.systemBackground))
-    }
-
-    // MARK: — iPad landscape: staff+info left, meter+stop right
-
-    private var iPadLandscapeLayout: some View {
-        HStack(alignment: .top, spacing: 24) {
-            VStack(alignment: .leading, spacing: 0) {
-                Spacer().frame(height: 8)
-                chordLabelRow
-                staffView
-                Spacer().frame(height: 8)
-                listeningBanner
-                Spacer().frame(height: 4)
-                metaText
-                Spacer().frame(height: 16)
-                currentAttemptRow
-                Spacer()
-            }
-            .frame(maxWidth: .infinity)
-
-            VStack(spacing: 24) {
-                Spacer()
-                pitchMeter
-                stopButton
-                Spacer()
-            }
-            .frame(width: meterSize + 48)
-        }
-        .padding(.horizontal, 24)
+        .frame(maxWidth: isIPad ? 680 : .infinity)
+        .frame(maxWidth: .infinity)  // centre on iPad
         .background(Color(.systemBackground))
     }
 }
