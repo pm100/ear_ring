@@ -115,6 +115,23 @@ desktop: _desktop-version
 test:
     cargo test
 
+# Run Android's instrumented UI tests (app/src/androidTest) on a real
+# emulator/device — boots the app and drives the actual Compose UI, unlike
+# `test` above which only covers the Rust core's pure logic.
+# Starts the emulator automatically if no device/emulator is connected.
+[doc("Run Android functional/UI tests on an emulator (auto-starts one if needed)")]
+android-test: _android-version
+    @$devices = (& "{{adb}}" devices | Select-String -Pattern '\tdevice$'); \
+     if (-not $devices) { \
+       Write-Host "No device found — starting emulator '{{avd}}'..."; \
+       Start-Process -FilePath "{{emulator}}" -ArgumentList "-avd {{avd}} -no-snapshot-save" -WindowStyle Normal; \
+       Write-Host "Waiting for emulator to boot (this takes ~60 s)..."; \
+       & "{{adb}}" wait-for-device | Out-Null; \
+       do { Start-Sleep 3; $booted = & "{{adb}}" shell getprop sys.boot_completed 2>$null } while ($booted.Trim() -ne '1'); \
+       Write-Host "Emulator ready."; \
+     }
+    Push-Location android; .\gradlew connectedDebugAndroidTest; Pop-Location
+
 
 # Unlock the dedicated code-signing keychain so codesign works in headless
 # (SSH) sessions. No-op if the keychain hasn't been set up — see

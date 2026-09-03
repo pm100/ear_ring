@@ -23,6 +23,7 @@ android {
         versionCode providers.environmentVariable('VERSION_CODE').map { it.toInteger() }.orElse(3).get()
         versionName "1.0"
         ndk { abiFilters 'arm64-v8a', 'x86_64' }
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     signingConfigs {
         debug {
@@ -132,4 +133,13 @@ dependencies {
     implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'com.google.code.gson:gson:2.10.1'
     debugImplementation 'androidx.compose.ui:ui-tooling'
+
+    // Instrumented (emulator/device) UI tests — see app/src/androidTest
+    androidTestImplementation composeBom
+    androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.7.0'
+    androidTestImplementation 'androidx.test:rules:1.6.1'
+    // Required by createAndroidComposeRule even though the test APK doesn't use it directly.
+    debugImplementation 'androidx.compose.ui:ui-test-manifest'
 }
