@@ -62,13 +62,17 @@ struct SetupView: View {
             HStack {
                 Spacer()
                 VStack(spacing: 2) {
-                    let label = displayMidi >= 0 ? MusicTheory.midiToLabel(displayMidi) : "—"
+                    // Always the actual (concert) pitch, regardless of instrument
+                    // transposition — unlike the staff above, it's not notation to
+                    // read/play, so it should never change just because the
+                    // instrument does.
+                    let label = concertMidi >= 0 ? MusicTheory.midiToLabel(concertMidi) : "—"
                     Text(label)
                         .font(.system(size: label.count >= 3 ? 56 : 72, weight: .bold))
-                        .foregroundColor(displayMidi >= 0
+                        .foregroundColor(concertMidi >= 0
                             ? Color(red: 0.247, green: 0.318, blue: 0.710)
                             : Color.secondary)
-                    if displayMidi >= 0, model.confirmedHz > 0 {
+                    if concertMidi >= 0, model.confirmedHz > 0 {
                         Text(String(format: "%.1f Hz", model.confirmedHz))
                             .font(.body)
                             .foregroundColor(.secondary)

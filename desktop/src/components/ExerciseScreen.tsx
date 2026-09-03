@@ -5,7 +5,7 @@ import MusicStaff from './MusicStaff';
 import PitchMeter from './PitchMeter';
 import { useAudioCapture, TrackerFrame } from '../hooks/useAudioCapture';
 import { useAudioPlayback } from '../hooks/useAudioPlayback';
-import { freqToCents, midiToLabel, preferredMidiLabel, NOTE_NAMES } from '../music';
+import { freqToCents, midiToLabel, preferredMidiLabel, preferredNoteName, NOTE_NAMES } from '../music';
 
 interface Props {
   exercise: ExerciseState;
@@ -100,23 +100,6 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       .catch(() => {});
   }, [exercise.instrumentIndex]);
   const transpMidi = (midi: number) => Math.max(0, Math.min(127, midi + transpSemitones));
-
-  // Pre-compute written-pitch title via Rust (Tauri invoke is async).
-  const [writtenRoot, setWrittenRoot] = useState('');
-  const [writtenRangeStart, setWrittenRangeStart] = useState('');
-  const [writtenRangeEnd, setWrittenRangeEnd] = useState('');
-  useEffect(() => {
-    const instrIdx = exercise.instrumentIndex ?? 0;
-    Promise.all([
-      invoke<string>('cmd_written_note_name', { concertChroma: exercise.rootNote, instrumentIndex: instrIdx }),
-      invoke<string>('cmd_written_midi_label', { concertMidi: exercise.rangeStart, instrumentIndex: instrIdx }),
-      invoke<string>('cmd_written_midi_label', { concertMidi: exercise.rangeEnd, instrumentIndex: instrIdx }),
-    ]).then(([root, start, end]) => {
-      setWrittenRoot(root);
-      setWrittenRangeStart(start);
-      setWrittenRangeEnd(end);
-    }).catch(() => {});
-  }, [exercise.rootNote, exercise.rangeStart, exercise.rangeEnd, exercise.instrumentIndex]);
 
   const schedule = useCallback((callback: () => void, ms: number) => {
     const id = window.setTimeout(callback, ms);
@@ -414,7 +397,8 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     }
   };
 
-  const rootLabel = `${writtenRoot}  ${writtenRangeStart}–${writtenRangeEnd}`;
+  const exerciseKeyChroma = effectiveKeyChroma(exercise.rootNote, exercise.scaleId);
+  const rootLabel = `${preferredNoteName(exercise.rootNote, exerciseKeyChroma)}  ${preferredMidiLabel(exercise.rangeStart, exerciseKeyChroma)}–${preferredMidiLabel(exercise.rangeEnd, exerciseKeyChroma)}`;
   const scaleLabel = SCALE_NAMES[exercise.scaleId];
   const score = averageScore(cumulativeScorePercent, testsCompleted);
   const staffNotes: StaffDisplayNote[] = exercise.showTestNotes
@@ -472,7 +456,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
           <div className="note-tracker">
             {detected.map((note, i) => (
               <div key={i} className={`note-tracker-item ${note.correct ? 'tracker-correct' : 'tracker-incorrect'}`}>
-                <div className="tracker-note">{preferredMidiLabel(transpMidi(note.midi), effectiveKeyChroma(exercise.rootNote, exercise.scaleId))}</div>
+                <div className="tracker-note">{preferredMidiLabel(note.midi, effectiveKeyChroma(exercise.rootNote, exercise.scaleId))}</div>
               </div>
             ))}
           </div>

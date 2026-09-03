@@ -124,10 +124,14 @@ fun ExerciseScreen(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        val writtenRoot = EarRingCore.writtenNoteName(state.rootNote, instrIdx)
-        val writtenRange = "${EarRingCore.writtenMidiLabel(state.rangeStart, instrIdx)}–${EarRingCore.writtenMidiLabel(state.rangeEnd, instrIdx)}"
+        // Note-name text always states the actual (concert) pitch, regardless of
+        // instrument transposition -- unlike the staff below, it's not notation to
+        // read/play, so it should never change just because the instrument does.
+        val concertKeyChroma = EarRingCore.effectiveKeyChroma(state.rootNote, state.scaleId)
+        val rootLabel = EarRingCore.preferredNoteLabel(state.rootNote, concertKeyChroma)
+        val rangeLabel = "${EarRingCore.preferredMidiLabel(state.rangeStart, concertKeyChroma)}–${EarRingCore.preferredMidiLabel(state.rangeEnd, concertKeyChroma)}"
         Text(
-            text = "$writtenRoot $writtenRange  ${MusicTheory.SCALE_NAMES[state.scaleId]}",
+            text = "$rootLabel $rangeLabel  ${MusicTheory.SCALE_NAMES[state.scaleId]}",
             style = MaterialTheme.typography.titleMedium
         )
 
@@ -213,7 +217,7 @@ fun ExerciseScreen(
             ) {
                 state.detected.forEach {
                     Text(
-                        text = MusicTheory.midiToLabel(EarRingCore.transposeDisplayMidi(it.midi, instrIdx)),
+                        text = EarRingCore.preferredMidiLabel(it.midi, concertKeyChroma),
                         color = if (it.correct) androidx.compose.ui.graphics.Color(0xFF4CAF50) else androidx.compose.ui.graphics.Color(0xFFF44336),
                         fontWeight = FontWeight.SemiBold
                     )

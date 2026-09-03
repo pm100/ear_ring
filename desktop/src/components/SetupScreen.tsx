@@ -88,11 +88,14 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
   }, [start, stop, destroy, handleFrame]);
 
   const transpMidi = (midi: number) => Math.max(0, Math.min(127, midi + transpSemitones));
+  // Staff notation shows written pitch, like a transposing instrument's part.
   const displayMidi = currentMidi >= 0 ? transpMidi(currentMidi) : -1;
   const displayHistory = noteHistory.map(transpMidi);
   const instrKeyTranspose = ((transpSemitones % 12) + 12) % 12;
   const effChroma = (effectiveKeyChroma(rootChroma, scaleId) + instrKeyTranspose) % 12;
-  const noteLabel = displayMidi >= 0 ? preferredMidiLabel(displayMidi, effChroma) : '—';
+  // The big text readout always states the actual (concert) pitch, regardless of
+  // instrument transposition — unlike the staff above, it's not notation to read/play.
+  const noteLabel = currentMidi >= 0 ? preferredMidiLabel(currentMidi, effectiveKeyChroma(rootChroma, scaleId)) : '—';
   // The actual measured frequency (not recomputed from currentMidi) so it can
   // reveal a mislabeled note instead of just parroting back whatever label was chosen.
   const noteHz = currentMidi >= 0 ? currentHz : null;

@@ -47,9 +47,12 @@ struct ExerciseView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                let writtenRoot = EarRingCore.writtenNoteName(concertChroma: model.rootNote, instrumentIndex: model.instrumentIndex)
-                let writtenRange = "\(EarRingCore.writtenMidiLabel(concertMidi: model.rangeStart, instrumentIndex: model.instrumentIndex))–\(EarRingCore.writtenMidiLabel(concertMidi: model.rangeEnd, instrumentIndex: model.instrumentIndex))"
-                Text("\(writtenRoot) \(writtenRange) \(MusicTheory.SCALE_NAMES[model.scaleId])")
+                // Always the actual (concert) key/range, regardless of instrument
+                // transposition — unlike the staff, it's not notation to read/play.
+                let concertKeyChroma = EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId)
+                let rootLabel = EarRingCore.preferredNoteLabel(midi: model.rootNote, rootChroma: concertKeyChroma)
+                let rangeLabel = "\(EarRingCore.preferredMidiLabel(midi: model.rangeStart, rootChroma: concertKeyChroma))–\(EarRingCore.preferredMidiLabel(midi: model.rangeEnd, rootChroma: concertKeyChroma))"
+                Text("\(rootLabel) \(rangeLabel) \(MusicTheory.SCALE_NAMES[model.scaleId])")
                     .font(.subheadline.weight(.semibold))
             }
         }
@@ -149,13 +152,16 @@ struct ExerciseView: View {
     @ViewBuilder
     private var currentAttemptRow: some View {
         if !model.detectedNotes.isEmpty {
+            let concertKeyChroma = EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Current attempt")
                     .font(.caption)
                     .foregroundColor(.erMuted)
                 HStack(spacing: 10) {
                     ForEach(Array(model.detectedNotes.enumerated()), id: \.offset) { _, note in
-                        Text(MusicTheory.midiToLabel(transpMidi(note.midi)))
+                        // Always the actual (concert) pitch, regardless of instrument
+                        // transposition — this is a readout, not notation to read/play.
+                        Text(EarRingCore.preferredMidiLabel(midi: note.midi, rootChroma: concertKeyChroma))
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(note.isCorrect ? .erSuccess : .erError)
                     }

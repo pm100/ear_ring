@@ -38,6 +38,13 @@ export function preferredMidiLabel(midi: number, rootChroma: number): string {
   return `${names[chroma]}${octave}`;
 }
 
+// Note-name-only (no octave), same sharp/flat convention as preferredMidiLabel.
+export function preferredNoteName(chroma: number, rootChroma: number): string {
+  const c = ((chroma % 12) + 12) % 12;
+  const names = isSharpKey(rootChroma) ? NOTE_NAMES : NOTE_NAMES_FLAT;
+  return names[c];
+}
+
 export function keySigPositions(rootChroma: number): { positions: number[]; isSharp: boolean } {
   const count = keyAccidentalCount(rootChroma);
   if (count > 0) return { positions: SHARP_STAFF_POSITIONS.slice(0, count), isSharp: true };

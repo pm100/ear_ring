@@ -109,11 +109,13 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, ro
         )
         Spacer(Modifier.height(8.dp))
 
-        // Large note name + Hz. noteHz is the actual measured frequency (not
-        // recomputed from displayMidi) so it can reveal a mislabeled note
-        // instead of just parroting back whatever label was chosen.
-        val noteLabel = if (displayMidi >= 0) MusicTheory.midiToLabel(displayMidi) else "—"
-        val noteHz = if (displayMidi >= 0) concertHz.toDouble() else 0.0
+        // Large note name + Hz. Always the actual (concert) pitch, regardless of
+        // instrument transposition -- unlike the staff above, it's not notation to
+        // read/play, so it should never change just because the instrument does.
+        // noteHz is the actual measured frequency (not recomputed from the note) so
+        // it can reveal a mislabeled note instead of just parroting back the label.
+        val noteLabel = if (concertMidi >= 0) MusicTheory.midiToLabel(concertMidi) else "—"
+        val noteHz = if (concertMidi >= 0) concertHz.toDouble() else 0.0
         Text(
             noteLabel,
             fontSize = if (noteLabel.length >= 3) 56.sp else 72.sp,
@@ -130,7 +132,7 @@ fun SetupScreen(onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, ro
         }
         Spacer(Modifier.height(24.dp))
 
-        PitchMeter(detectedMidi = displayMidi, detectedHz = liveHz)
+        PitchMeter(detectedMidi = concertMidi, detectedHz = liveHz)
         Spacer(Modifier.height(32.dp))
     }
 }
