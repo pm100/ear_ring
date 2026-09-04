@@ -310,6 +310,12 @@ class ExerciseModel: ObservableObject {
     }
 
     private func playPrompt() async {
+        // A previous session's delayed continuation (completeTest's/commitNote's Task) can still
+        // be mid-flight when a new session starts — isSessionRunning alone can't tell them apart
+        // since it just checks status != .stopped, which is true again as soon as the new session
+        // begins. Capture the session identity now and re-check it at every resume point below so
+        // a stale call from an old session can never play audio or flip state for the new one.
+        let mySession = sessionId
         guard !sequence.isEmpty else { return }
         status = .playing
         audioPlayback.resetCancellation()
@@ -320,11 +326,11 @@ class ExerciseModel: ObservableObject {
         // the fade always finishes before the sequence starts.
         let chordFadeDuration = min(0.3, Double(postChordGapNanoseconds) / 1_000_000_000.0 * 0.75)
         Task { await self.audioPlayback.fadeOutActive(duration: chordFadeDuration) }
-        guard status == .playing else { return }
+        guard status == .playing, sessionId == mySession else { return }
         try? await Task.sleep(nanoseconds: self.postChordGapNanoseconds)
-        guard status == .playing else { return }
+        guard status == .playing, sessionId == mySession else { return }
         await audioPlayback.playSequence(notes: sequence, bpm: tempoBpm, durations: melodyDurations.isEmpty ? nil : melodyDurations) { _ in }
-        guard status == .playing else { return }
+        guard status == .playing, sessionId == mySession else { return }
         // Fade sequence sustain; then stop the engine before capture starts.
         await audioPlayback.fadeOutActive(duration: 0.4)
         let remainingGapNs = postSequenceGapNanoseconds > 400_000_000
@@ -335,7 +341,7 @@ class ExerciseModel: ObservableObject {
         }
         audioPlayback.stopEngine()
         print("[EAR] playback engine stopped, starting capture")
-        if status == .playing {
+        if status == .playing, sessionId == mySession {
             await startListening()
         }
     }
@@ -409,9 +415,10 @@ class ExerciseModel: ObservableObject {
             if currentAttempt >= maxAttempts {
                 completeTest(passed: false, attemptsUsed: currentAttempt, attemptNotes: detectedNotes)
             } else {
+                let mySession = sessionId
                 Task {
                     try? await Task.sleep(nanoseconds: self.wrongNotePauseNanoseconds)
-                    guard self.isSessionRunning else { return }
+                    guard self.isSessionRunning, self.sessionId == mySession else { return }
                     await self.retryCurrentTest(attempt: self.currentAttempt + 1)
                 }
             }
@@ -429,9 +436,10 @@ class ExerciseModel: ObservableObject {
         status = .retryDelay
         persistTestRecord(score: testScore, attemptsUsed: attemptsUsed, passed: passed, attemptNotes: attemptNotes)
 
+        let mySession = sessionId
         Task {
             try? await Task.sleep(nanoseconds: self.wrongNotePauseNanoseconds)
-            guard self.isSessionRunning else { return }
+            guard self.isSessionRunning, self.sessionId == mySession else { return }
             await self.startFreshTest()
         }
     }

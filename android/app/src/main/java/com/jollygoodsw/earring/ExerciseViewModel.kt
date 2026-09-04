@@ -384,30 +384,37 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     private fun playPrompt() {
         val state = _state.value
         if (!state.sessionRunning || state.sequence.isEmpty()) return
+        // A previous session's delayed continuation (from completeTest/scheduleRetry) can still be
+        // mid-flight when a new session starts — sessionRunning alone can't tell them apart, since
+        // it's true again as soon as the new session begins. Re-check sessionId (not just
+        // sessionRunning) at every resume point below so a stale callback from an old session can
+        // never play audio or advance state for the new one.
+        val mySession = state.sessionId
+        fun isCurrent() = _state.value.sessionRunning && _state.value.sessionId == mySession
         val triad = EarRingCore.introChord(EarRingCore.effectiveIntroRootMidi(state.rootNote, state.scaleId, state.rangeStart), state.scaleId).toList()
         audioPlayback.playChord(
             midiNotes = triad,
             onDone = {
-                if (_state.value.sessionRunning) {
+                if (isCurrent()) {
                     // Fade chord sustain so it doesn't bleed into the sequence.
                     // Cap at 75% of the gap so the fade always finishes before the sequence starts.
                     val chordFadeMs = (_state.value.postChordGapMs * 3 / 4).coerceIn(100L, 400L)
                     audioPlayback.fadeOutActive(chordFadeMs)
                     viewModelScope.launch {
                         delay(_state.value.postChordGapMs)
-                        if (_state.value.sessionRunning) {
+                        if (isCurrent()) {
                             audioPlayback.playSequence(
                                 midiNotes = state.sequence,
                                 bpm = state.tempoBpm,
                                 durations = if (state.melodyDurations.isNotEmpty()) state.melodyDurations else null,
                                 onEach = {},
                                 onDone = {
-                                    if (_state.value.sessionRunning) {
+                                    if (isCurrent()) {
                                         // Fade sequence sustain before the mic opens
                                         audioPlayback.fadeOutActive(400L)
                                         viewModelScope.launch {
                                             delay(POST_SEQUENCE_GAP_MS)
-                                            if (_state.value.sessionRunning) {
+                                            if (isCurrent()) {
                                                 startListening()
                                             }
                                         }
@@ -482,18 +489,20 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             testsCompleted = state.testsCompleted + 1,
             cumulativeScorePercent = state.cumulativeScorePercent + scorePercent
         )
+        val mySession = state.sessionId
         viewModelScope.launch {
             delay(_state.value.wrongNotePauseMs)
-            if (_state.value.sessionRunning) {
+            if (_state.value.sessionRunning && _state.value.sessionId == mySession) {
                 startFreshTest()
             }
         }
     }
 
     private fun scheduleRetry(nextAttempt: Int) {
+        val mySession = _state.value.sessionId
         viewModelScope.launch {
             delay(_state.value.wrongNotePauseMs)
-            if (_state.value.sessionRunning) {
+            if (_state.value.sessionRunning && _state.value.sessionId == mySession) {
                 retryCurrentTest(nextAttempt)
             }
         }

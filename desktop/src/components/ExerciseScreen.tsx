@@ -206,7 +206,13 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     }
   }, [exercise.testType, exercise.rootNote, exercise.scaleId, exercise.sequenceLength, exercise.rangeStart, exercise.rangeEnd]);
 
-  const playPromptForSequence = useCallback(async (nextSequence: number[], durations?: number[], timings?: [number, number][]) => {
+  const playPromptForSequence = useCallback(async (nextSequence: number[], durations: number[] | undefined, timings: [number, number][] | undefined, myGen: number) => {
+    // A previous session's scheduled continuation (completeTest's/retryCurrentTest's timer) can
+    // still be mid-flight when a new session starts — sessionRunningRef alone can't tell them
+    // apart, since it's true again as soon as the new session begins. Re-check the generation
+    // (not just sessionRunningRef) at every resume point below so a stale call from an old
+    // session can never play audio or advance state for the new one.
+    const isCurrent = () => sessionRunningRef.current && startFreshGenRef.current === myGen;
     setStatus('playing');
     setDetected([]);
     detectedRef.current = [];
@@ -216,18 +222,18 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     setLiveHz(0);
     await invoke('cmd_tracker_reset');
     await playChord(await fetchIntroTriad());
-    if (!sessionRunningRef.current) return;
+    if (!isCurrent()) return;
     await new Promise(resolve => {
       window.setTimeout(resolve, exercise.postChordGapMs);
     });
-    if (!sessionRunningRef.current) return;
+    if (!isCurrent()) return;
     await playSequence(
       nextSequence,
       () => {},
       () => {
-        if (!sessionRunningRef.current) return;
+        if (!isCurrent()) return;
         window.setTimeout(() => {
-          if (!sessionRunningRef.current) return;
+          if (!isCurrent()) return;
           cancelPlayback();
           setStatus('listening');
           void invoke('cmd_tracker_reset_with_warmup', { warmupFrames: exercise.warmupFrames });
@@ -256,16 +262,18 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     else setMelodyTitle('');
     setCurrentAttempt(1);
     currentAttemptRef.current = 1;
-    await playPromptForSequence(result.sequence, result.durations, melodyTimingsRef.current);
+    await playPromptForSequence(result.sequence, result.durations, melodyTimingsRef.current, myGen);
   }, [generateFreshSequence, playPromptForSequence]);
 
   const retryCurrentTest = useCallback(async (nextAttempt: number) => {
+    const myGen = startFreshGenRef.current;
     setCurrentAttempt(nextAttempt);
     currentAttemptRef.current = nextAttempt;
-    await playPromptForSequence(sequenceRef.current, melodyDurationsRef.current.length > 0 ? melodyDurationsRef.current : undefined, melodyTimingsRef.current.length > 0 ? melodyTimingsRef.current : undefined);
+    await playPromptForSequence(sequenceRef.current, melodyDurationsRef.current.length > 0 ? melodyDurationsRef.current : undefined, melodyTimingsRef.current.length > 0 ? melodyTimingsRef.current : undefined, myGen);
   }, [playPromptForSequence]);
 
   const completeTest = useCallback((passed: boolean, attemptNotes: DetectedNote[], attemptsUsed: number) => {
+    const myGen = startFreshGenRef.current;
     if (exercise.playPassFailSounds) {
       if (passed) playPassSound(); else playFailSound();
     }
@@ -291,7 +299,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       setCumulativeScorePercent(prev => prev + testScore);
       setStatus('retry_delay');
       schedule(() => {
-        if (sessionRunningRef.current) {
+        if (sessionRunningRef.current && startFreshGenRef.current === myGen) {
           void startFreshTest();
         }
       }, exercise.wrongNotePauseMs);
@@ -337,8 +345,9 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       if (currentAttemptRef.current >= exercise.maxRetries) {
         completeTest(false, newDetected, currentAttemptRef.current);
       } else {
+        const myGen = startFreshGenRef.current;
         schedule(() => {
-          if (sessionRunningRef.current) {
+          if (sessionRunningRef.current && startFreshGenRef.current === myGen) {
             void retryCurrentTest(currentAttemptRef.current + 1);
           }
         }, exercise.wrongNotePauseMs);
@@ -373,7 +382,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       // Melody mode starts with empty sequence — generate first test
       void startFreshTest();
     } else {
-      void playPromptForSequence(sequenceRef.current);
+      void playPromptForSequence(sequenceRef.current, undefined, undefined, startFreshGenRef.current);
     }
     return () => {
       startFreshGenRef.current++; // invalidate any in-flight startFreshTest before cleanup

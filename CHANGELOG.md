@@ -14,6 +14,18 @@ All notable changes to Ear Ring are documented here.
   Settings (default on) controls both sounds together.
 
 ### Fixed
+- **Changing sequence length right after a test could silently drop the next test's
+  note audio** — after a test finishes, each platform schedules a delayed
+  continuation (auto-advance to the next test, or a retry-after-wrong-note) guarded
+  only by a coarse "is a session running" flag. If the user backed out and started a
+  new session (e.g. changing Sequence Length from 5 to 1) while that continuation was
+  still pending, the flag looked "running" again for the *new* session too, so the
+  stale continuation fired anyway — racing its own chord/sequence playback against
+  the new session's and occasionally starving the new test's note audio (the intro
+  chord still played, since it's the first, synchronous step). Fixed on iOS, Android,
+  and Desktop by checking session identity (not just "is something running") at every
+  resume point of these delayed continuations, so a continuation from an old session
+  can never play audio or advance state for a new one.
 - **Scale selection tested the wrong notes for every non-Major scale** — picking
   key=C + Natural Minor generated test notes in A Natural Minor (C major's relative
   minor) instead of C Natural Minor. A prior "transpose fixes" commit had silently
