@@ -205,6 +205,49 @@ each one.
 
 ---
 
+## Settings Screen (not premium-specific)
+
+Requested 2026-09-04.
+
+### Split into "User" and "Advanced" sections
+Each platform's Settings screen (`desktop/src/components/SettingsScreen.tsx`,
+`android/.../ui/SettingsScreen.kt`, `ios/earring/views/SettingsView.swift`) currently
+renders five flat sections in this order: Instrument, Sound, Exercise, Pitch Detection,
+Timing — same structure on all three platforms, just different UI toolkits
+(`SectionTitle`/plain divs on desktop, `Text(...FontWeight.Bold)` headers on Android,
+`sectionHeader(...)` on iOS). Regroup these under two top-level headers:
+- **User**: Instrument, Sound, Exercise, Timing (Pause Before Singing, Wrong Note
+  Pause) — settings anyone would reasonably want to tweak.
+- **Advanced**: Pitch Detection (Mic Sensitivity/`silenceThreshold`, Note
+  Stability/`framesToConfirm`, Mic Warmup Frames/`warmupFrames`) — mic/tone-detection
+  tuning that's mostly a debugging/troubleshooting knob, not something most users need.
+
+Open question: Timing's two settings (`postChordGapMs`, `wrongNotePauseMs`) are pacing
+preferences, not detection tuning — listed under User above, but worth confirming
+before building since "Advanced" could instead mean "everything past the basics"
+rather than strictly tone-detection. No new settings, no data model changes — this is
+purely a re-layout of existing controls into two collapsible/sectioned groups per
+platform (e.g. a disclosure section, a second screen, or a tab), each already
+maintaining the same field bindings unchanged.
+
+### User setting: play root note vs. play chord before a test
+Today the intro before every test unconditionally plays a chord — desktop's
+`playPromptForSequence` in `ExerciseScreen.tsx` always calls
+`playChord(await fetchIntroTriad())`, where `fetchIntroTriad()` resolves the root MIDI
+via `cmd_effective_intro_root_midi` and then builds the triad via `cmd_intro_chord`
+(Android/iOS mirror this with their own `EarRingCore` FFI calls into the same Rust
+functions). Add a User-section setting (e.g. `introPlaysChord: boolean`, default true to
+match current behavior) that, when off, plays just the root note instead —
+straightforward since `useAudioPlayback.ts` already exposes a single-note `playNote()`
+alongside `playChord()` (Android/iOS have the equivalent single-note playback already
+used elsewhere, e.g. for sequence notes). When the setting is off, skip the
+`cmd_intro_chord` call entirely and just `playNote(rootMidi)` using the root MIDI already
+computed by `cmd_effective_intro_root_midi`. Belongs in the User section, not Advanced —
+it's a practice-style preference (some players want the fuller tonal context a chord
+gives, others prefer training against just the root), not a tuning knob.
+
+---
+
 ## Detection & Exercise-Mode R&D (not premium-specific)
 
 ### Mic setup auto-calibration
