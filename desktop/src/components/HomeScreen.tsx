@@ -132,14 +132,14 @@ function PianoRangePicker({ rangeStart: rangeStartProp, rangeEnd: rangeEndProp, 
       ctx.fillRect(cx - BLACK_KEY_W / 2, keyTop, BLACK_KEY_W, BLACK_KEY_H);
     }
     // C key labels
-    ctx.font = '9px sans-serif';
+    ctx.font = 'bold 14px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     for (let m = PIANO_MIDI_MIN; m <= PIANO_MIDI_MAX; m += 12) {
       const oct = Math.floor(m / 12) - 1;
       const left = whiteIndex(m) * WHITE_KEY_W;
-      ctx.fillStyle = (m >= rangeStart && m <= rangeEnd) ? '#3F51B5' : '#777';
-      ctx.fillText(`C${oct}`, left + WHITE_KEY_W / 2, keyTop + WHITE_KEY_H - 3);
+      ctx.fillStyle = (m >= rangeStart && m <= rangeEnd) ? '#3F51B5' : '#555';
+      ctx.fillText(`C${oct}`, left + WHITE_KEY_W / 2, keyTop + WHITE_KEY_H - 4);
     }
     // Handles
     const hy = HANDLE_AREA / 2;
@@ -153,9 +153,17 @@ function PianoRangePicker({ rangeStart: rangeStartProp, rangeEnd: rangeEndProp, 
     ctx.beginPath(); ctx.arc(ex, hy, HANDLE_R, 0, Math.PI * 2); ctx.fill();
   }, [rangeStart, rangeEnd, totalW, totalH]);
 
+  // The canvas is drawn in its normal (horizontal) orientation, then rotated 90deg via
+  // CSS to display sideways (see the returned JSX) — the drawing/hit-testing math above
+  // and below is entirely in that original, pre-rotation local space. A raw DOM
+  // getBoundingClientRect() reflects the POST-rotation box, so mouse coordinates read off
+  // it have to be mapped back: for rotate(90deg), original (x,y) <-> rotated-box (bx,by)
+  // via x = by, y = totalH - bx (the inverse of the forward mapping x'=totalH-y, y'=x).
   const getPos = (e: React.MouseEvent) => {
-    const rect = (e.target as HTMLElement).getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const bx = e.clientX - rect.left;
+    const by = e.clientY - rect.top;
+    return { x: by, y: totalH - bx };
   };
 
   const onMouseDown = (e: React.MouseEvent) => {
@@ -166,12 +174,16 @@ function PianoRangePicker({ rangeStart: rangeStartProp, rangeEnd: rangeEndProp, 
     if (dS <= HANDLE_R * 2.5) dragging.current = 0;
     else if (dE <= HANDLE_R * 2.5) dragging.current = 1;
     else {
-      // Tap
+      // Tap away from either handle: move whichever endpoint (start or end) is nearer to
+      // the tapped key directly there, instead of requiring a precise drag on a small
+      // handle — a single click sets start or end.
       const yInKeys = y - HANDLE_AREA;
       const tapped = xToMidi(x, yInKeys);
-      const span = rangeEnd - rangeStart;
-      const ns = Math.max(PIANO_MIDI_MIN, Math.min(PIANO_MIDI_MAX - span, tapped));
-      onChange(ns, ns + span);
+      if (Math.abs(tapped - rangeStart) <= Math.abs(tapped - rangeEnd)) {
+        onChange(Math.max(PIANO_MIDI_MIN, Math.min(rangeEnd - 12, tapped)), rangeEnd);
+      } else {
+        onChange(rangeStart, Math.max(rangeStart + 12, Math.min(PIANO_MIDI_MAX, tapped)));
+      }
     }
   };
   const onMouseMove = (e: React.MouseEvent) => {
@@ -183,27 +195,119 @@ function PianoRangePicker({ rangeStart: rangeStartProp, rangeEnd: rangeEndProp, 
   };
   const onMouseUp = () => { dragging.current = null; };
 
-  // Center scroll on initial render.
+  // Center scroll on initial render. Rotated display: a key's position along the
+  // original x-axis (keyX) maps directly to vertical position in the rotated,
+  // scrollable box — see getPos's comment for the rotation math.
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
-    const cx = (keyX(rangeStart) + keyX(rangeEnd)) / 2;
-    el.scrollLeft = Math.max(0, cx - el.clientWidth / 2);
+    const cy = (keyX(rangeStart) + keyX(rangeEnd)) / 2;
+    el.scrollTop = Math.max(0, cy - el.clientHeight / 2);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Outer box is sized to the POST-rotation (swapped) dimensions; the canvas keeps its
+  // original totalW x totalH size and is centered + rotated 90deg to exactly fill it,
+  // showing the keyboard sideways (low notes at top) so its long axis fits the popup's
+  // vertical space instead of needing wide horizontal scrolling.
   return (
-    <div ref={scrollContainerRef} style={{ overflowX: 'auto', width: '100%' }}>
-      <canvas
-        ref={canvasRef}
-        width={totalW}
-        height={totalH}
-        style={{ display: 'block', cursor: 'pointer' }}
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}
+    <div ref={scrollContainerRef} style={{ width: totalH, height: 'auto', maxHeight: '100%', overflowY: 'auto', overflowX: 'hidden', margin: '0 auto' }}>
+      <div style={{ position: 'relative', width: totalH, height: totalW }}>
+        <canvas
+          ref={canvasRef}
+          width={totalW}
+          height={totalH}
+          style={{
+            position: 'absolute', top: '50%', left: '50%',
+            transform: 'translate(-50%, -50%) rotate(90deg)',
+            cursor: 'pointer',
+          }}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}
+          onMouseLeave={onMouseUp}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── Typed start/end note entry, alongside the piano keyboard ─────────────────
+function RangeTextInputs({ rangeStart, rangeEnd, onChange, disabled }: {
+  rangeStart: number;
+  rangeEnd: number;
+  onChange: (s: number, e: number) => void;
+  disabled: boolean;
+}) {
+  const [startText, setStartText] = useState(midiLabel(rangeStart));
+  const [endText, setEndText] = useState(midiLabel(rangeEnd));
+  useEffect(() => setStartText(midiLabel(rangeStart)), [rangeStart]);
+  useEffect(() => setEndText(midiLabel(rangeEnd)), [rangeEnd]);
+
+  const commitStart = async () => {
+    const midi = await invoke<number | null>('cmd_label_to_midi', { label: startText }).catch(() => null);
+    if (midi !== null && midi >= PIANO_MIDI_MIN && midi <= PIANO_MIDI_MAX && rangeEnd - midi >= 12) {
+      onChange(midi, rangeEnd);
+    } else {
+      setStartText(midiLabel(rangeStart)); // invalid — revert to last valid value
+    }
+  };
+  const commitEnd = async () => {
+    const midi = await invoke<number | null>('cmd_label_to_midi', { label: endText }).catch(() => null);
+    if (midi !== null && midi >= PIANO_MIDI_MIN && midi <= PIANO_MIDI_MAX && midi - rangeStart >= 12) {
+      onChange(rangeStart, midi);
+    } else {
+      setEndText(midiLabel(rangeEnd)); // invalid — revert to last valid value
+    }
+  };
+  const inputStyle: React.CSSProperties = { width: 70, padding: '6px 8px', fontSize: 14, borderRadius: 6, border: '1px solid #ccc', textAlign: 'center' };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <input
+        value={startText}
+        disabled={disabled}
+        onChange={e => setStartText(e.target.value)}
+        onBlur={commitStart}
+        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+        style={inputStyle}
       />
+      <span style={{ color: '#757575' }}>to</span>
+      <input
+        value={endText}
+        disabled={disabled}
+        onChange={e => setEndText(e.target.value)}
+        onBlur={commitEnd}
+        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+        style={inputStyle}
+      />
+    </div>
+  );
+}
+
+// ─── Full-screen overlay for the range picker — the keyboard needs all the room it can
+// get to be tappable, so this fills the viewport rather than sizing to content. ─────────
+function FullScreenModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, background: '#fff', zIndex: 1000,
+        display: 'flex', flexDirection: 'column',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid #eee', flexShrink: 0 }}>
+        <span style={{ fontSize: 17, fontWeight: 600 }}>{title}</span>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{ background: 'none', border: 'none', padding: 0, color: '#3F51B5', fontSize: 16, fontWeight: 600, cursor: 'pointer' }}
+        >
+          Done
+        </button>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 16 }}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -220,6 +324,8 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
 
   // Semitone offset for key display (written vs concert pitch), mod 12.
   // Transposed Guitar has +12 which collapses to 0 — no annotation shown for it.
+  const [showRangePicker, setShowRangePicker] = useState(false);
+
   const [instrKeyTranspose, setInstrKeyTranspose] = useState(0);
   useEffect(() => {
     invoke<string>('cmd_instrument_list')
@@ -309,12 +415,33 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
         </div>
       </div>
 
-      <span className="section-label">Range ({midiLabel(safeRange(settings.rangeStart, settings.rangeEnd)[0])} – {midiLabel(safeRange(settings.rangeStart, settings.rangeEnd)[1])})</span>
-      <PianoRangePicker
-        rangeStart={settings.rangeStart}
-        rangeEnd={settings.rangeEnd}
-        onChange={isMelodyMode ? () => {} : (s, e) => onUpdateSettings(prev => ({ ...prev, rangeStart: s, rangeEnd: e }))}
-      />
+      <span className="section-label">Range</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+        <RangeTextInputs
+          rangeStart={settings.rangeStart}
+          rangeEnd={settings.rangeEnd}
+          disabled={isMelodyMode}
+          onChange={isMelodyMode ? () => {} : (s, e) => onUpdateSettings(prev => ({ ...prev, rangeStart: s, rangeEnd: e }))}
+        />
+        <button
+          type="button"
+          onClick={() => setShowRangePicker(true)}
+          title="Pick range on a keyboard"
+          aria-label="Pick range on a keyboard"
+          style={{ fontSize: 22, lineHeight: 1, padding: '6px 10px', borderRadius: 6, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}
+        >
+          🎹
+        </button>
+      </div>
+      {showRangePicker && (
+        <FullScreenModal title="Note Range" onClose={() => setShowRangePicker(false)}>
+          <PianoRangePicker
+            rangeStart={settings.rangeStart}
+            rangeEnd={settings.rangeEnd}
+            onChange={isMelodyMode ? () => {} : (s, e) => onUpdateSettings(prev => ({ ...prev, rangeStart: s, rangeEnd: e }))}
+          />
+        </FullScreenModal>
+      )}
 
       <div>
         <span className="section-label">Sequence Length</span>

@@ -5,7 +5,7 @@ pub mod tracker;
 pub use music_theory::{
     accidental_in_key, diatonic_chord_label, effective_key_chroma, effective_intro_root_midi, freq_to_note, generate_diatonic_chord, generate_sequence, intro_chord,
     is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
-    key_signature_pitch_classes, melody_count, melody_range_midi, melody_raw_notes, melody_title,
+    key_signature_pitch_classes, label_to_midi, melody_count, melody_range_midi, melody_raw_notes, melody_title,
     melody_to_midi_by_index, midi_to_freq, midi_to_label, note_name, note_timing,
     preferred_midi_label, preferred_note_label, scale_label, scale_name, scale_notes,
     scale_type_from_id, shuffle_melody_indices, staff_position, staff_position_in_key, test_score,
@@ -459,6 +459,21 @@ pub extern "C" fn ear_ring_midi_to_label(
     copy_len as c_int
 }
 
+/// Parse a typed note label (e.g. "C4", "C#4", "Db4") into a MIDI number.
+/// `label` must be a null-terminated UTF-8 C string.
+/// Returns the MIDI number (0–127) on success, or -1 if the label doesn't parse.
+#[no_mangle]
+pub extern "C" fn ear_ring_label_to_midi(label: *const std::os::raw::c_char) -> c_int {
+    if label.is_null() {
+        return -1;
+    }
+    let s = unsafe { std::ffi::CStr::from_ptr(label) };
+    match s.to_str().ok().and_then(label_to_midi) {
+        Some(midi) => midi as c_int,
+        None => -1,
+    }
+}
+
 /// Display name for a pitch class (chroma 0–11).
 /// Writes a null-terminated UTF-8 string into `out_buf`.
 /// Returns the number of bytes written (excluding null), or -1 on error.
@@ -793,14 +808,14 @@ pub extern "C" fn ear_ring_tracker_process(
 // ── Android JNI exports ───────────────────────────────────────────────────────
 #[cfg(target_os = "android")]
 mod android_jni {
-    use jni::objects::{JClass, JFloatArray, JIntArray};
+    use jni::objects::{JClass, JFloatArray, JIntArray, JString};
     use jni::sys::{jfloat, jfloatArray, jint, jintArray, jlong, jstring};
     use jni::JNIEnv;
 
     use super::{
         accidental_in_key, detect_pitch, diatonic_chord_label, effective_key_chroma, effective_intro_root_midi, freq_to_note,
         generate_diatonic_chord, generate_sequence, intro_chord, is_correct_note, is_sharp_key,
-        key_accidental_count, key_sig_staff_positions, melody_count, melody_range_midi,
+        key_accidental_count, key_sig_staff_positions, label_to_midi, melody_count, melody_range_midi,
         melody_to_midi_by_index, midi_to_label, note_name, preferred_midi_label,
         preferred_note_label, scale_label, scale_name, scale_type_from_id, shuffle_melody_indices, staff_position,
         staff_position_in_key, test_score, written_diatonic_chord_label, written_scale_label, Note, ScaleType,
@@ -1010,6 +1025,16 @@ mod android_jni {
         env.new_string(label)
             .map(|s| s.into_raw())
             .unwrap_or(std::ptr::null_mut())
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeLabelToMidi(
+        mut env: JNIEnv,
+        _class: JClass,
+        label: JString,
+    ) -> jint {
+        let s: String = env.get_string(&label).map(|s| s.into()).unwrap_or_default();
+        label_to_midi(&s).map(|m| m as jint).unwrap_or(-1)
     }
 
     #[no_mangle]

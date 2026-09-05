@@ -24,6 +24,7 @@ object EarRingCore {
     @JvmStatic external fun nativeIsCorrectNote(detectedMidi: Int, cents: Int, expectedMidi: Int): Int
     @JvmStatic external fun nativeTestScore(maxAttempts: Int, attemptsUsed: Int, passed: Int): Int
     @JvmStatic external fun nativeMidiToLabel(midi: Int): String
+    @JvmStatic external fun nativeLabelToMidi(label: String): Int
     @JvmStatic external fun nativeNoteName(chroma: Int): String
     @JvmStatic external fun nativeScaleName(scaleId: Int): String
     @JvmStatic external fun nativeScaleLabel(rootChroma: Int, scaleId: Int): String
@@ -140,6 +141,28 @@ object EarRingCore {
             val names = listOf("C","C#","D","D#","E","F","F#","G","G#","A","A#","B")
             "${names[pitchClass]}$octave"
         }
+
+    /** Parse a typed note label (e.g. "C4", "C#4", "Db4") into a MIDI number, or null if invalid. */
+    fun labelToMidi(label: String): Int? {
+        if (loaded) {
+            val midi = nativeLabelToMidi(label)
+            return if (midi in 0..127) midi else null
+        }
+        val s = label.trim()
+        if (s.isEmpty()) return null
+        val baseChroma = when (s[0].uppercaseChar()) {
+            'C' -> 0; 'D' -> 2; 'E' -> 4; 'F' -> 5; 'G' -> 7; 'A' -> 9; 'B' -> 11
+            else -> return null
+        }
+        var rest = s.substring(1)
+        var chroma = baseChroma
+        if (rest.startsWith("#")) { chroma += 1; rest = rest.substring(1) }
+        else if (rest.startsWith("b", ignoreCase = true)) { chroma -= 1; rest = rest.substring(1) }
+        val octave = rest.trim().toIntOrNull() ?: return null
+        chroma = ((chroma % 12) + 12) % 12
+        val midi = (octave + 1) * 12 + chroma
+        return if (midi in 0..127) midi else null
+    }
 
     fun noteName(chroma: Int): String =
         if (loaded) nativeNoteName(chroma) else

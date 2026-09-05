@@ -3,6 +3,8 @@ package com.jollygoodsw.earring.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -15,8 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,6 +49,15 @@ fun HomeScreen(
         } catch (_: Exception) { 0 }
     }
 
+    // Hoisted above the scrollable Column so the full-screen picker overlay below can sit
+    // as its sibling in this Box, rather than a system Dialog — Dialog's window resize
+    // (needed for a true full-screen size; see PianoRangePickerScreen's history) raced with
+    // the first Compose layout pass and left the keyboard measured against the small
+    // pre-resize constraints, silently mispositioned no matter what alignment was tried.
+    // An in-tree overlay gets correct full-size constraints from the very first frame.
+    var showRangePicker by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -194,14 +208,32 @@ fun HomeScreen(
         }
         Spacer(Modifier.height(16.dp))
 
-        // Range selection — piano keyboard
-        SectionLabel("Range  (${MusicTheory.midiToLabel(state.rangeStart)} – ${MusicTheory.midiToLabel(state.rangeEnd)})")
-        PianoRangePicker(
-            rangeStart = state.rangeStart,
-            rangeEnd = state.rangeEnd,
-            onRangeChange = if (state.testType != 1) { s, e -> viewModel.setRange(s, e) } else { _, _ -> },
-            modifier = Modifier.fillMaxWidth()
-        )
+        // Range selection — typed start/end fields, plus a button opening the piano
+        // keyboard full-screen (it needs all the room it can get to stay tappable —
+        // see PianoRangePickerScreen below for why this isn't a small dialog).
+        SectionLabel("Range")
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            RangeTextInputs(
+                rangeStart = state.rangeStart,
+                rangeEnd = state.rangeEnd,
+                enabled = state.testType != 1,
+                onRangeChange = if (state.testType != 1) { s, e -> viewModel.setRange(s, e) } else { _, _ -> }
+            )
+            val focusManager = LocalFocusManager.current
+            OutlinedButton(
+                onClick = {
+                    // Force any in-progress edit in the range fields to commit (their
+                    // onFocusChanged only fires on real focus loss) before the full-screen
+                    // picker opens over them — otherwise a value just typed and not yet
+                    // blurred could be silently lost.
+                    focusManager.clearFocus()
+                    showRangePicker = true
+                },
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Text("🎹", fontSize = 20.sp)  // 🎹
+            }
+        }
         Spacer(Modifier.height(16.dp))
 
         // Sequence length
@@ -250,6 +282,64 @@ fun HomeScreen(
             Text("▶ Start Exercise", fontSize = 18.sp)
         }
         Spacer(Modifier.height(16.dp))
+    }  // Column
+
+    if (showRangePicker) {
+        PianoRangePickerScreen(
+            rangeStart = state.rangeStart,
+            rangeEnd = state.rangeEnd,
+            onRangeChange = if (state.testType != 1) { s, e -> viewModel.setRange(s, e) } else { _, _ -> },
+            onDone = { showRangePicker = false }
+        )
+    }
+    }  // Box
+}
+
+/** Typed start/end note entry ("C4", "D5"), alongside the piano keyboard picker. */
+@Composable
+private fun RangeTextInputs(
+    rangeStart: Int,
+    rangeEnd: Int,
+    enabled: Boolean,
+    onRangeChange: (Int, Int) -> Unit
+) {
+    var startText by remember(rangeStart) { mutableStateOf(MusicTheory.midiToLabel(rangeStart)) }
+    var endText by remember(rangeEnd) { mutableStateOf(MusicTheory.midiToLabel(rangeEnd)) }
+
+    fun commitStart() {
+        val midi = EarRingCore.labelToMidi(startText)
+        if (midi != null && rangeEnd - midi >= 12) onRangeChange(midi, rangeEnd)
+        else startText = MusicTheory.midiToLabel(rangeStart) // invalid — revert to last valid value
+    }
+    fun commitEnd() {
+        val midi = EarRingCore.labelToMidi(endText)
+        if (midi != null && midi - rangeStart >= 12) onRangeChange(rangeStart, midi)
+        else endText = MusicTheory.midiToLabel(rangeEnd) // invalid — revert to last valid value
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        OutlinedTextField(
+            value = startText,
+            onValueChange = { startText = it },
+            enabled = enabled,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { commitStart() }),
+            modifier = Modifier.width(90.dp).onFocusChanged { if (!it.isFocused) commitStart() }
+        )
+        Text("to")
+        OutlinedTextField(
+            value = endText,
+            onValueChange = { endText = it },
+            enabled = enabled,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { commitEnd() }),
+            modifier = Modifier.width(90.dp).onFocusChanged { if (!it.isFocused) commitEnd() }
+        )
     }
 }
 

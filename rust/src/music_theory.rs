@@ -546,6 +546,40 @@ pub fn midi_to_label(midi: u8) -> String {
     Note::from_midi(midi).to_string()
 }
 
+/// Parse a typed note label (e.g. "C4", "C#4", "Db4", "Bb-1") into a MIDI number.
+/// The note letter is case-insensitive; the accidental accepts either '#'/sharp or
+/// 'b'/'B' flat (so both spellings of the same pitch class parse, even though
+/// `midi_to_label` only ever emits the flat spelling). The octave is a signed integer
+/// using the same convention as `midi_to_label`/`Note::from_midi` (C4 = MIDI 60).
+/// Returns `None` for anything that doesn't parse or resolves outside 0..=127.
+pub fn label_to_midi(label: &str) -> Option<u8> {
+    let s = label.trim();
+    let mut chars = s.chars();
+    let letter = chars.next()?.to_ascii_uppercase();
+    let base_chroma: i32 = match letter {
+        'C' => 0,
+        'D' => 2,
+        'E' => 4,
+        'F' => 5,
+        'G' => 7,
+        'A' => 9,
+        'B' => 11,
+        _ => return None,
+    };
+    let rest: String = chars.collect();
+    let (chroma_offset, rest) = if let Some(r) = rest.strip_prefix('#') {
+        (1, r)
+    } else if let Some(r) = rest.strip_prefix('b').or_else(|| rest.strip_prefix('B')) {
+        (-1, r)
+    } else {
+        (0, rest.as_str())
+    };
+    let octave: i32 = rest.trim().parse().ok()?;
+    let chroma = (base_chroma + chroma_offset).rem_euclid(12);
+    let midi = (octave + 1) * 12 + chroma;
+    u8::try_from(midi).ok().filter(|_| (0..=127).contains(&midi))
+}
+
 /// Display name for a pitch class (chroma 0–11), e.g. 0 → "C", 1 → "C#".
 pub fn note_name(chroma: u8) -> &'static str {
     NoteName::from_chroma(chroma).display_name()
@@ -976,6 +1010,38 @@ mod tests {
         let c4 = Note::new(NoteName::C, 4);
         assert_eq!(c4.midi(), 60);
         assert!((c4.frequency() - 261.63).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_label_to_midi_round_trips_midi_to_label() {
+        for midi in 0..=127u8 {
+            let label = midi_to_label(midi);
+            assert_eq!(label_to_midi(&label), Some(midi), "round-trip failed for {label}");
+        }
+    }
+
+    #[test]
+    fn test_label_to_midi_accepts_sharp_and_flat_spellings() {
+        // C#4 and Db4 are the same pitch class; midi_to_label only ever emits Db4.
+        assert_eq!(label_to_midi("C#4"), Some(61));
+        assert_eq!(label_to_midi("Db4"), Some(61));
+        assert_eq!(label_to_midi("db4"), Some(61));
+    }
+
+    #[test]
+    fn test_label_to_midi_is_case_insensitive_and_trims_whitespace() {
+        assert_eq!(label_to_midi("c4"), Some(60));
+        assert_eq!(label_to_midi("  A4  "), Some(69));
+    }
+
+    #[test]
+    fn test_label_to_midi_rejects_garbage() {
+        assert_eq!(label_to_midi(""), None);
+        assert_eq!(label_to_midi("H4"), None);       // not a note letter
+        assert_eq!(label_to_midi("C"), None);        // missing octave
+        assert_eq!(label_to_midi("C4x"), None);      // trailing junk
+        assert_eq!(label_to_midi("C99"), None);      // out of MIDI range (>127)
+        assert_eq!(label_to_midi("C-99"), None);     // out of MIDI range (<0)
     }
 
     #[test]

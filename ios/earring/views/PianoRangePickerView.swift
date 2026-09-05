@@ -27,33 +27,36 @@ struct PianoRangePickerView: View {
     private var handleArea: CGFloat { 22 * keyScale }
 
     var body: some View {
-        let totalW = whiteKeyW * CGFloat(TOTAL_WHITE_KEYS)
-        let centerX = (keyX(rangeStart) + keyX(rangeEnd)) / 2
-        let midY = (handleArea + whiteKeyH) / 2
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                ZStack(alignment: .topLeading) {
-                    Canvas { ctx, size in
-                        drawPiano(ctx: ctx, size: size)
-                    }
-                    .frame(width: totalW, height: handleArea + whiteKeyH)
-                    .gesture(
-                        DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                            .onChanged { value in handleGesture(at: value.location, isDrag: true) }
-                            .onEnded { value in handleGesture(at: value.location, isDrag: false) }
-                    )
-                    // Invisible anchor used by ScrollViewReader to center the range.
-                    Color.clear
-                        .frame(width: 1, height: 1)
-                        .id("range-center")
-                        .position(x: centerX, y: midY)
-                }
-                .frame(width: totalW, height: handleArea + whiteKeyH)
-            }
-            .onAppear {
-                proxy.scrollTo("range-center", anchor: .center)
-            }
+        let totalW = whiteKeyW * CGFloat(TOTAL_WHITE_KEYS)   // keyboard length, along the original x-axis
+        let totalH = handleArea + whiteKeyH                   // keyboard thickness, along the original y-axis
+
+        // Drawn and hit-tested in its normal (horizontal) layout below, then rotated 90deg
+        // so the keyboard displays sideways (low notes at top): its long axis runs down the
+        // popup instead of needing wide horizontal scrolling. The DragGesture is attached to
+        // this *outer*, un-rotated container (sized to the swapped totalH x totalW box)
+        // rather than to the rotated Canvas itself — SwiftUI's rotationEffect doesn't
+        // reliably auto-transform gesture coordinates the way Compose's pointer input does,
+        // so mapToOriginal() below does that mapping explicitly, and none of
+        // drawPiano/xToMidi/keyX needs to change.
+        Canvas { ctx, size in
+            drawPiano(ctx: ctx, size: size)
         }
+        .frame(width: totalW, height: totalH)
+        .rotationEffect(.degrees(90))
+        .frame(width: totalH, height: totalW)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                .onChanged { value in handleGesture(at: mapToOriginal(value.location, totalH: totalH), isDrag: true) }
+                .onEnded { value in handleGesture(at: mapToOriginal(value.location, totalH: totalH), isDrag: false) }
+        )
+    }
+
+    /// Maps a point in the outer (un-rotated) totalH x totalW container back into the
+    /// original pre-rotation totalW x totalH canvas space that drawPiano/keyX/xToMidi use.
+    /// Inverse of the rotationEffect(90deg) forward mapping x'=totalH-y, y'=x.
+    private func mapToOriginal(_ p: CGPoint, totalH: CGFloat) -> CGPoint {
+        CGPoint(x: p.y, y: totalH - p.x)
     }
 
     private func keyX(_ midi: Int) -> CGFloat {
@@ -89,12 +92,16 @@ struct PianoRangePickerView: View {
         let ex = keyX(rangeEnd)
 
         if dragging == nil && !isDrag {
-            // Tap
+            // Tap away from either handle: move whichever endpoint (start or end) is
+            // nearer to the tapped key directly there, instead of requiring a precise
+            // drag on a small handle — a single tap sets start or end.
             let yInKeys = point.y - handleArea
             let tapped = xToMidi(point.x, yInKeys: yInKeys)
-            let span = rangeEnd - rangeStart
-            let newStart = max(PIANO_MIDI_MIN, min(PIANO_MIDI_MAX - span, tapped))
-            onRangeChange(newStart, newStart + span)
+            if abs(tapped - rangeStart) <= abs(tapped - rangeEnd) {
+                onRangeChange(max(PIANO_MIDI_MIN, min(rangeEnd - 12, tapped)), rangeEnd)
+            } else {
+                onRangeChange(rangeStart, max(rangeStart + 12, min(PIANO_MIDI_MAX, tapped)))
+            }
             return
         }
 
@@ -157,9 +164,9 @@ struct PianoRangePickerView: View {
             let left = CGFloat(whiteIndex(of: midi)) * whiteKeyW
             let cx = left + whiteKeyW / 2
             let inRange = midi >= rangeStart && midi <= rangeEnd
-            let labelColor = inRange ? primary : Color(red: 0.467, green: 0.467, blue: 0.467)
+            let labelColor = inRange ? primary : Color(red: 0.33, green: 0.33, blue: 0.33)
             ctx.draw(
-                Text("C\(oct)").font(.system(size: 9 * keyScale)).foregroundColor(labelColor),
+                Text("C\(oct)").font(.system(size: 14 * keyScale, weight: .bold)).foregroundColor(labelColor),
                 at: CGPoint(x: cx, y: keyTop + whiteKeyH - labelOffset),
                 anchor: .bottom
             )
@@ -175,5 +182,46 @@ struct PianoRangePickerView: View {
         ctx.stroke(linePath, with: .color(primary), lineWidth: 3)
         ctx.fill(Path(ellipseIn: CGRect(x: sx - handleR, y: hy - handleR, width: handleR * 2, height: handleR * 2)), with: .color(primary))
         ctx.fill(Path(ellipseIn: CGRect(x: ex - handleR, y: hy - handleR, width: handleR * 2, height: handleR * 2)), with: .color(primary))
+    }
+}
+
+/// Keyboard length at keyScale=1 — the full unscaled span PianoRangePickerView draws before
+/// any fit-to-available-space shrinking is applied. Exposed so callers can compute that scale.
+let PIANO_RANGE_PICKER_NATURAL_LENGTH: CGFloat = 22 * CGFloat(TOTAL_WHITE_KEYS)
+
+/// Full-screen presentation of [PianoRangePickerView] — deliberately not a small sheet: at
+/// natural size the rotated keyboard is far taller than a sheet can offer without either
+/// scrolling (which risks fighting the picker's own drag-a-handle gesture, the same class of
+/// conflict hit and fixed on Android — see PianoRangePicker.kt's history) or shrinking it
+/// down to an untappable size. Full-screen gives it enough room to render close to natural
+/// size on most phones, computed here from the actual space left after the top bar via
+/// GeometryReader.
+struct PianoRangePickerFullScreen: View {
+    let rangeStart: Int
+    let rangeEnd: Int
+    let onRangeChange: (Int, Int) -> Void
+    let onDone: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Note Range").font(.title2)
+                Spacer()
+                Button("Done", action: onDone)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            GeometryReader { geo in
+                let keyScale = min(1.0, geo.size.height / PIANO_RANGE_PICKER_NATURAL_LENGTH)
+                PianoRangePickerView(
+                    rangeStart: rangeStart,
+                    rangeEnd: rangeEnd,
+                    onRangeChange: onRangeChange,
+                    keyScale: keyScale
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+        }
+        .background(Color(.systemBackground))
     }
 }

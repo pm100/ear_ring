@@ -115,6 +115,11 @@ int32_t ear_ring_test_score(uint8_t max_attempts, uint8_t attempts_used, int32_t
 /// Returns bytes written (excluding null), or -1 on error.
 int32_t ear_ring_midi_to_label(uint8_t midi, char *out_buf, uint32_t buf_len);
 
+/// Parse a typed note label (e.g. "C4", "C#4", "Db4") into a MIDI number.
+/// `label` must be a null-terminated UTF-8 C string.
+/// Returns the MIDI number (0–127) on success, or -1 if the label doesn't parse.
+int32_t ear_ring_label_to_midi(const char *label);
+
 /// Display name for a pitch class (chroma 0–11), e.g. 0 → "C", 1 → "C#".
 /// Writes a null-terminated string into out_buf.
 /// Returns bytes written (excluding null), or -1 on error.

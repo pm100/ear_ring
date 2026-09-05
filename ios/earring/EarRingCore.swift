@@ -62,6 +62,12 @@ struct EarRingCore {
         return String(cString: buf)
     }
 
+    /// Parse a typed note label (e.g. "C4", "C#4", "Db4") into a MIDI number, or nil if invalid.
+    static func labelToMidi(_ label: String) -> Int? {
+        let midi = label.withCString { ear_ring_label_to_midi($0) }
+        return midi >= 0 ? Int(midi) : nil
+    }
+
     /// Display name for a pitch class (chroma 0–11), e.g. 0 → "C", 1 → "C#".
     static func noteName(chroma: Int) -> String {
         var buf = [CChar](repeating: 0, count: 8)

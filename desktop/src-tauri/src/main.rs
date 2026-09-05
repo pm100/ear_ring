@@ -2,7 +2,7 @@
 
 use ear_ring_core::{
     accidental_in_key, detect_pitch, diatonic_chord_label, effective_intro_root_midi, freq_to_note, generate_diatonic_chord, generate_sequence, help_sections_json,
-    intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
+    intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions, label_to_midi,
     melody_count, melody_range_midi, melody_title, melody_to_midi_by_index, note_timing, preferred_midi_label,
     scale_type_from_id, shuffle_melody_indices, staff_position, test_score, written_diatonic_chord_label, written_note_name, written_midi_label, written_scale_label,
     Note, PitchTracker, ScaleType,
@@ -157,6 +157,13 @@ fn cmd_accidental_in_key(midi: u8, root_chroma: u8) -> i32 {
     }
 }
 
+/// Parse a typed note label (e.g. "C4", "C#4", "Db4") into a MIDI number.
+/// Returns None if it doesn't parse or falls outside 0..=127.
+#[tauri::command]
+fn cmd_label_to_midi(label: String) -> Option<u8> {
+    label_to_midi(&label)
+}
+
 #[tauri::command]
 fn cmd_key_sig_positions(root_chroma: u8) -> (Vec<i32>, bool) {
     let (positions, is_sharp) = key_sig_staff_positions(root_chroma);
@@ -270,6 +277,7 @@ fn main() {
             cmd_transpose_display_midi,
             cmd_written_note_name,
             cmd_written_midi_label,
+            cmd_label_to_midi,
             cmd_written_scale_label,
             cmd_effective_intro_root_midi,
             cmd_melody_count,

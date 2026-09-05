@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Brand colours
 
@@ -120,10 +121,10 @@ struct HomeView: View {
     @Environment(\.horizontalSizeClass) var hsc
 
     @State private var instrKeyTranspose: Int = 0
+    @State private var showRangePicker: Bool = false
 
     private var isIPad: Bool { hsc == .regular }
     private var keyScale: CGFloat { isIPad ? 1.35 : 1.0 }
-    private var pianoHeight: CGFloat { (22 * keyScale + 80 * keyScale) * 1.0 }  // handleArea + whiteKeyH
 
     var body: some View {
         ScrollView {
@@ -201,15 +202,36 @@ struct HomeView: View {
                     .frame(maxWidth: .infinity)
                 }
 
-                // ── Range (piano keyboard) ────────────────────────────────
-                sectionLabel("Range  (\(model.rangeLabel))").padding(.top, 16)
-                PianoRangePickerView(
-                    rangeStart: model.rangeStart,
-                    rangeEnd: model.rangeEnd,
-                    onRangeChange: model.testType == 1 ? { _, _ in } : { s, e in model.rangeStart = s; model.rangeEnd = e },
-                    keyScale: keyScale
-                )
-                .frame(height: pianoHeight)
+                // ── Range: typed start/end fields, plus a button opening the piano
+                // keyboard full-screen (it needs all the room it can get to stay tappable —
+                // see PianoRangePickerFullScreen below for why this isn't a small sheet). ──
+                sectionLabel("Range").padding(.top, 16)
+                HStack(spacing: 10) {
+                    RangeTextInputs(
+                        rangeStart: model.rangeStart,
+                        rangeEnd: model.rangeEnd,
+                        enabled: model.testType != 1,
+                        onRangeChange: model.testType == 1 ? { _, _ in } : { s, e in model.rangeStart = s; model.rangeEnd = e }
+                    )
+                    Button {
+                        // Force any in-progress edit in the range fields to resign first
+                        // responder (their commit only fires on real focus loss) before the
+                        // full-screen picker opens over them — otherwise a value just typed
+                        // and not yet blurred could be silently lost. Mirrors the equivalent
+                        // fix on Android (LocalFocusManager.clearFocus()).
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                        showRangePicker = true
+                    } label: {
+                        Text("🎹")
+                            .font(.system(size: 20))
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .strokeBorder(Color.erMuted, lineWidth: 1)
+                            )
+                    }
+                }
 
                 // ── Sequence Length ───────────────────────────────────────
                 sectionLabel("Sequence Length").padding(.top, 16)
@@ -268,6 +290,14 @@ struct HomeView: View {
         .hideNavigationBar()
         .onAppear { loadInstrTranspose() }
         .onChange(of: model.instrumentIndex) { _ in loadInstrTranspose() }
+        .fullScreenCover(isPresented: $showRangePicker) {
+            PianoRangePickerFullScreen(
+                rangeStart: model.rangeStart,
+                rangeEnd: model.rangeEnd,
+                onRangeChange: model.testType == 1 ? { _, _ in } : { s, e in model.rangeStart = s; model.rangeEnd = e },
+                onDone: { showRangePicker = false }
+            )
+        }
     }
 
     @ViewBuilder
@@ -288,5 +318,62 @@ struct HomeView: View {
         }
         let sem = (arr[model.instrumentIndex]["semitones"] as? Int) ?? 0
         instrKeyTranspose = ((sem % 12) + 12) % 12
+    }
+}
+
+/// Typed start/end note entry ("C4", "D5"), alongside the piano keyboard picker.
+private struct RangeTextInputs: View {
+    let rangeStart: Int
+    let rangeEnd: Int
+    let enabled: Bool
+    let onRangeChange: (Int, Int) -> Void
+
+    @State private var startText: String = ""
+    @State private var endText: String = ""
+    @FocusState private var startFocused: Bool
+    @FocusState private var endFocused: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            TextField("", text: $startText)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 70)
+                .multilineTextAlignment(.center)
+                .disabled(!enabled)
+                .focused($startFocused)
+                .onSubmit { commitStart() }
+                .onChange(of: startFocused) { focused in if !focused { commitStart() } }
+            Text("to")
+            TextField("", text: $endText)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 70)
+                .multilineTextAlignment(.center)
+                .disabled(!enabled)
+                .focused($endFocused)
+                .onSubmit { commitEnd() }
+                .onChange(of: endFocused) { focused in if !focused { commitEnd() } }
+        }
+        .onAppear {
+            startText = MusicTheory.midiToLabel(rangeStart)
+            endText = MusicTheory.midiToLabel(rangeEnd)
+        }
+        .onChange(of: rangeStart) { startText = MusicTheory.midiToLabel($0) }
+        .onChange(of: rangeEnd) { endText = MusicTheory.midiToLabel($0) }
+    }
+
+    private func commitStart() {
+        if let midi = EarRingCore.labelToMidi(startText), rangeEnd - midi >= 12 {
+            onRangeChange(midi, rangeEnd)
+        } else {
+            startText = MusicTheory.midiToLabel(rangeStart) // invalid — revert to last valid value
+        }
+    }
+
+    private func commitEnd() {
+        if let midi = EarRingCore.labelToMidi(endText), midi - rangeStart >= 12 {
+            onRangeChange(rangeStart, midi)
+        } else {
+            endText = MusicTheory.midiToLabel(rangeEnd) // invalid — revert to last valid value
+        }
     }
 }
