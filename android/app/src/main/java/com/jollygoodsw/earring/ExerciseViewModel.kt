@@ -381,6 +381,21 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         playPrompt()
     }
 
+    /**
+     * Manually replay the current test's prompt on demand (issue #7) — reuses
+     * retryCurrentTest's reset-and-replay behavior but keeps the SAME attempt number
+     * instead of advancing it, so it doesn't consume one of maxRetries. Only meaningful
+     * while LISTENING: rememberPitchDetector (see ExerciseScreen.kt) automatically stops
+     * mic capture as soon as status leaves LISTENING, and that's also the only state where
+     * no other playPrompt() call is already in flight for this session — so there's no risk
+     * of two overlapping prompts firing.
+     */
+    fun repeatCurrentTest() {
+        val state = _state.value
+        if (state.status != ExerciseStatus.LISTENING) return
+        retryCurrentTest(state.currentAttempt)
+    }
+
     private fun playPrompt() {
         val state = _state.value
         if (!state.sessionRunning || state.sequence.isEmpty()) return

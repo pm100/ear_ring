@@ -309,6 +309,16 @@ class ExerciseModel: ObservableObject {
         await playPrompt()
     }
 
+    /// Replays the current test on demand (issue #7's Repeat button). Unlike the
+    /// automatic wrong-note retry, this keeps the same attempt number so it never
+    /// consumes one of the user's allowed attempts.
+    func repeatCurrentTest() {
+        guard status == .listening else { return }
+        audioCapture.stop()
+        let attempt = currentAttempt
+        Task { await self.retryCurrentTest(attempt: attempt) }
+    }
+
     private func playPrompt() async {
         // A previous session's delayed continuation (completeTest's/commitNote's Task) can still
         // be mid-flight when a new session starts — isSessionRunning alone can't tell them apart

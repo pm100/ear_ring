@@ -141,12 +141,20 @@ struct ExerciseView: View {
     }
 
     private var stopButton: some View {
-        Button("⏹ Stop Testing") {
-            model.stopExerciseSession()
-            progressModel.reload()
-            path = NavigationPath()
+        HStack(spacing: 10) {
+            Button("↻ Repeat") {
+                model.repeatCurrentTest()
+            }
+            .buttonStyle(OutlinedButtonStyle(height: 52, fontSize: 17))
+            .disabled(model.status != .listening)
+
+            Button("⏹ Stop Testing") {
+                model.stopExerciseSession()
+                progressModel.reload()
+                path = NavigationPath()
+            }
+            .buttonStyle(ErrorButtonStyle(height: 52, fontSize: 17))
         }
-        .buttonStyle(ErrorButtonStyle(height: 52, fontSize: 17))
     }
 
     @ViewBuilder

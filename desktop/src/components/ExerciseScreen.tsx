@@ -272,6 +272,18 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     await playPromptForSequence(sequenceRef.current, melodyDurationsRef.current.length > 0 ? melodyDurationsRef.current : undefined, melodyTimingsRef.current.length > 0 ? melodyTimingsRef.current : undefined, myGen);
   }, [playPromptForSequence]);
 
+  // Manually replay the current test's prompt on demand (issue #7) — reuses
+  // retryCurrentTest's reset-and-replay behavior (via playPromptForSequence) but passes
+  // the SAME attempt number instead of +1, so it doesn't consume one of maxRetries.
+  // Only offered while status is 'listening': that's the only state where no other
+  // playPromptForSequence call is already in flight for this generation, so there's no
+  // risk of two overlapping prompts firing at once.
+  const repeatCurrentTest = useCallback(() => {
+    if (status !== 'listening') return;
+    stopCapture();
+    void retryCurrentTest(currentAttemptRef.current);
+  }, [status, stopCapture, retryCurrentTest]);
+
   const completeTest = useCallback((passed: boolean, attemptNotes: DetectedNote[], attemptsUsed: number) => {
     const myGen = startFreshGenRef.current;
     if (exercise.playPassFailSounds) {
@@ -457,7 +469,20 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         <PitchMeter hz={liveHz} />
       </div>
 
-      <button className="btn-danger" onClick={stopSession}>{'\u23f9'} Stop Testing</button>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button
+          onClick={repeatCurrentTest}
+          disabled={status !== 'listening'}
+          style={{
+            flex: 1, height: 52, fontSize: 17, fontWeight: 600, borderRadius: 8, marginTop: 8,
+            background: 'none', border: '1.5px solid var(--primary)', color: 'var(--primary)',
+            cursor: status !== 'listening' ? 'default' : 'pointer', opacity: status !== 'listening' ? 0.38 : 1,
+          }}
+        >
+          {'\u21bb'} Repeat
+        </button>
+        <button className="btn-danger" onClick={stopSession} style={{ flex: 1 }}>{'\u23f9'} Stop Testing</button>
+      </div>
 
       {detected.length > 0 && (
         <div style={{ marginTop: 20 }}>
