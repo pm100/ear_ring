@@ -1,8 +1,17 @@
 package com.jollygoodsw.earring.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
@@ -16,6 +25,54 @@ import com.jollygoodsw.earring.EarRingCore
 import com.jollygoodsw.earring.ExerciseViewModel
 import org.json.JSONArray
 import kotlin.math.roundToInt
+
+/** Bold uppercase-ish group header ("User" / "Advanced") above a set of collapsible sections. */
+@Composable
+private fun GroupHeader(title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier
+            .padding(top = 20.dp, bottom = 4.dp)
+            .fillMaxWidth()
+    )
+    HorizontalDivider()
+}
+
+/** A section that starts collapsed; tapping the header title toggles it open/closed. */
+@Composable
+private fun ExpandableSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(vertical = 10.dp)
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            Column(modifier = Modifier.padding(bottom = 12.dp), content = content)
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,130 +101,129 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
     ) {
         Spacer(Modifier.height(8.dp))
 
-        Text("Instrument", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 4.dp))
-        SectionLabel("Instrument")
-        ExposedDropdownMenuBox(
-            expanded = instrumentExpanded,
-            onExpandedChange = { instrumentExpanded = !instrumentExpanded }
-        ) {
-            OutlinedTextField(
-                value = instrumentNames.getOrElse(state.instrumentIndex) { "Piano" },
-                onValueChange = {},
-                readOnly = true,
-                singleLine = true,
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = instrumentExpanded) },
-                modifier = Modifier.menuAnchor().fillMaxWidth()
-            )
-            ExposedDropdownMenu(
+        GroupHeader("User")
+
+        ExpandableSection("Instrument") {
+            SectionLabel("Instrument")
+            ExposedDropdownMenuBox(
                 expanded = instrumentExpanded,
-                onDismissRequest = { instrumentExpanded = false }
+                onExpandedChange = { instrumentExpanded = !instrumentExpanded }
             ) {
-                instrumentNames.forEachIndexed { idx, name ->
-                    DropdownMenuItem(
-                        text = { Text(name) },
-                        onClick = { viewModel.setInstrumentIndex(idx); instrumentExpanded = false }
-                    )
+                OutlinedTextField(
+                    value = instrumentNames.getOrElse(state.instrumentIndex) { "Piano" },
+                    onValueChange = {},
+                    readOnly = true,
+                    singleLine = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = instrumentExpanded) },
+                    modifier = Modifier.menuAnchor().fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = instrumentExpanded,
+                    onDismissRequest = { instrumentExpanded = false }
+                ) {
+                    instrumentNames.forEachIndexed { idx, name ->
+                        DropdownMenuItem(
+                            text = { Text(name) },
+                            onClick = { viewModel.setInstrumentIndex(idx); instrumentExpanded = false }
+                        )
+                    }
                 }
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-        Text("Playback", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 4.dp))
-        SectionLabel("Tempo (BPM)")
-        ChipRow(
-            items = bpmOptions,
-            selected = bpmOptions.indexOf(state.tempoBpm.toString()).coerceAtLeast(0),
-            onSelect = { viewModel.setTempoBpm(bpmOptions[it].toInt()) }
-        )
-
-        Spacer(Modifier.height(16.dp))
-        Text("Sound", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 4.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(
-                checked = state.playPassFailSounds,
-                onCheckedChange = { viewModel.setPlayPassFailSounds(it) }
+        ExpandableSection("Playback") {
+            SectionLabel("Tempo (BPM)")
+            ChipRow(
+                items = bpmOptions,
+                selected = bpmOptions.indexOf(state.tempoBpm.toString()).coerceAtLeast(0),
+                onSelect = { viewModel.setTempoBpm(bpmOptions[it].toInt()) }
             )
-            Text("Play Pass/Fail Sounds", style = MaterialTheme.typography.bodyLarge)
         }
-        Text("A chime when a test is passed, a different tone when it fails",
-            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-        Spacer(Modifier.height(16.dp))
-        Text("Exercise", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 4.dp))
-        SectionLabel("Max Retries")
-        Text("Attempts per test before moving on", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 6.dp))
-        ChipRow(
-            items = retryOptions.map { it.toString() },
-            selected = retryOptions.indexOf(state.maxRetries).coerceAtLeast(0),
-            onSelect = { viewModel.setMaxRetries(retryOptions[it]) }
-        )
+        ExpandableSection("Sound") {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = state.playPassFailSounds,
+                    onCheckedChange = { viewModel.setPlayPassFailSounds(it) }
+                )
+                Text("Play Pass/Fail Sounds", style = MaterialTheme.typography.bodyLarge)
+            }
+            Text("A chime when a test is passed, a different tone when it fails",
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
 
-        Spacer(Modifier.height(16.dp))
-        Text("Pitch Detection", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 4.dp))
-        SectionLabel("Mic Sensitivity")
-        val sensitivity = ((0.011f - state.silenceThreshold) / 0.001f).roundToInt().coerceIn(1, 10)
-        Text("${sensitivity} / 10",
-            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp))
-        Slider(
-            value = sensitivity.toFloat(),
-            onValueChange = { viewModel.setSilenceThreshold((0.011f - it * 0.001f).coerceIn(0.001f, 0.010f)) },
-            valueRange = 1f..10f,
-            steps = 8,
-            modifier = Modifier.fillMaxWidth()
-        )
+        ExpandableSection("Exercise") {
+            SectionLabel("Max Retries")
+            Text("Attempts per test before moving on", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 6.dp))
+            ChipRow(
+                items = retryOptions.map { it.toString() },
+                selected = retryOptions.indexOf(state.maxRetries).coerceAtLeast(0),
+                onSelect = { viewModel.setMaxRetries(retryOptions[it]) }
+            )
+        }
 
-        SectionLabel("Note Stability (frames to confirm)")
-        Text("Consecutive stable frames before confirming a note",
-            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 6.dp))
-        ChipRow(
-            items = stabilityOptions.map { it.toString() },
-            selected = stabilityOptions.indexOf(state.framesToConfirm).coerceAtLeast(0),
-            onSelect = { viewModel.setFramesToConfirm(stabilityOptions[it]) }
-        )
+        ExpandableSection("Timing") {
+            SectionLabel("Pause Before Playing")
+            Text("Gap between chord and test sequence (${state.postChordGapMs}ms)",
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 4.dp))
+            Slider(
+                value = state.postChordGapMs.toFloat(),
+                onValueChange = { viewModel.setPostChordGapMs(it.toLong()) },
+                valueRange = 400f..2000f,
+                steps = 15,
+                modifier = Modifier.fillMaxWidth()
+            )
 
-        Spacer(Modifier.height(12.dp))
-        SectionLabel("Mic Warmup Frames")
-        Text("Frames discarded when mic opens (both Exercise and Mic Setup)",
-            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 6.dp))
-        ChipRow(
-            items = warmupOptions.map { it.toString() },
-            selected = warmupOptions.indexOf(state.warmupFrames).coerceAtLeast(0),
-            onSelect = { viewModel.setWarmupFrames(warmupOptions[it]) }
-        )
+            SectionLabel("Wrong Note Pause")
+            Text("How long to display a wrong note before replaying",
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 6.dp))
+            ChipRow(
+                items = wrongPauseOptions.map { it.second },
+                selected = wrongPauseOptions.indexOfFirst { it.first == state.wrongNotePauseMs }.coerceAtLeast(0),
+                onSelect = { viewModel.setWrongNotePauseMs(wrongPauseOptions[it].first) }
+            )
+        }
 
-        Spacer(Modifier.height(16.dp))
-        Text("Timing", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 4.dp))
-        SectionLabel("Pause Before Playing")
-        Text("Gap between chord and test sequence (${state.postChordGapMs}ms)",
-            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp))
-        Slider(
-            value = state.postChordGapMs.toFloat(),
-            onValueChange = { viewModel.setPostChordGapMs(it.toLong()) },
-            valueRange = 400f..2000f,
-            steps = 15,
-            modifier = Modifier.fillMaxWidth()
-        )
+        GroupHeader("Advanced")
 
-        SectionLabel("Wrong Note Pause")
-        Text("How long to display a wrong note before replaying",
-            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 6.dp))
-        ChipRow(
-            items = wrongPauseOptions.map { it.second },
-            selected = wrongPauseOptions.indexOfFirst { it.first == state.wrongNotePauseMs }.coerceAtLeast(0),
-            onSelect = { viewModel.setWrongNotePauseMs(wrongPauseOptions[it].first) }
-        )
+        ExpandableSection("Pitch Detection") {
+            SectionLabel("Mic Sensitivity")
+            val sensitivity = ((0.011f - state.silenceThreshold) / 0.001f).roundToInt().coerceIn(1, 10)
+            Text("${sensitivity} / 10",
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 4.dp))
+            Slider(
+                value = sensitivity.toFloat(),
+                onValueChange = { viewModel.setSilenceThreshold((0.011f - it * 0.001f).coerceIn(0.001f, 0.010f)) },
+                valueRange = 1f..10f,
+                steps = 8,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            SectionLabel("Note Stability (frames to confirm)")
+            Text("Consecutive stable frames before confirming a note",
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 6.dp))
+            ChipRow(
+                items = stabilityOptions.map { it.toString() },
+                selected = stabilityOptions.indexOf(state.framesToConfirm).coerceAtLeast(0),
+                onSelect = { viewModel.setFramesToConfirm(stabilityOptions[it]) }
+            )
+
+            Spacer(Modifier.height(12.dp))
+            SectionLabel("Mic Warmup Frames")
+            Text("Frames discarded when mic opens (both Exercise and Mic Setup)",
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 6.dp))
+            ChipRow(
+                items = warmupOptions.map { it.toString() },
+                selected = warmupOptions.indexOf(state.warmupFrames).coerceAtLeast(0),
+                onSelect = { viewModel.setWarmupFrames(warmupOptions[it]) }
+            )
+        }
 
         Spacer(Modifier.height(32.dp))
 
