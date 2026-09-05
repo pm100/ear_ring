@@ -230,21 +230,17 @@ purely a re-layout of existing controls into two collapsible/sectioned groups pe
 platform (e.g. a disclosure section, a second screen, or a tab), each already
 maintaining the same field bindings unchanged.
 
-### User setting: play root note vs. play chord before a test
-Today the intro before every test unconditionally plays a chord — desktop's
-`playPromptForSequence` in `ExerciseScreen.tsx` always calls
-`playChord(await fetchIntroTriad())`, where `fetchIntroTriad()` resolves the root MIDI
-via `cmd_effective_intro_root_midi` and then builds the triad via `cmd_intro_chord`
-(Android/iOS mirror this with their own `EarRingCore` FFI calls into the same Rust
-functions). Add a User-section setting (e.g. `introPlaysChord: boolean`, default true to
-match current behavior) that, when off, plays just the root note instead —
-straightforward since `useAudioPlayback.ts` already exposes a single-note `playNote()`
-alongside `playChord()` (Android/iOS have the equivalent single-note playback already
-used elsewhere, e.g. for sequence notes). When the setting is off, skip the
-`cmd_intro_chord` call entirely and just `playNote(rootMidi)` using the root MIDI already
-computed by `cmd_effective_intro_root_midi`. Belongs in the User section, not Advanced —
-it's a practice-style preference (some players want the fuller tonal context a chord
-gives, others prefer training against just the root), not a tuning knob.
+### User setting: intro sound before a test (superseded by GitHub issue #8)
+Originally scoped here as a binary root-note-vs-chord toggle; expanded to four choices
+(root note / chord / arpeggiated chord / scale) and filed as
+[#8](https://github.com/pm100/ear_ring/issues/8) — see that issue for the current design.
+Still belongs in the User section, not Advanced — it's a practice-style preference, not a
+tuning knob.
+
+### Repeat button on the exercise screen ([#7](https://github.com/pm100/ear_ring/issues/7))
+Manually replay the current test's prompt on demand, without consuming an attempt or
+generating a new sequence. See the issue for the design questions to settle
+(availability while listening, whether it cancels an in-progress capture).
 
 ---
 

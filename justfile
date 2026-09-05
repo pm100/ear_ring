@@ -110,6 +110,13 @@ _desktop-version:
 desktop: _desktop-version
     Push-Location desktop; npm run build; Pop-Location
 
+# Launch the desktop app for interactive testing — dev mode with hot-reload
+# (Tauri's beforeDevCommand runs the Vite dev server automatically).
+# Blocks until stopped (Ctrl+C), same as `npm run dev` on its own.
+[doc("Launch the desktop app (dev mode, hot-reload) for interactive testing")]
+desktop-launch: _desktop-version
+    Push-Location desktop; cargo tauri dev; Pop-Location
+
 # Run cargo tests (shared Rust core)
 [doc("Run cargo tests (shared Rust core)")]
 test:
