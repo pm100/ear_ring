@@ -6,6 +6,7 @@ import android.media.AudioFormat
 import android.media.AudioTrack
 import android.media.MediaPlayer
 import android.media.PlaybackParams
+import android.media.audiofx.LoudnessEnhancer
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -97,15 +98,32 @@ class AudioPlayback(private val context: Context) {
 
     private fun playFile(file: File, rate: Float) {
         try {
+            var enhancer: LoudnessEnhancer? = null
             val player = MediaPlayer().apply {
                 setDataSource(file.absolutePath)
                 prepare()
                 playbackParams = PlaybackParams().setPitch(rate.coerceIn(0.5f, 2.0f))
+                // The Salamander piano samples play back at whatever level they were
+                // recorded/normalized at, with no headroom applied — reported as too quiet
+                // by testers. MediaPlayer.setVolume() only attenuates (0.0-1.0, already at
+                // its 1.0 default), so a real boost needs LoudnessEnhancer, which is built
+                // for exactly this ("make quiet media louder without clipping" via dynamic
+                // range compression, not naive linear gain). Attached per-note since each
+                // note is its own MediaPlayer/session; a chord's simultaneous notes each get
+                // the same boost independently, so the acoustic mix stays proportional. ~+6dB.
+                enhancer = runCatching {
+                    LoudnessEnhancer(audioSessionId).apply {
+                        setTargetGain(600) // millibels = 6 dB
+                        enabled = true
+                    }
+                }.getOrNull()
                 setOnCompletionListener {
+                    enhancer?.release()
                     it.release()
                     synchronized(activePlayers) { activePlayers.remove(it) }
                 }
                 setOnErrorListener { mp, _, _ ->
+                    enhancer?.release()
                     mp.release()
                     synchronized(activePlayers) { activePlayers.remove(mp) }
                     false

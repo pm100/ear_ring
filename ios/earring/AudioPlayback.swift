@@ -23,6 +23,27 @@ class AudioPlayback {
     private var activeNodes: [(AVAudioPlayerNode, AVAudioUnitTimePitch)] = []
     private var isCancelled = false
 
+    // The Salamander piano samples play back at whatever level they were recorded/
+    // normalized at, with no headroom applied — reported as too quiet by testers.
+    // AVAudioPlayerNode.volume and AVAudioMixerNode.outputVolume are both clamped to
+    // 0.0...1.0 (no amplification beyond the source level), so a real boost needs an
+    // effect unit whose gain can exceed unity — AVAudioUnitEQ's globalGain (dB) does.
+    // Inserted once between mainMixerNode and the output so every note (and, as a
+    // side effect, the pass/fail chime, which shares the same mixer) gets the same
+    // post-mix boost — a chord's several simultaneous notes end up boosted exactly
+    // like a single note, not stacked on top of each other. ~+6dB.
+    private var outputGainEQ: AVAudioUnitEQ?
+
+    private func setupOutputGainIfNeeded() {
+        guard outputGainEQ == nil else { return }
+        let eq = AVAudioUnitEQ(numberOfBands: 0)
+        eq.globalGain = 6.0
+        engine.attach(eq)
+        engine.connect(engine.mainMixerNode, to: eq, format: nil)
+        engine.connect(eq, to: engine.outputNode, format: nil)
+        outputGainEQ = eq
+    }
+
     // MARK: - Lifecycle
 
     /// Pre-configure the audio session so playback can start instantly.
@@ -116,6 +137,7 @@ class AudioPlayback {
         if !session.isOtherAudioPlaying {
             try? session.setActive(true)
         }
+        setupOutputGainIfNeeded()
         if !engine.isRunning {
             try engine.start()
         }

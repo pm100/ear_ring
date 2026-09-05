@@ -18,8 +18,16 @@ function nearestSample(midi: number): number {
   return best;
 }
 
+// The Salamander piano samples play back at whatever level they were recorded/normalized
+// at, with no headroom applied — reported as too quiet by testers. This boosts everything
+// (notes and the pass/fail chime alike) by a fixed amount post-mix, via a single shared
+// gain stage, rather than per-source — that way a chord's several simultaneous notes get
+// boosted exactly like a single note, not stacked on top of each other. ~+6dB.
+const NOTE_GAIN_BOOST = 2.0;
+
 export function useAudioPlayback() {
   const contextRef = useRef<AudioContext | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null);
   const bufferCache = useRef<Map<number, AudioBuffer>>(new Map());
   const cancelRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -28,8 +36,20 @@ export function useAudioPlayback() {
   const getContext = useCallback(() => {
     if (!contextRef.current || contextRef.current.state === 'closed') {
       contextRef.current = new AudioContext();
+      masterGainRef.current = null; // stale gain node from a closed context
     }
     return contextRef.current;
+  }, []);
+
+  // All playback (notes and chime) connects here instead of straight to ctx.destination.
+  const getMasterGain = useCallback((ctx: AudioContext) => {
+    if (!masterGainRef.current) {
+      const gain = ctx.createGain();
+      gain.gain.value = NOTE_GAIN_BOOST;
+      gain.connect(ctx.destination);
+      masterGainRef.current = gain;
+    }
+    return masterGainRef.current;
   }, []);
 
   const loadSample = useCallback(async (midi: number): Promise<AudioBuffer | null> => {
@@ -61,13 +81,13 @@ export function useAudioPlayback() {
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.playbackRate.value = Math.pow(2, (midi - sampleMidi) / 12);
-    source.connect(ctx.destination);
+    source.connect(getMasterGain(ctx));
     activeSourcesRef.current.push(source);
     source.onended = () => {
       activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
     };
     source.start();
-  }, [loadSample, getContext]);
+  }, [loadSample, getContext, getMasterGain]);
 
   const playChord = useCallback(async (midis: number[], holdMs = 600) => {
     // Clear any residual notes from a previous test (they've had time to decay)
@@ -90,7 +110,7 @@ export function useAudioPlayback() {
       const source = ctx.createBufferSource();
       source.buffer = item.buffer;
       source.playbackRate.value = Math.pow(2, (item.midi - item.sampleMidi) / 12);
-      source.connect(ctx.destination);
+      source.connect(getMasterGain(ctx));
       activeSourcesRef.current.push(source);
       source.onended = () => {
         activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
@@ -100,7 +120,7 @@ export function useAudioPlayback() {
     await new Promise(resolve => {
       timeoutRef.current = setTimeout(resolve, holdMs);
     });
-  }, [getContext, loadSample]);
+  }, [getContext, loadSample, getMasterGain]);
 
   // Short synthesized tones for test pass/fail feedback — plain oscillators, not the
   // sampled piano, so they play instantly with no network/sample-load dependency.
@@ -116,7 +136,7 @@ export function useAudioPlayback() {
       osc.type = 'sine';
       osc.frequency.value = freq;
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(getMasterGain(ctx));
       const t0 = now + startSec;
       const t1 = t0 + durationSec;
       // Quick linear fade in/out avoids the click a hard on/off edge would cause.
@@ -126,7 +146,7 @@ export function useAudioPlayback() {
       osc.start(t0);
       osc.stop(t1 + 0.02);
     });
-  }, [getContext]);
+  }, [getContext, getMasterGain]);
 
   // Bright ascending major arpeggio (C6 E6 G6) — a test passed.
   const playPassSound = useCallback(() => {
@@ -196,7 +216,7 @@ export function useAudioPlayback() {
         const source = ctx.createBufferSource();
         source.buffer = buffer;
         source.playbackRate.value = Math.pow(2, (midis[i] - sampleMidi) / 12);
-        source.connect(ctx.destination);
+        source.connect(getMasterGain(ctx));
         activeSourcesRef.current.push(source);
         source.onended = () => {
           activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
@@ -209,7 +229,7 @@ export function useAudioPlayback() {
       timeoutRef.current = setTimeout(playNext, stepMs);
     };
     await playNext();
-  }, [loadSample, getContext]);
+  }, [loadSample, getContext, getMasterGain]);
 
   return { playNote, playChord, playSequence, playPassSound, playFailSound, cancelPlayback };
 }
