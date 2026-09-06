@@ -478,11 +478,13 @@ class ExerciseModel: ObservableObject {
                 completeTest(passed: true, attemptsUsed: currentAttempt, attemptNotes: detectedNotes)
             }
         } else {
-            // Issue #9 "note correction": a wrong note always consumes an attempt (still
-            // hits the score via testScore). Within the configured noteRetries budget it
-            // just keeps listening for another try at the SAME note — no capture stop/
-            // restart, no staff mark for the wrong note, no prompt replay — rather than
-            // always restarting the whole test like before this feature. Views show
+            // Issue #9 "note correction": noteRetryCount and currentAttempt are independent
+            // counters. Within the configured noteRetries budget, a wrong note just keeps
+            // listening for another try at the SAME note — no capture stop/restart, no
+            // staff mark for the wrong note, no prompt replay, and NO change to
+            // currentAttempt (it doesn't hit the score). Only once that budget is exhausted
+            // does today's original behavior kick in: currentAttempt advances and the whole
+            // test restarts (or fails, if maxAttempts is already used up). Views show
             // "Wrong note. Try again…" while status stays .listening and noteRetryCount > 0.
             noteRetryCount += 1
             let outcome = EarRingCore.wrongNoteOutcome(
@@ -491,7 +493,7 @@ class ExerciseModel: ObservableObject {
             )
             switch outcome {
             case .retrySameNote:
-                currentAttempt += 1
+                break
             case .fail:
                 detectedNotes.append(DetectedNote(midi: midi, cents: cents, isCorrect: false))
                 audioCapture.stop()

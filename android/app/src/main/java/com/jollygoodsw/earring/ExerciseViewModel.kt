@@ -540,20 +540,19 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
                 )
             }
         } else {
-            // Issue #9 "note correction": a wrong note always consumes an attempt (still
-            // hits the score via testScore). Within the configured noteRetries budget it
-            // just keeps listening for another try at the SAME note — no capture stop/
-            // restart, no staff mark for the wrong note, no prompt replay — rather than
-            // always restarting the whole test like before this feature. statusText()
+            // Issue #9 "note correction": noteRetryCount and currentAttempt are independent
+            // counters. Within the configured noteRetries budget, a wrong note just keeps
+            // listening for another try at the SAME note — no capture stop/restart, no
+            // staff mark for the wrong note, no prompt replay, and NO change to
+            // currentAttempt (it doesn't hit the score). Only once that budget is exhausted
+            // does today's original behavior kick in: currentAttempt advances and the whole
+            // test restarts (or fails, if maxAttempts is already used up). statusText()
             // shows "Wrong note. Try again…" while status stays LISTENING and
             // noteRetryCount > 0.
             val noteRetryCount = state.noteRetryCount + 1
             when (EarRingCore.wrongNoteOutcome(state.currentAttempt, state.maxAttempts, noteRetryCount, state.noteRetries)) {
                 EarRingCore.WRONG_NOTE_RETRY_SAME_NOTE -> {
-                    _state.value = state.copy(
-                        currentAttempt = state.currentAttempt + 1,
-                        noteRetryCount = noteRetryCount
-                    )
+                    _state.value = state.copy(noteRetryCount = noteRetryCount)
                 }
                 EarRingCore.WRONG_NOTE_FAIL -> {
                     val detected = state.detected + DetectedNote(midi, cents, false)

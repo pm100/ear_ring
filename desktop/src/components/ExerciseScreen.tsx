@@ -398,12 +398,14 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       return;
     }
 
-    // Issue #9 "note correction": a wrong note always consumes an attempt (still hits
-    // the score via cmd_test_score). Within the configured noteRetries budget it just
-    // keeps listening for another try at the SAME note — no capture stop/restart, no
-    // staff mark for the wrong note, no prompt replay — rather than always restarting
-    // the whole test like before this feature. statusText() shows "Wrong note. Try
-    // again…" while status stays 'listening' and noteRetryCount > 0.
+    // Issue #9 "note correction": noteRetryCount and currentAttempt are independent
+    // counters. Within the configured noteRetries budget, a wrong note just keeps
+    // listening for another try at the SAME note — no capture stop/restart, no staff
+    // mark for the wrong note, no prompt replay, and NO change to currentAttempt (it
+    // doesn't hit the score). Only once that budget is exhausted does today's original
+    // behavior kick in: currentAttempt advances and the whole test restarts (or fails,
+    // if maxAttempts is already used up). statusText() shows "Wrong note. Try again…"
+    // while status stays 'listening' and noteRetryCount > 0.
     const noteRetryCount = noteRetryCountRef.current + 1;
     noteRetryCountRef.current = noteRetryCount;
     const outcome = await invoke<number>('cmd_wrong_note_outcome', {
@@ -414,8 +416,6 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     });
     if (outcome === WRONG_NOTE_RETRY_SAME_NOTE) {
       setNoteRetryCount(noteRetryCount);
-      setCurrentAttempt(prev => prev + 1);
-      currentAttemptRef.current += 1;
       return;
     }
 
