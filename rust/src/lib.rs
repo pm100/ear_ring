@@ -262,10 +262,12 @@ pub extern "C" fn ear_ring_generate_sequence(
     notes.len() as c_int
 }
 
-/// Generate a diatonic chord (triad or 7th), every note within [range_start, range_end].
+/// Generate a diatonic chord (triad or 7th), root position, every note within
+/// [range_start, range_end].
 /// * `out_buf` must be at least `note_count` bytes (max 4).
-/// Returns note count written (may be less than `note_count` if a voicing wider than
-/// the range collapses duplicate notes at the boundary), or -1 on error.
+/// Returns note count written, 0 if this scale degree's voicing doesn't fit inside
+/// the range at any octave (caller should retry with a different seed — see
+/// ExerciseModel.swift's diatonic-mode retry loop), or -1 on error.
 #[no_mangle]
 pub extern "C" fn ear_ring_generate_diatonic_chord(
     root_chroma: c_uchar,

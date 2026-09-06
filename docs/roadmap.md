@@ -124,6 +124,16 @@ setting for everyone.
   sequence length / retry count / tempo based on recent accuracy, lighter-weight than
   the full "AI analysis" idea above but same underlying data.
 
+### Diatonic Arpeggios: chord inversions
+Added 2026-09-05. Diatonic Arpeggios currently always voices the chord in root
+position (`generate_diatonic_chord` in `rust/src/music_theory.rs` — see
+`docs/diatonic.md`). A natural follow-on is offering 1st/2nd (/3rd, for 7ths)
+inversion voicings too — candidate for a premium/paid feature rather than
+folding into the free base exercise. Root position was deliberately kept simple
+for now (inversions plus a narrow range made a chord hard to identify by ear,
+and interacted badly with range-fit rejection) — revisit once there's a design
+for how inversion selection should work alongside that rejection rule.
+
 ---
 
 ## Home / Progress Screen UI (not premium-specific)

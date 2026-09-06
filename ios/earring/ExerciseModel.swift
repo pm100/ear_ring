@@ -71,7 +71,9 @@ class ExerciseModel: ObservableObject {
     }
     @Published var testType: Int = {
         let stored = ud.object(forKey: "testType") != nil ? ud.integer(forKey: "testType") : 0
-        return stored == 1 ? 0 : stored  // Reset melody mode (no longer in UI)
+        if stored == 1 { return 0 }  // Reset melody mode (no longer in UI)
+        if stored == 3 { return 2 }  // Merged descending-arpeggio mode into 2 (issue #5)
+        return stored
     }() {
         didSet { UserDefaults.standard.set(testType, forKey: "testType") }
     }
@@ -255,20 +257,36 @@ class ExerciseModel: ObservableObject {
             rangeStart = max(21, minMidi)
             rangeEnd = min(108, maxMidi)
             sequence = midiNotes
-        } else if testType == 2 || testType == 3 {
-            // Diatonic arpeggio mode (2=ascending, 3=descending)
+        } else if testType == 2 {
+            // Diatonic arpeggio mode — direction (ascending/descending) is randomized
+            // per test rather than a user choice (issue #5), and consecutive tests
+            // must not open on the same note, mirroring the guard in random-note mode
+            // below. Each retry draws a fresh seed so the chord label (recomputed
+            // separately from the same seed) stays in sync with what's actually played.
+            // Also retry if the voicing came up short: root position is used throughout
+            // (no inversions yet — see roadmap.md), and Rust rejects (returns empty)
+            // rather than clamp a note to the range boundary, which could substitute a
+            // wrong pitch that isn't a real chord tone. A different scale degree usually
+            // fits the range cleanly.
             melodyDurations = []
-            let seed = UInt64(Date().timeIntervalSince1970 * 1000)
             let centerMidi = (rangeStart + rangeEnd) / 2
-            let notes = EarRingCore.generateDiatonicChord(
-                rootChroma: rootNote,
-                scaleId: 0,
-                noteCount: sequenceLength,
-                rangeStart: rangeStart,
-                rangeEnd: rangeEnd,
-                seed: seed
-            )
-            sequence = testType == 3 ? notes.reversed() : notes
+            let avoidFirstMidi = sequence.first
+            var notes: [Int] = []
+            var seed: UInt64 = 0
+            for attempt in 0..<8 {
+                seed = UInt64(Date().timeIntervalSince1970 * 1000) &+ UInt64(attempt)
+                let generated = EarRingCore.generateDiatonicChord(
+                    rootChroma: rootNote,
+                    scaleId: 0,
+                    noteCount: sequenceLength,
+                    rangeStart: rangeStart,
+                    rangeEnd: rangeEnd,
+                    seed: seed
+                )
+                notes = Bool.random() ? generated.reversed() : generated
+                if notes.count == sequenceLength && notes.first != avoidFirstMidi { break }
+            }
+            sequence = notes
             chordLabel = EarRingCore.writtenDiatonicChordLabel(
                 concertRootChroma: rootNote,
                 scaleId: 0,

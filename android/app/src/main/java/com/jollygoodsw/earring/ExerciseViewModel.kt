@@ -137,7 +137,13 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             postChordGapMs = prefs.getLong(PREF_POST_CHORD_GAP_MS, DEFAULT_POST_CHORD_GAP_MS),
             wrongNotePauseMs = prefs.getLong(PREF_WRONG_NOTE_PAUSE_MS, DEFAULT_WRONG_NOTE_PAUSE_MS),
             instrumentIndex = prefs.getInt(PREF_INSTRUMENT_INDEX, 0),
-            testType = prefs.getInt(PREF_TEST_TYPE, 0).let { if (it == 1) 0 else it },
+            testType = prefs.getInt(PREF_TEST_TYPE, 0).let {
+                when (it) {
+                    1 -> 0  // Melody mode reset (no longer in UI)
+                    3 -> 2  // Merged descending-arpeggio mode into 2 (issue #5)
+                    else -> it
+                }
+            },
             isPremium = prefs.getBoolean(PREF_IS_PREMIUM, false),
         )
     }
@@ -324,14 +330,30 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
                 status = ExerciseStatus.PLAYING,
                 highlightIndex = -1
             )
-        } else if (state.testType == 2 || state.testType == 3) {
-            // Diatonic arpeggio mode (2=ascending, 3=descending)
-            val seed = System.currentTimeMillis()
+        } else if (state.testType == 2) {
+            // Diatonic arpeggio mode — direction (ascending/descending) is randomized
+            // per test rather than a user choice (issue #5), and consecutive tests
+            // must not open on the same note, mirroring the guard in random mode
+            // below. Each retry draws a fresh seed so the chord label (recomputed
+            // separately from the same seed) stays in sync with what's actually played.
+            // Also retry if the voicing came up short: root position is used throughout
+            // (no inversions yet — see roadmap.md), and Rust rejects (returns empty)
+            // rather than clamp a note to the range boundary, which could substitute a
+            // wrong pitch that isn't a real chord tone. A different scale degree usually
+            // fits the range cleanly.
             val centerMidi = (state.rangeStart + state.rangeEnd) / 2
-            val midiNotes = EarRingCore.generateDiatonicChord(
-                state.rootNote, 0, state.sequenceLength,
-                state.rangeStart, state.rangeEnd, seed
-            ).toList().let { if (state.testType == 3) it.reversed() else it }
+            val avoidFirstMidi = state.sequence.firstOrNull()
+            var midiNotes: List<Int> = emptyList()
+            var seed = System.currentTimeMillis()
+            for (attempt in 0 until 8) {
+                seed = System.currentTimeMillis() + attempt
+                val generated = EarRingCore.generateDiatonicChord(
+                    state.rootNote, 0, state.sequenceLength,
+                    state.rangeStart, state.rangeEnd, seed
+                ).toList()
+                midiNotes = if (kotlin.random.Random.nextBoolean()) generated.reversed() else generated
+                if (midiNotes.size == state.sequenceLength && midiNotes.firstOrNull() != avoidFirstMidi) break
+            }
             val label = EarRingCore.writtenDiatonicChordLabel(state.rootNote, 0, state.sequenceLength, centerMidi, seed, state.instrumentIndex)
             _state.value = state.copy(
                 sequence = midiNotes,

@@ -149,14 +149,13 @@ struct HomeView: View {
                     set: { newType in
                         model.testType = newType
                         // Auto-clamp seqLen for diatonic mode
-                        if (newType == 2 || newType == 3) && model.sequenceLength != 3 && model.sequenceLength != 4 {
+                        if newType == 2 && model.sequenceLength != 3 && model.sequenceLength != 4 {
                             model.sequenceLength = 3
                         }
                     }
                 )) {
                     Text("Random Notes").tag(0)
-                    Text("Diatonic Arpeggios (ascend)").tag(2)
-                    Text("Diatonic Arpeggios (desc)").tag(3)
+                    Text("Diatonic Arpeggios").tag(2)
                 }
                 .pickerStyle(.menu)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -242,7 +241,7 @@ struct HomeView: View {
                     ForEach(1...8, id: \.self) { len in
                         let chipEnabled: Bool = {
                             if model.testType == 1 { return false }
-                            if model.testType == 2 || model.testType == 3 { return len == 3 || len == 4 }
+                            if model.testType == 2 { return len == 3 || len == 4 }
                             return true
                         }()
                         Button("\(len)") {

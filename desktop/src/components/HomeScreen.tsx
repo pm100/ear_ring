@@ -314,13 +314,12 @@ function FullScreenModal({ title, onClose, children }: { title: string; onClose:
 
 const TEST_TYPE_OPTIONS = [
   { value: 0, label: 'Random Notes' },
-  { value: 2, label: 'Diatonic Arpeggios (ascend)' },
-  { value: 3, label: 'Diatonic Arpeggios (desc)' },
+  { value: 2, label: 'Diatonic Arpeggios' },
 ];
 
 function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
   const isMelodyMode = settings.testType === 1;
-  const isDiatonicMode = settings.testType === 2 || settings.testType === 3;
+  const isDiatonicMode = settings.testType === 2;
 
   // Semitone offset for key display (written vs concert pitch), mod 12.
   // Transposed Guitar has +12 which collapses to 0 — no annotation shown for it.

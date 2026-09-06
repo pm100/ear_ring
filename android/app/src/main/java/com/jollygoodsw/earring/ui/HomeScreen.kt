@@ -91,8 +91,8 @@ fun HomeScreen(
         )
         Spacer(Modifier.height(28.dp))
 
-        // Test Type dropdown — only Random Notes (0) and Diatonic Triads (2) shown
-        val testTypeOptions = listOf(0 to "Random Notes", 2 to "Diatonic Arpeggios (ascend)", 3 to "Diatonic Arpeggios (desc)")
+        // Test Type dropdown — only Random Notes (0) and Diatonic Arpeggios (2) shown
+        val testTypeOptions = listOf(0 to "Random Notes", 2 to "Diatonic Arpeggios")
         var testTypeExpanded by remember { mutableStateOf(false) }
         SectionLabel("Test Type")
         ExposedDropdownMenuBox(
@@ -238,7 +238,7 @@ fun HomeScreen(
 
         // Sequence length
         SectionLabel("Sequence Length")
-        val isDiatonicMode = state.testType == 2 || state.testType == 3
+        val isDiatonicMode = state.testType == 2
         ChipRow(
             items = (1..8).map { it.toString() },
             selected = state.sequenceLength - 1,

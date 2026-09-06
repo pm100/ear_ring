@@ -163,21 +163,37 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         newRangeEnd: Math.min(108, maxMidi),
         title: result.title,
       };
-    } else if (exercise.testType === 2 || exercise.testType === 3) {
-      // Diatonic arpeggio mode (2=ascending, 3=descending)
+    } else if (exercise.testType === 2) {
+      // Diatonic arpeggio mode — direction (ascending/descending) is randomized
+      // per test rather than a user choice (issue #5), and consecutive tests
+      // must not open on the same note, mirroring the guard in random mode
+      // below. Each retry draws a fresh seed so the chord label (recomputed
+      // separately from the same seed) stays in sync with what's actually played.
+      // Also retry if the voicing came up short: root position is used throughout
+      // (no inversions yet — see roadmap.md), and Rust rejects (returns empty)
+      // rather than clamp a note to the range boundary, which could substitute a
+      // wrong pitch that isn't a real chord tone. A different scale degree usually
+      // fits the range cleanly.
       melodyDurationsRef.current = [];
       melodyTimingsRef.current = [];
       setMelodyDurations([]);
       const centerMidi = Math.floor((exercise.rangeStart + exercise.rangeEnd) / 2);
-      const seed = Date.now();
-      const seq = await invoke<number[]>('cmd_generate_diatonic_chord', {
-        rootChroma: exercise.rootNote,
-        scaleId: 0,
-        noteCount: exercise.sequenceLength,
-        rangeStart: exercise.rangeStart,
-        rangeEnd: exercise.rangeEnd,
-        seed,
-      });
+      const avoidFirstMidi = sequenceRef.current[0] ?? null;
+      let orderedSeq: number[] = [];
+      let seed = Date.now();
+      for (let attempt = 0; attempt < 8; attempt++) {
+        seed = Date.now() + attempt;
+        const seq = await invoke<number[]>('cmd_generate_diatonic_chord', {
+          rootChroma: exercise.rootNote,
+          scaleId: 0,
+          noteCount: exercise.sequenceLength,
+          rangeStart: exercise.rangeStart,
+          rangeEnd: exercise.rangeEnd,
+          seed,
+        });
+        orderedSeq = Math.random() < 0.5 ? [...seq].reverse() : seq;
+        if (orderedSeq.length === exercise.sequenceLength && (orderedSeq[0] ?? null) !== avoidFirstMidi) break;
+      }
       const label = await invoke<string>('cmd_written_diatonic_chord_label', {
         concertRootChroma: exercise.rootNote,
         scaleId: 0,
@@ -186,7 +202,6 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         seed,
         instrumentIndex: exercise.instrumentIndex ?? 0,
       });
-      const orderedSeq = exercise.testType === 3 ? [...seq].reverse() : seq;
       return { sequence: orderedSeq, title: label };
     } else {
       melodyDurationsRef.current = [];

@@ -72,6 +72,8 @@ function loadSettings(): ExerciseSettings {
       const parsed = { ...defaultSettings, ...JSON.parse(raw) };
       // Reset melody mode (testType==1) which is no longer in the UI
       if (parsed.testType === 1) parsed.testType = 0;
+      // Merged descending-arpeggio mode (testType==3) into 2 (issue #5)
+      if (parsed.testType === 3) parsed.testType = 2;
       return parsed;
     }
   } catch {}
@@ -137,7 +139,7 @@ export default function App() {
       sessionRunning: true,
       sessionId: Date.now(),
     };
-    if (testType === 1 || testType === 2 || testType === 3) {
+    if (testType === 1 || testType === 2) {
       // Melody mode and diatonic mode: let ExerciseScreen generate each sequence
       setExercise({
         ...baseExercise,

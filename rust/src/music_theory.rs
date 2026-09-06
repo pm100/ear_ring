@@ -278,16 +278,17 @@ pub fn intro_chord(root: Note, scale: ScaleType) -> Vec<Note> {
 }
 
 /// Generate a diatonic triad (note_count=3) or seventh chord (note_count=4) from
-/// a random scale degree, with a random inversion and random ascending/descending
-/// direction. Every note is guaranteed to fall within `[range_start, range_end]`
-/// (the user's selected instrument range) — the chosen root octave first tries to
-/// fit the whole voicing inside that window with zero overflow; if the voicing's
-/// span is wider than the window (possible for a 7th chord in a wide inversion
-/// squeezed into a narrow range), the closest-fitting octave is used and any note
-/// still outside the window is clamped to the nearest boundary rather than
-/// escaping it.
+/// a random scale degree, root position only (inversions are not yet supported —
+/// see roadmap.md). Every note is guaranteed to fall within `[range_start,
+/// range_end]`: the chosen root octave must fit the whole voicing inside that
+/// window with zero overflow, or this returns an empty Vec rather than clamping
+/// a note to the range boundary — a boundary pitch is not necessarily a real
+/// chord tone, so silently substituting one would produce a wrong-sounding
+/// "chord". Callers should retry with a different seed when they get an empty
+/// result (see e.g. ExerciseModel.swift's diatonic-mode retry loop), which also
+/// already covers the "don't repeat the previous test's opening note" rule.
 ///
-/// Returns MIDI notes in play order (ascending or descending).
+/// Returns MIDI notes in ascending order.
 pub fn generate_diatonic_chord(
     root_chroma: u8,
     scale: ScaleType,
@@ -310,7 +311,7 @@ pub fn generate_diatonic_chord(
     let degree = (next() % 7) as usize;
 
     // Build semitone offsets above the SCALE ROOT (not chord root) for each chord tone,
-    // using the skip-one-degree pattern within the scale.
+    // using the skip-one-degree pattern within the scale. Root position only.
     let mut offsets: Vec<i32> = Vec::with_capacity(nc);
     for i in 0..nc {
         let raw_degree = degree + i * 2;
@@ -325,26 +326,15 @@ pub fn generate_diatonic_chord(
         }
     }
 
-    // Apply inversion: raise the bottom note(s) by an octave
-    let inversion = (next() % nc as u64) as usize;
-    for i in 0..inversion {
-        offsets[i] += 12;
-    }
-    offsets.sort_unstable();
-
-    // Find the scale-root octave that fits the whole voicing inside
-    // [range_start, range_end]. Search every octave the root pitch class could
-    // occupy across the full MIDI range; prefer a placement with zero overflow
-    // (iterating high-to-low so ties favour the higher, brighter octave), and
-    // fall back to the smallest total overflow when no octave fits the full span
-    // (a voicing wider than the available range can't fit anywhere).
+    // Find a scale-root octave that fits the whole voicing inside [range_start,
+    // range_end] with zero overflow. Search every octave the root pitch class
+    // could occupy across the full MIDI range, high to low, so a tie favours the
+    // higher (brighter) octave; return on the first exact fit.
     let range_start_i = range_start as i32;
     let range_end_i = range_end as i32;
     let scale_root_chroma = root_chroma % 12;
     let lo_offset = offsets[0];
     let hi_offset = offsets[offsets.len() - 1];
-    let mut best_root = 60i32;
-    let mut best_overflow = i32::MAX;
     for oct in (-1i32..=9).rev() {
         let root_midi = (oct + 1) * 12 + scale_root_chroma as i32;
         let lo = root_midi + lo_offset;
@@ -352,42 +342,28 @@ pub fn generate_diatonic_chord(
         if lo < 0 || hi > 127 {
             continue;
         }
-        let overflow = (range_start_i - lo).max(0) + (hi - range_end_i).max(0);
-        if overflow < best_overflow {
-            best_overflow = overflow;
-            best_root = root_midi;
-            if overflow == 0 {
-                break;
-            }
+        if lo >= range_start_i && hi <= range_end_i {
+            return offsets
+                .iter()
+                .map(|&o| Note::from_midi((root_midi + o) as u8))
+                .collect();
         }
     }
 
-    // Final clamp guarantees every note lands inside [range_start, range_end] even
-    // when the voicing's span is wider than the available range — that note
-    // collapses to the nearest boundary rather than escaping the playable range.
-    let mut midi_notes: Vec<u8> = offsets
-        .iter()
-        .map(|&o| (best_root + o).clamp(range_start_i, range_end_i) as u8)
-        .collect();
-
-    // Always play ascending
-    midi_notes.sort_unstable();
-    midi_notes.dedup();
-
-    midi_notes.into_iter().map(Note::from_midi).collect()
+    // This degree's voicing doesn't fit the range at any octave — reject it.
+    Vec::new()
 }
 
 /// Return a human-readable label for the diatonic chord that `generate_diatonic_chord`
-/// would produce with the same arguments.  Example: "G – 1st Inversion".
+/// would produce with the same arguments (root position only).  Example: "G-" (G minor).
 pub fn diatonic_chord_label(
     root_chroma: u8,
     scale: ScaleType,
-    note_count: u8,
+    _note_count: u8,
     _center_midi: u8,
     seed: u64,
 ) -> String {
     let intervals = scale.intervals();
-    let nc = note_count.clamp(3, 4) as usize;
 
     let mut rng = seed;
     let mut next = || -> u64 {
@@ -396,8 +372,6 @@ pub fn diatonic_chord_label(
     };
 
     let degree = (next() % 7) as usize;
-    let _inversion_unused = next() % nc as u64; // consume same RNG slot
-    let inversion = _inversion_unused as usize;
 
     // Chord root note = scale root + intervals[degree]
     let chord_root_chroma = ((root_chroma as i32 + intervals[degree] as i32) % 12) as u8;
@@ -417,14 +391,7 @@ pub fn diatonic_chord_label(
         _ => "",               // major
     };
 
-    let inversion_label = match inversion {
-        0 => "Root Position",
-        1 => "1st Inversion",
-        2 => "2nd Inversion",
-        _ => "3rd Inversion",
-    };
-
-    format!("{}{} \u{2013} {}", chord_root_name, quality_suffix, inversion_label)
+    format!("{}{}", chord_root_name, quality_suffix)
 }
 
 /// Like `diatonic_chord_label` but displays the chord root in written (transposed) pitch
@@ -433,14 +400,13 @@ pub fn diatonic_chord_label(
 pub fn written_diatonic_chord_label(
     concert_root_chroma: u8,
     scale: ScaleType,
-    note_count: u8,
+    _note_count: u8,
     _center_midi: u8,
     seed: u64,
     instrument_index: usize,
 ) -> String {
     let semitones = INSTRUMENTS.get(instrument_index).map(|i| i.semitones).unwrap_or(0);
     let intervals = scale.intervals();
-    let nc = note_count.clamp(3, 4) as usize;
 
     let mut rng = seed;
     let mut next = || -> u64 {
@@ -449,7 +415,6 @@ pub fn written_diatonic_chord_label(
     };
 
     let degree = (next() % 7) as usize;
-    let inversion = (next() % nc as u64) as usize;
 
     // Concert chord root chroma → written chord root chroma
     let concert_chord_root = ((concert_root_chroma as i32 + intervals[degree] as i32) % 12) as u8;
@@ -470,14 +435,7 @@ pub fn written_diatonic_chord_label(
         _ => "",
     };
 
-    let inversion_label = match inversion {
-        0 => "Root Position",
-        1 => "1st Inversion",
-        2 => "2nd Inversion",
-        _ => "3rd Inversion",
-    };
-
-    format!("{}{} \u{2013} {}", chord_root_name, quality_suffix, inversion_label)
+    format!("{}{}", chord_root_name, quality_suffix)
 }
 pub fn is_correct_note(detected_midi: u8, cents: i32, expected_midi: u8) -> bool {
     detected_midi % 12 == expected_midi % 12 && cents.abs() <= 50
@@ -1307,6 +1265,45 @@ mod tests {
                     }
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_diatonic_chord_notes_are_exact_chord_tones() {
+        // Regression test: generated notes must be exact chord tones (root, third,
+        // fifth) of SOME scale degree — never a boundary pitch substituted in by
+        // clamping. A real bug produced D,E,G for a D-rooted triad in C major
+        // instead of the correct D,F,A.
+        let intervals = ScaleType::Major.intervals();
+        let expected_sets: Vec<std::collections::HashSet<u8>> = (0..7usize)
+            .map(|degree| [0usize, 2, 4].iter().map(|&i| intervals[(degree + i) % 7]).collect())
+            .collect();
+
+        for seed in 0u64..500 {
+            let notes = generate_diatonic_chord(0, ScaleType::Major, 3, 55, 79, seed);
+            if notes.is_empty() {
+                continue;
+            }
+            let pcs: std::collections::HashSet<u8> = notes.iter().map(|n| n.midi() % 12).collect();
+            assert!(
+                expected_sets.contains(&pcs),
+                "seed {}: notes {:?} (pcs {:?}) don't match any valid triad",
+                seed,
+                notes.iter().map(|n| n.midi()).collect::<Vec<_>>(),
+                pcs
+            );
+        }
+    }
+
+    #[test]
+    fn test_diatonic_chord_rejects_when_no_octave_fits() {
+        // A window narrower than even the tightest possible triad (a diminished
+        // triad spans 6 semitones in a major scale) must yield an empty result,
+        // never a clamped substitute pitch.
+        for seed in 0u64..50 {
+            let notes = generate_diatonic_chord(0, ScaleType::Major, 3, 60, 62, seed);
+            assert!(notes.is_empty(), "seed {}: expected empty (range too narrow), got {:?}",
+                seed, notes.iter().map(|n| n.midi()).collect::<Vec<_>>());
         }
     }
 
