@@ -417,6 +417,31 @@ pub extern "C" fn ear_ring_intro_chord(
     notes.len() as c_int
 }
 
+/// Return the 7 notes of a scale ascending from `root_midi`, as MIDI note numbers.
+/// Used for the "Scale" intro-sound option (issue #8).
+/// * `out_buf` must be at least 7 bytes.
+#[no_mangle]
+pub extern "C" fn ear_ring_scale_notes(
+    root_midi: c_uchar,
+    scale_id: c_uchar,
+    out_buf: *mut c_uchar,
+) -> c_int {
+    if out_buf.is_null() {
+        return -1;
+    }
+    let scale = match scale_type_from_id(scale_id) {
+        Some(s) => s,
+        None => return -1,
+    };
+    let root = Note::from_midi(root_midi);
+    let notes = scale_notes(root, scale);
+    let out = unsafe { std::slice::from_raw_parts_mut(out_buf, notes.len()) };
+    for (i, note) in notes.iter().enumerate() {
+        out[i] = note.midi();
+    }
+    notes.len() as c_int
+}
+
 #[no_mangle]
 pub extern "C" fn ear_ring_is_correct_note(
     detected_midi: c_uchar,
@@ -819,7 +844,7 @@ mod android_jni {
         generate_diatonic_chord, generate_sequence, intro_chord, is_correct_note, is_sharp_key,
         key_accidental_count, key_sig_staff_positions, label_to_midi, melody_count, melody_range_midi,
         melody_to_midi_by_index, midi_to_label, note_name, preferred_midi_label,
-        preferred_note_label, scale_label, scale_name, scale_type_from_id, shuffle_melody_indices, staff_position,
+        preferred_note_label, scale_label, scale_name, scale_notes, scale_type_from_id, shuffle_melody_indices, staff_position,
         staff_position_in_key, test_score, written_diatonic_chord_label, written_scale_label, Note, ScaleType,
     };
 
@@ -981,6 +1006,27 @@ mod android_jni {
         let scale = scale_type_from_id(scale_id as u8).unwrap_or(ScaleType::Major);
         let root = Note::from_midi(root_midi as u8);
         let notes = intro_chord(root, scale);
+        let midi_vals: Vec<jint> = notes.iter().map(|n| n.midi() as jint).collect();
+
+        let arr: JIntArray = match env.new_int_array(midi_vals.len() as i32) {
+            Ok(a) => a,
+            Err(_) => return std::ptr::null_mut(),
+        };
+        let _ = env.set_int_array_region(&arr, 0, &midi_vals);
+        arr.into_raw()
+    }
+
+    /// Return the 7 notes of a scale ascending from `root_midi` (issue #8's "Scale" intro-sound option).
+    #[no_mangle]
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeScaleNotes(
+        env: JNIEnv,
+        _class: JClass,
+        root_midi: jint,
+        scale_id: jint,
+    ) -> jintArray {
+        let scale = scale_type_from_id(scale_id as u8).unwrap_or(ScaleType::Major);
+        let root = Note::from_midi(root_midi as u8);
+        let notes = scale_notes(root, scale);
         let midi_vals: Vec<jint> = notes.iter().map(|n| n.midi() as jint).collect();
 
         let arr: JIntArray = match env.new_int_array(midi_vals.len() as i32) {

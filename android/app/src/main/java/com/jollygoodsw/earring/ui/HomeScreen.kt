@@ -246,33 +246,6 @@ fun HomeScreen(
             enabled = state.testType == 0,
             enabledIndices = if (isDiatonicMode) setOf(2, 3) else null  // indices 2=3, 3=4
         )
-        Spacer(Modifier.height(16.dp))
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Checkbox(
-                    checked = state.showTestNotes,
-                    onCheckedChange = { viewModel.setShowTestNotes(it) }
-                )
-                Text("Display Test Notes", style = MaterialTheme.typography.bodyLarge, maxLines = 1)
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Checkbox(
-                    checked = state.keySignatureMode == 1,
-                    onCheckedChange = { viewModel.setKeySignatureMode(if (it) 1 else 0) }
-                )
-                Text("Use Key Signature", style = MaterialTheme.typography.bodyLarge, maxLines = 1)
-            }
-        }
         Spacer(Modifier.height(32.dp))
 
         Button(

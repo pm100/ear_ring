@@ -21,6 +21,7 @@ object EarRingCore {
     @JvmStatic external fun nativeStaffPosition(midi: Int): Int
     @JvmStatic external fun nativeGenerateSequence(rootChroma: Int, scaleId: Int, length: Int, rangeStart: Int, rangeEnd: Int, seed: Long, avoidFirstMidi: Int): IntArray
     @JvmStatic external fun nativeIntroChord(rootMidi: Int, scaleId: Int): IntArray
+    @JvmStatic external fun nativeScaleNotes(rootMidi: Int, scaleId: Int): IntArray
     @JvmStatic external fun nativeIsCorrectNote(detectedMidi: Int, cents: Int, expectedMidi: Int): Int
     @JvmStatic external fun nativeTestScore(maxAttempts: Int, attemptsUsed: Int, passed: Int): Int
     @JvmStatic external fun nativeMidiToLabel(midi: Int): String
@@ -124,6 +125,20 @@ object EarRingCore {
                 else -> 4 to 7  // Major, Mixolydian → major triad
             }
             intArrayOf(rootMidi, rootMidi + third, rootMidi + fifth)
+        }
+
+    /** The 7 notes of a scale ascending from rootMidi. Used for the "Scale" intro-sound
+     *  option (issue #8). */
+    fun scaleNotes(rootMidi: Int, scaleId: Int): IntArray =
+        if (loaded) nativeScaleNotes(rootMidi, scaleId) else {
+            val intervals = when (scaleId) {
+                1 -> intArrayOf(0, 2, 3, 5, 7, 8, 10)  // Natural Minor
+                2 -> intArrayOf(0, 2, 3, 5, 7, 9, 10)  // Dorian
+                3 -> intArrayOf(0, 2, 4, 5, 7, 9, 10)  // Mixolydian
+                4 -> intArrayOf(0, 1, 3, 5, 6, 8, 10)  // Locrian
+                else -> intArrayOf(0, 2, 4, 5, 7, 9, 11) // Major
+            }
+            IntArray(intervals.size) { rootMidi + intervals[it] }
         }
 
     fun isCorrectNote(detectedMidi: Int, cents: Int, expectedMidi: Int): Boolean =

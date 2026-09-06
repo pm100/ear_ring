@@ -43,6 +43,10 @@ class ExerciseModel: ObservableObject {
     @Published var keySignatureMode: Int = ud.object(forKey: "keySignatureMode") != nil ? ud.integer(forKey: "keySignatureMode") : 0 {
         didSet { UserDefaults.standard.set(keySignatureMode, forKey: "keySignatureMode") }
     }
+    /// What plays before each test: 0=root note, 1=chord (default), 2=arpeggiated chord, 3=scale, 4=none.
+    @Published var introSoundMode: Int = ud.object(forKey: "introSoundMode") != nil ? ud.integer(forKey: "introSoundMode") : 1 {
+        didSet { UserDefaults.standard.set(introSoundMode, forKey: "introSoundMode") }
+    }
     @Published var maxRetries: Int = ud.object(forKey: "maxRetries") != nil ? ud.integer(forKey: "maxRetries") : 5 {
         didSet { UserDefaults.standard.set(maxRetries, forKey: "maxRetries") }
     }
@@ -347,8 +351,28 @@ class ExerciseModel: ObservableObject {
         guard !sequence.isEmpty else { return }
         status = .playing
         audioPlayback.resetCancellation()
-        let chord = EarRingCore.introChord(rootMidi: EarRingCore.effectiveIntroRootMidi(rootNote: rootNote, scaleId: scaleId, rangeStart: rangeStart), scaleId: scaleId)
-        await audioPlayback.playChord(notes: chord)
+        // Issue #8: what plays before the test sequence is configurable — a single root
+        // note, a block chord (default, unchanged), the chord arpeggiated, the full scale
+        // ascending, or nothing at all. All but "chord" reuse playSequence (one note after
+        // another) instead of playChord (simultaneous).
+        let introRootMidi = EarRingCore.effectiveIntroRootMidi(rootNote: rootNote, scaleId: scaleId, rangeStart: rangeStart)
+        switch introSoundMode {
+        case 0:
+            await audioPlayback.playSequence(notes: [introRootMidi], bpm: tempoBpm, durations: nil) { _ in }
+        case 2:
+            let chord = EarRingCore.introChord(rootMidi: introRootMidi, scaleId: scaleId)
+            await audioPlayback.playSequence(notes: chord, bpm: tempoBpm, durations: nil) { _ in }
+        case 3:
+            // scaleNotes returns the 7 scale degrees; append the octave root so the
+            // scale intro plays a full 8-note run ending on the octave, not the 7th.
+            let scale = EarRingCore.scaleNotes(rootMidi: introRootMidi, scaleId: scaleId) + [introRootMidi + 12]
+            await audioPlayback.playSequence(notes: scale, bpm: tempoBpm, durations: nil) { _ in }
+        case 4:
+            break  // No intro sound — skip straight to the post-intro gap/sequence.
+        default:
+            let chord = EarRingCore.introChord(rootMidi: introRootMidi, scaleId: scaleId)
+            await audioPlayback.playChord(notes: chord)
+        }
         // Fade chord sustain concurrently with the post-chord gap so notes
         // are silent before the sequence begins. Cap at 75% of the gap so
         // the fade always finishes before the sequence starts.
@@ -514,7 +538,7 @@ class ExerciseModel: ObservableObject {
     func resetSettings() {
         let ud = UserDefaults.standard
         let keys = ["rootNote","rangeStart","rangeEnd","scaleId","sequenceLength","tempoBpm",
-                    "showTestNotes","keySignatureMode","maxRetries","silenceThreshold",
+                    "showTestNotes","keySignatureMode","introSoundMode","maxRetries","silenceThreshold",
                     "framesToConfirm","warmupFrames","postChordGapNs","wrongNotePauseNs",
                     "instrumentIndex","testType","playPassFailSounds","hasLaunched"]
         keys.forEach { ud.removeObject(forKey: $0) }
@@ -526,6 +550,7 @@ class ExerciseModel: ObservableObject {
         tempoBpm = 100
         showTestNotes = false
         keySignatureMode = 0
+        introSoundMode = 1
         maxRetries = 5
         silenceThreshold = 0.003
         framesToConfirm = 2

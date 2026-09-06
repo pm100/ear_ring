@@ -10,6 +10,7 @@ struct SettingsView: View {
         (1_000_000_000, "1s"), (2_000_000_000, "2s"),
         (3_000_000_000, "3s"), (5_000_000_000, "5s")
     ]
+    private let introSoundOptions = ["Root Note", "Chord", "Arpeggio", "Scale", "None"]
 
     private struct InstrumentInfo: Identifiable {
         let id: Int
@@ -24,6 +25,7 @@ struct SettingsView: View {
     @State private var expandInstrument = false
     @State private var expandPlayback = false
     @State private var expandSound = false
+    @State private var expandDisplay = false
     @State private var expandExercise = false
     @State private var expandTiming = false
     @State private var expandPitchDetection = false
@@ -62,13 +64,40 @@ struct SettingsView: View {
                         Text("Play Pass/Fail Sounds")
                     }
                     Text("A chime when a test is passed, a different tone when it fails")
-                        .font(.caption).foregroundColor(.erMuted).padding(.bottom, 6)
+                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
+
+                    sectionLabel("Intro Sound").padding(.top, 8)
+                    Text("What plays before each test")
+                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
+                    Picker("Intro Sound", selection: $model.introSoundMode) {
+                        ForEach(introSoundOptions.indices, id: \.self) { idx in
+                            Text(introSoundOptions[idx]).tag(idx)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 4)
                 } label: { sectionHeader("Sound") }
+
+                DisclosureGroup(isExpanded: $expandDisplay) {
+                    Toggle(isOn: Binding(
+                        get: { model.showTestNotes },
+                        set: { model.showTestNotes = $0 }
+                    )) {
+                        Text("Display Test Notes")
+                    }
+                    Toggle(isOn: Binding(
+                        get: { model.keySignatureMode == 1 },
+                        set: { model.keySignatureMode = $0 ? 1 : 0 }
+                    )) {
+                        Text("Use Key Signature")
+                    }
+                } label: { sectionHeader("Display") }
 
                 DisclosureGroup(isExpanded: $expandExercise) {
                     sectionLabel("Max Retries").padding(.top, 8)
                     Text("Attempts per test before moving on")
-                        .font(.caption).foregroundColor(.erMuted).padding(.bottom, 6)
+                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
                     chipGrid(options: retryOptions.map { "\($0)" },
                              selected: retryOptions.firstIndex(of: model.maxRetries) ?? 0,
                              count: retryOptions.count) { idx in
@@ -79,7 +108,7 @@ struct SettingsView: View {
                 DisclosureGroup(isExpanded: $expandTiming) {
                     sectionLabel("Pause Before Playing").padding(.top, 8)
                     Text("Gap between chord and test sequence: \(model.postChordGapNanoseconds / 1_000_000)ms")
-                        .font(.caption).foregroundColor(.erMuted).padding(.bottom, 4)
+                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 4)
                     Slider(value: Binding(
                         get: { Double(model.postChordGapNanoseconds / 1_000_000) },
                         set: { model.postChordGapNanoseconds = UInt64($0) * 1_000_000 }
@@ -87,7 +116,7 @@ struct SettingsView: View {
 
                     sectionLabel("Wrong Note Pause").padding(.top, 8)
                     Text("How long to display a wrong note before replaying")
-                        .font(.caption).foregroundColor(.erMuted).padding(.bottom, 6)
+                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
                     chipGrid(options: wrongPauseOptions.map { $0.1 },
                              selected: wrongPauseOptions.firstIndex(where: { $0.0 == model.wrongNotePauseNanoseconds }) ?? 0,
                              count: wrongPauseOptions.count) { idx in
@@ -101,7 +130,7 @@ struct SettingsView: View {
                     sectionLabel("Mic Sensitivity").padding(.top, 8)
                     let sensitivity = min(10, max(1, Int(((0.011 - Double(model.silenceThreshold)) / 0.001).rounded())))
                     Text("Sensitivity: \(sensitivity) / 10")
-                        .font(.caption).foregroundColor(.erMuted).padding(.bottom, 4)
+                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 4)
                     Slider(value: Binding(
                         get: { Double(sensitivity) },
                         set: { model.silenceThreshold = Float(max(0.001, min(0.010, 0.011 - $0 * 0.001))) }
@@ -109,7 +138,7 @@ struct SettingsView: View {
 
                     sectionLabel("Note Stability").padding(.top, 8)
                     Text("Consecutive stable frames before confirming a note")
-                        .font(.caption).foregroundColor(.erMuted).padding(.bottom, 6)
+                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
                     chipGrid(options: stabilityOptions.map { "\($0)" },
                              selected: stabilityOptions.firstIndex(of: model.framesToConfirm) ?? 0,
                              count: stabilityOptions.count) { idx in
@@ -118,7 +147,7 @@ struct SettingsView: View {
 
                     sectionLabel("Mic Warmup Frames").padding(.top, 8)
                     Text("Frames discarded when mic opens (both Exercise and Mic Setup)")
-                        .font(.caption).foregroundColor(.erMuted).padding(.bottom, 6)
+                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
                     chipGrid(options: warmupOptions.map { "\($0)" },
                              selected: warmupOptions.firstIndex(of: model.warmupFrames) ?? 4,
                              count: warmupOptions.count) { idx in

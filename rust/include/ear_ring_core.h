@@ -56,6 +56,14 @@ int32_t ear_ring_generate_sequence(uint8_t root_chroma,
 /// @param out_buf    Output buffer (must be at least 3 bytes)
 int32_t ear_ring_intro_chord(uint8_t root_midi, uint8_t scale_id, uint8_t *out_buf);
 
+/// Return the 7 notes of a scale ascending from root_midi, as MIDI note numbers.
+/// Used for the "Scale" intro-sound option (issue #8).
+/// Returns the count of notes written into out_buf on success, -1 on failure.
+/// @param root_midi  Root note MIDI number
+/// @param scale_id   Scale identifier (0–7)
+/// @param out_buf    Output buffer (must be at least 7 bytes)
+int32_t ear_ring_scale_notes(uint8_t root_midi, uint8_t scale_id, uint8_t *out_buf);
+
 /// Generate a diatonic chord (triad or 7th) from the given scale. Every note is
 /// guaranteed to fall within [range_start, range_end].
 /// Returns the count of notes written into out_buf on success (may be less than

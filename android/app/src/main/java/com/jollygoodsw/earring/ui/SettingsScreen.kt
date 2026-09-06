@@ -150,6 +150,55 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             }
             Text("A chime when a test is passed, a different tone when it fails",
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            Spacer(Modifier.height(12.dp))
+            SectionLabel("Intro Sound")
+            Text("What plays before each test",
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 6.dp))
+            val introSoundOptions = listOf("Root Note", "Chord", "Arpeggio", "Scale", "None")
+            var introSoundExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(
+                expanded = introSoundExpanded,
+                onExpandedChange = { introSoundExpanded = !introSoundExpanded }
+            ) {
+                OutlinedTextField(
+                    value = introSoundOptions.getOrElse(state.introSoundMode) { "Chord" },
+                    onValueChange = {},
+                    readOnly = true,
+                    singleLine = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = introSoundExpanded) },
+                    modifier = Modifier.menuAnchor().fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = introSoundExpanded,
+                    onDismissRequest = { introSoundExpanded = false }
+                ) {
+                    introSoundOptions.forEachIndexed { idx, name ->
+                        DropdownMenuItem(
+                            text = { Text(name) },
+                            onClick = { viewModel.setIntroSoundMode(idx); introSoundExpanded = false }
+                        )
+                    }
+                }
+            }
+        }
+
+        ExpandableSection("Display") {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = state.showTestNotes,
+                    onCheckedChange = { viewModel.setShowTestNotes(it) }
+                )
+                Text("Display Test Notes", style = MaterialTheme.typography.bodyLarge)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = state.keySignatureMode == 1,
+                    onCheckedChange = { viewModel.setKeySignatureMode(if (it) 1 else 0) }
+                )
+                Text("Use Key Signature", style = MaterialTheme.typography.bodyLarge)
+            }
         }
 
         ExpandableSection("Exercise") {

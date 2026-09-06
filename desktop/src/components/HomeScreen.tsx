@@ -463,27 +463,6 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 24, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={settings.showTestNotes}
-            onChange={e => onUpdateSettings(prev => ({ ...prev, showTestNotes: e.target.checked }))}
-            style={{ width: 18, height: 18, cursor: 'pointer' }}
-          />
-          <span className="section-label" style={{ margin: 0 }}>Display Test Notes</span>
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={settings.keySignatureMode === 1}
-            onChange={e => onUpdateSettings(prev => ({ ...prev, keySignatureMode: e.target.checked ? 1 : 0 }))}
-            style={{ width: 18, height: 18, cursor: 'pointer' }}
-          />
-          <span className="section-label" style={{ margin: 0 }}>Use Key Signature</span>
-        </label>
-      </div>
-
       <div style={{ marginTop: 32 }}>
         <button className="btn-primary" onClick={handleStart}>▶ Start Exercise</button>
       </div>

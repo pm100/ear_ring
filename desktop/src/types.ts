@@ -24,6 +24,7 @@ export interface ExerciseSettings {
   tempoBpm: number;
   showTestNotes: boolean;
   keySignatureMode: number;  // 0=inline accidentals, 1=key signature
+  introSoundMode: number;    // 0=root note, 1=chord (default), 2=arpeggiated chord, 3=scale, 4=none
   maxRetries: number;         // default 5
   silenceThreshold: number;   // default 0.003
   framesToConfirm: number;    // default 3
@@ -44,6 +45,7 @@ export interface ExerciseState {
   tempoBpm: number;
   showTestNotes: boolean;
   keySignatureMode: number;
+  introSoundMode: number;
   maxRetries: number;
   silenceThreshold: number;
   framesToConfirm: number;

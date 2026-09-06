@@ -47,6 +47,15 @@ struct EarRingCore {
         return buf.prefix(Int(count)).map { Int($0) }
     }
 
+    /// The 7 notes of a scale ascending from rootMidi. Used for the "Scale" intro-sound
+    /// option (issue #8).
+    static func scaleNotes(rootMidi: Int, scaleId: Int) -> [Int] {
+        var buf = [UInt8](repeating: 0, count: 7)
+        let count = ear_ring_scale_notes(UInt8(rootMidi), UInt8(scaleId), &buf)
+        guard count > 0 else { return [] }
+        return buf.prefix(Int(count)).map { Int($0) }
+    }
+
     static func isCorrectNote(detectedMidi: Int, cents: Int, expectedMidi: Int) -> Bool {
         ear_ring_is_correct_note(UInt8(detectedMidi), Int32(cents), UInt8(expectedMidi)) == 1
     }

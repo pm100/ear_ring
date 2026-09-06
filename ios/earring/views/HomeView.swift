@@ -253,23 +253,6 @@ struct HomeView: View {
                     }
                 }
 
-                HStack(spacing: 8) {
-                    Toggle(isOn: Binding(
-                        get: { model.showTestNotes },
-                        set: { model.showTestNotes = $0 }
-                    )) {
-                        Text("Display Test Notes")
-                            .font(.body)
-                    }
-                    Toggle(isOn: Binding(
-                        get: { model.keySignatureMode == 1 },
-                        set: { model.keySignatureMode = $0 ? 1 : 0 }
-                    )) {
-                        Text("Use Key Signature")
-                            .font(.body)
-                    }
-                }.padding(.top, 16)
-
                 // ── Action buttons ────────────────────────────────────────
                 VStack(spacing: 10) {
                     Button("▶ Start Exercise") {

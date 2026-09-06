@@ -4,7 +4,7 @@ use ear_ring_core::{
     accidental_in_key, detect_pitch, diatonic_chord_label, effective_intro_root_midi, freq_to_note, generate_diatonic_chord, generate_sequence, help_sections_json,
     intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions, label_to_midi,
     melody_count, melody_range_midi, melody_title, melody_to_midi_by_index, note_timing, preferred_midi_label,
-    scale_type_from_id, shuffle_melody_indices, staff_position, test_score, written_diatonic_chord_label, written_note_name, written_midi_label, written_scale_label,
+    scale_notes, scale_type_from_id, shuffle_melody_indices, staff_position, test_score, written_diatonic_chord_label, written_note_name, written_midi_label, written_scale_label,
     Note, PitchTracker, ScaleType,
 };
 use std::sync::Mutex;
@@ -116,6 +116,17 @@ fn cmd_written_diatonic_chord_label(concert_root_chroma: u8, scale_id: u8, note_
 fn cmd_intro_chord(root_midi: u8, scale_id: u8) -> Vec<u8> {
     let scale = scale_type_from_id(scale_id).unwrap_or(ScaleType::Major);
     intro_chord(Note::from_midi(root_midi), scale)
+        .iter()
+        .map(|n| n.midi())
+        .collect()
+}
+
+/// The 7 notes of a scale ascending from root_midi. Used for the "Scale" intro-sound
+/// option (issue #8).
+#[tauri::command]
+fn cmd_scale_notes(root_midi: u8, scale_id: u8) -> Vec<u8> {
+    let scale = scale_type_from_id(scale_id).unwrap_or(ScaleType::Major);
+    scale_notes(Note::from_midi(root_midi), scale)
         .iter()
         .map(|n| n.midi())
         .collect()
@@ -264,6 +275,7 @@ fn main() {
             cmd_diatonic_chord_label,
             cmd_written_diatonic_chord_label,
             cmd_intro_chord,
+            cmd_scale_notes,
             cmd_is_correct_note,
             cmd_test_score,
             cmd_is_sharp_key,

@@ -28,6 +28,7 @@ data class ExerciseState(
     val tempoBpm: Int = 100,
     val showTestNotes: Boolean = false,
     val keySignatureMode: Int = 0,  // 0=inline accidentals, 1=key signature
+    val introSoundMode: Int = 1,  // 0=root note, 1=chord (default), 2=arpeggiated chord, 3=scale, 4=none
     val maxRetries: Int = DEFAULT_MAX_ATTEMPTS,
     val silenceThreshold: Float = DEFAULT_SILENCE_THRESHOLD,
     val framesToConfirm: Int = DEFAULT_FRAMES_TO_CONFIRM,
@@ -95,6 +96,7 @@ private const val PREF_TEMPO_BPM = "tempoBpm"
 private const val PREF_SHOW_TEST_NOTES = "showTestNotes"
 private const val PREF_PLAY_PASS_FAIL_SOUNDS = "playPassFailSounds"
 private const val PREF_KEY_SIG_MODE = "keySignatureMode"
+private const val PREF_INTRO_SOUND_MODE = "introSoundMode"
 private const val PREF_MAX_RETRIES = "maxRetries"
 private const val PREF_SILENCE_THRESHOLD = "silenceThreshold"
 private const val PREF_FRAMES_TO_CONFIRM = "framesToConfirm"
@@ -130,6 +132,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             showTestNotes = prefs.getBoolean(PREF_SHOW_TEST_NOTES, false),
             playPassFailSounds = prefs.getBoolean(PREF_PLAY_PASS_FAIL_SOUNDS, true),
             keySignatureMode = prefs.getInt(PREF_KEY_SIG_MODE, 0),
+            introSoundMode = prefs.getInt(PREF_INTRO_SOUND_MODE, 1),
             maxRetries = prefs.getInt(PREF_MAX_RETRIES, DEFAULT_MAX_ATTEMPTS),
             silenceThreshold = prefs.getFloat(PREF_SILENCE_THRESHOLD, DEFAULT_SILENCE_THRESHOLD),
             framesToConfirm = prefs.getInt(PREF_FRAMES_TO_CONFIRM, DEFAULT_FRAMES_TO_CONFIRM),
@@ -159,6 +162,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putBoolean(PREF_SHOW_TEST_NOTES, state.showTestNotes)
             .putBoolean(PREF_PLAY_PASS_FAIL_SOUNDS, state.playPassFailSounds)
             .putInt(PREF_KEY_SIG_MODE, state.keySignatureMode)
+            .putInt(PREF_INTRO_SOUND_MODE, state.introSoundMode)
             .putInt(PREF_MAX_RETRIES, state.maxRetries)
             .putFloat(PREF_SILENCE_THRESHOLD, state.silenceThreshold)
             .putInt(PREF_FRAMES_TO_CONFIRM, state.framesToConfirm)
@@ -186,6 +190,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putBoolean(PREF_SHOW_TEST_NOTES, defaults.showTestNotes)
             .putBoolean(PREF_PLAY_PASS_FAIL_SOUNDS, defaults.playPassFailSounds)
             .putInt(PREF_KEY_SIG_MODE, defaults.keySignatureMode)
+            .putInt(PREF_INTRO_SOUND_MODE, defaults.introSoundMode)
             .putInt(PREF_MAX_RETRIES, defaults.maxRetries)
             .putFloat(PREF_SILENCE_THRESHOLD, defaults.silenceThreshold)
             .putInt(PREF_FRAMES_TO_CONFIRM, defaults.framesToConfirm)
@@ -226,6 +231,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     fun setShowTestNotes(show: Boolean) { _state.value = _state.value.copy(showTestNotes = show); saveSettings(_state.value) }
     fun setPlayPassFailSounds(play: Boolean) { _state.value = _state.value.copy(playPassFailSounds = play); saveSettings(_state.value) }
     fun setKeySignatureMode(mode: Int) { _state.value = _state.value.copy(keySignatureMode = mode); saveSettings(_state.value) }
+    fun setIntroSoundMode(mode: Int) { _state.value = _state.value.copy(introSoundMode = mode); saveSettings(_state.value) }
     fun setMaxRetries(n: Int) { _state.value = _state.value.copy(maxRetries = n); saveSettings(_state.value) }
     fun setSilenceThreshold(v: Float) { _state.value = _state.value.copy(silenceThreshold = v); saveSettings(_state.value) }
     fun setFramesToConfirm(n: Int) { _state.value = _state.value.copy(framesToConfirm = n); saveSettings(_state.value) }
@@ -428,12 +434,16 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         // never play audio or advance state for the new one.
         val mySession = state.sessionId
         fun isCurrent() = _state.value.sessionRunning && _state.value.sessionId == mySession
-        val triad = EarRingCore.introChord(EarRingCore.effectiveIntroRootMidi(state.rootNote, state.scaleId, state.rangeStart), state.scaleId).toList()
-        audioPlayback.playChord(
-            midiNotes = triad,
-            onDone = {
+
+        // Issue #8: what plays before the test sequence is configurable — a single root
+        // note, a block chord (default, unchanged), the chord arpeggiated, the full scale
+        // ascending, or nothing at all. All but "chord" reuse playSequence (one note after
+        // another) instead of playChord (simultaneous); either way onIntroDone continues
+        // into the test sequence once the intro sound finishes.
+        val introRootMidi = EarRingCore.effectiveIntroRootMidi(state.rootNote, state.scaleId, state.rangeStart)
+        val onIntroDone = {
                 if (isCurrent()) {
-                    // Fade chord sustain so it doesn't bleed into the sequence.
+                    // Fade intro sustain so it doesn't bleed into the sequence.
                     // Cap at 75% of the gap so the fade always finishes before the sequence starts.
                     val chordFadeMs = (_state.value.postChordGapMs * 3 / 4).coerceIn(100L, 400L)
                     audioPlayback.fadeOutActive(chordFadeMs)
@@ -462,7 +472,25 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
                     }
                 }
             }
-        )
+
+        when (state.introSoundMode) {
+            0 -> audioPlayback.playSequence(midiNotes = listOf(introRootMidi), bpm = state.tempoBpm, onEach = {}, onDone = onIntroDone)
+            2 -> {
+                val chord = EarRingCore.introChord(introRootMidi, state.scaleId).toList()
+                audioPlayback.playSequence(midiNotes = chord, bpm = state.tempoBpm, onEach = {}, onDone = onIntroDone)
+            }
+            3 -> {
+                // scaleNotes returns the 7 scale degrees; append the octave root so the
+                // scale intro plays a full 8-note run ending on the octave, not the 7th.
+                val scale = EarRingCore.scaleNotes(introRootMidi, state.scaleId).toList() + (introRootMidi + 12)
+                audioPlayback.playSequence(midiNotes = scale, bpm = state.tempoBpm, onEach = {}, onDone = onIntroDone)
+            }
+            4 -> onIntroDone()  // No intro sound — skip straight to the post-intro gap/sequence.
+            else -> {
+                val triad = EarRingCore.introChord(introRootMidi, state.scaleId).toList()
+                audioPlayback.playChord(midiNotes = triad, onDone = onIntroDone)
+            }
+        }
     }
 
     private fun startListening() {

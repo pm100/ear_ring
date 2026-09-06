@@ -111,17 +111,32 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     timersRef.current = [];
   }, []);
 
-  const fetchIntroTriad = useCallback(async () => {
+  // Issue #8: what plays before the test sequence is configurable — a single root
+  // note, a block chord (default, unchanged), the chord arpeggiated, the full scale
+  // ascending, or nothing at all. All but "chord" reuse playSequence (one note after
+  // another) instead of playChord (simultaneous).
+  const playIntroSound = useCallback(async () => {
+    if (exercise.introSoundMode === 4) return; // No intro sound
     const rootMidi = await invoke<number>('cmd_effective_intro_root_midi', {
       rootChroma: exercise.rootNote,
       scaleId: exercise.scaleId,
       rangeStart: exercise.rangeStart,
     });
-    return invoke<number[]>('cmd_intro_chord', {
-      rootMidi,
-      scaleId: exercise.scaleId,
-    });
-  }, [exercise.rangeStart, exercise.rootNote, exercise.scaleId]);
+    if (exercise.introSoundMode === 0) {
+      await playSequence([rootMidi], () => {}, () => {}, exercise.tempoBpm);
+    } else if (exercise.introSoundMode === 2) {
+      const chord = await invoke<number[]>('cmd_intro_chord', { rootMidi, scaleId: exercise.scaleId });
+      await playSequence(chord, () => {}, () => {}, exercise.tempoBpm);
+    } else if (exercise.introSoundMode === 3) {
+      // cmd_scale_notes returns the 7 scale degrees; append the octave root so the
+      // scale intro plays a full 8-note run ending on the octave, not the 7th.
+      const scale = await invoke<number[]>('cmd_scale_notes', { rootMidi, scaleId: exercise.scaleId });
+      await playSequence([...scale, rootMidi + 12], () => {}, () => {}, exercise.tempoBpm);
+    } else {
+      const chord = await invoke<number[]>('cmd_intro_chord', { rootMidi, scaleId: exercise.scaleId });
+      await playChord(chord);
+    }
+  }, [exercise.rangeStart, exercise.rootNote, exercise.scaleId, exercise.introSoundMode, playChord, playSequence]);
 
   const generateFreshSequence = useCallback(async (): Promise<{ sequence: number[], durations?: number[], newRangeStart?: number, newRangeEnd?: number, title?: string }> => {
     if (exercise.testType === 1) {
@@ -236,7 +251,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     currentNoteIndexRef.current = 0;
     setLiveHz(0);
     await invoke('cmd_tracker_reset');
-    await playChord(await fetchIntroTriad());
+    await playIntroSound();
     if (!isCurrent()) return;
     await new Promise(resolve => {
       window.setTimeout(resolve, exercise.postChordGapMs);
@@ -259,7 +274,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       durations,
       timings
     );
-  }, [exercise.tempoBpm, exercise.postChordGapMs, exercise.warmupFrames, fetchIntroTriad, playChord, playSequence, startCapture]);
+  }, [exercise.tempoBpm, exercise.postChordGapMs, exercise.warmupFrames, playIntroSound, playChord, playSequence, startCapture]);
 
   const startFreshTest = useCallback(async () => {
     // Capture the generation at call time. If the main effect is re-run (e.g. React StrictMode

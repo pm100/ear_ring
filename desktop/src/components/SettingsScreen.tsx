@@ -14,6 +14,7 @@ const RETRY_OPTIONS = [1, 2, 3, 5, 8, 10];
 const STABILITY_OPTIONS = [2, 3, 4, 5];
 const WARMUP_OPTIONS = [0, 1, 2, 3, 4, 5, 6];
 const WRONG_PAUSE_OPTIONS = [{ label: '1s', value: 1000 }, { label: '2s', value: 2000 }, { label: '3s', value: 3000 }, { label: '5s', value: 5000 }];
+const INTRO_SOUND_OPTIONS = ['Root Note', 'Chord', 'Arpeggio', 'Scale', 'None'];
 
 function GroupHeader({ children }: { children: React.ReactNode }) {
   return <h2 style={{ fontSize: 13, fontWeight: 700, color: '#212121', textTransform: 'uppercase', letterSpacing: 1.5, margin: '24px 0 4px', borderBottom: '2px solid #e0e0e0', paddingBottom: 4 }}>{children}</h2>;
@@ -113,6 +114,39 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
           <span className="section-label" style={{ margin: 0 }}>Play Pass/Fail Sounds</span>
         </label>
         <p style={{ fontSize: 12, color: '#757575', marginTop: 4, marginBottom: 0 }}>A chime when a test is passed, a different tone when it fails</p>
+
+        <span className="section-label">Intro Sound</span>
+        <p style={{ fontSize: 12, color: '#757575', marginBottom: 6 }}>What plays before each test</p>
+        <select
+          value={settings.introSoundMode}
+          onChange={e => set('introSoundMode', parseInt(e.target.value))}
+          style={{ width: '100%', padding: '8px 12px', fontSize: 14, borderRadius: 4, border: '1px solid #bdbdbd' }}
+        >
+          {INTRO_SOUND_OPTIONS.map((label, idx) => (
+            <option key={label} value={idx}>{label}</option>
+          ))}
+        </select>
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Display">
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginTop: 0 }}>
+          <input
+            type="checkbox"
+            checked={settings.showTestNotes}
+            onChange={e => set('showTestNotes', e.target.checked)}
+            style={{ width: 18, height: 18, cursor: 'pointer' }}
+          />
+          <span className="section-label" style={{ margin: 0 }}>Display Test Notes</span>
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={settings.keySignatureMode === 1}
+            onChange={e => set('keySignatureMode', e.target.checked ? 1 : 0)}
+            style={{ width: 18, height: 18, cursor: 'pointer' }}
+          />
+          <span className="section-label" style={{ margin: 0 }}>Use Key Signature</span>
+        </label>
       </CollapsibleSection>
 
       <CollapsibleSection title="Exercise">
