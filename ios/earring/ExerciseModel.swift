@@ -50,6 +50,11 @@ class ExerciseModel: ObservableObject {
     @Published var maxRetries: Int = ud.object(forKey: "maxRetries") != nil ? ud.integer(forKey: "maxRetries") : 5 {
         didSet { UserDefaults.standard.set(maxRetries, forKey: "maxRetries") }
     }
+    /// Issue #9 "note correction": consecutive wrong tries allowed at the same note
+    /// position before the whole test restarts. 0 = always restart (old behavior).
+    @Published var noteRetries: Int = ud.object(forKey: "noteRetries") != nil ? ud.integer(forKey: "noteRetries") : 2 {
+        didSet { UserDefaults.standard.set(noteRetries, forKey: "noteRetries") }
+    }
     @Published var silenceThreshold: Float = ud.object(forKey: "silenceThreshold") != nil ? Float(ud.double(forKey: "silenceThreshold")) : 0.003 {
         didSet { UserDefaults.standard.set(Double(silenceThreshold), forKey: "silenceThreshold") }
     }
@@ -116,6 +121,9 @@ class ExerciseModel: ObservableObject {
     @Published private(set) var confirmedNoteSeq: Int = 0
     @Published var currentAttempt: Int = 1
     @Published var maxAttempts: Int = 5
+    /// Consecutive wrong tries at the current note position — not persisted; reset on a
+    /// correct note or whenever the sequence restarts (see EarRingCore.wrongNoteOutcome).
+    private var noteRetryCount: Int = 0
     @Published var testsCompleted: Int = 0
     @Published var chordLabel: String = ""  // Set for diatonic mode; empty otherwise
 
@@ -160,6 +168,12 @@ class ExerciseModel: ObservableObject {
 
     var isCapturing: Bool { audioCapture.isRunning }
     var isSessionRunning: Bool { status != .stopped }
+
+    /// Issue #9 "note correction": true while `.listening` after a same-note retry (the
+    /// wrong note isn't drawn, so this is the only visible sign it happened) — views show
+    /// "Wrong note. Try again…" instead of the normal prompt. Cleared by the next correct
+    /// note or whenever the sequence restarts.
+    var isRetryingSameNote: Bool { noteRetryCount > 0 }
 
     func startExerciseSession() {
         cleanup()
@@ -319,6 +333,7 @@ class ExerciseModel: ObservableObject {
         detectedNotes = []
         currentNoteIndex = 0
         currentAttempt = 1
+        noteRetryCount = 0
         status = .playing
         await playPrompt()
     }
@@ -327,6 +342,7 @@ class ExerciseModel: ObservableObject {
         detectedNotes = []
         currentNoteIndex = 0
         currentAttempt = attempt
+        noteRetryCount = 0
         status = .playing
         await playPrompt()
     }
@@ -449,24 +465,42 @@ class ExerciseModel: ObservableObject {
 
         let expectedMidi = sequence[currentNoteIndex]
         let correct = EarRingCore.isCorrectNote(detectedMidi: midi, cents: cents, expectedMidi: expectedMidi)
-        let note = DetectedNote(midi: midi, cents: cents, isCorrect: correct)
-        detectedNotes.append(note)
-        currentNoteIndex += 1
 
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(correct ? .success : .error)
 
         if correct {
+            noteRetryCount = 0
+            detectedNotes.append(DetectedNote(midi: midi, cents: cents, isCorrect: true))
+            currentNoteIndex += 1
             if currentNoteIndex >= sequence.count {
                 audioCapture.stop()
                 completeTest(passed: true, attemptsUsed: currentAttempt, attemptNotes: detectedNotes)
             }
         } else {
-            audioCapture.stop()
-            status = .retryDelay
-            if currentAttempt >= maxAttempts {
+            // Issue #9 "note correction": a wrong note always consumes an attempt (still
+            // hits the score via testScore). Within the configured noteRetries budget it
+            // just keeps listening for another try at the SAME note — no capture stop/
+            // restart, no staff mark for the wrong note, no prompt replay — rather than
+            // always restarting the whole test like before this feature. Views show
+            // "Wrong note. Try again…" while status stays .listening and noteRetryCount > 0.
+            noteRetryCount += 1
+            let outcome = EarRingCore.wrongNoteOutcome(
+                currentAttempt: currentAttempt, maxAttempts: maxAttempts,
+                noteRetryCount: noteRetryCount, noteRetriesAllowed: noteRetries
+            )
+            switch outcome {
+            case .retrySameNote:
+                currentAttempt += 1
+            case .fail:
+                detectedNotes.append(DetectedNote(midi: midi, cents: cents, isCorrect: false))
+                audioCapture.stop()
+                status = .retryDelay
                 completeTest(passed: false, attemptsUsed: currentAttempt, attemptNotes: detectedNotes)
-            } else {
+            case .restartSequence:
+                detectedNotes.append(DetectedNote(midi: midi, cents: cents, isCorrect: false))
+                audioCapture.stop()
+                status = .retryDelay
                 let mySession = sessionId
                 Task {
                     try? await Task.sleep(nanoseconds: self.wrongNotePauseNanoseconds)
@@ -538,7 +572,7 @@ class ExerciseModel: ObservableObject {
     func resetSettings() {
         let ud = UserDefaults.standard
         let keys = ["rootNote","rangeStart","rangeEnd","scaleId","sequenceLength","tempoBpm",
-                    "showTestNotes","keySignatureMode","introSoundMode","maxRetries","silenceThreshold",
+                    "showTestNotes","keySignatureMode","introSoundMode","maxRetries","noteRetries","silenceThreshold",
                     "framesToConfirm","warmupFrames","postChordGapNs","wrongNotePauseNs",
                     "instrumentIndex","testType","playPassFailSounds","hasLaunched"]
         keys.forEach { ud.removeObject(forKey: $0) }
@@ -552,6 +586,7 @@ class ExerciseModel: ObservableObject {
         keySignatureMode = 0
         introSoundMode = 1
         maxRetries = 5
+        noteRetries = 2
         silenceThreshold = 0.003
         framesToConfirm = 2
         warmupFrames = 4

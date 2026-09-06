@@ -13,6 +13,11 @@ interface Props {
 }
 
 const SCALE_NAMES = ['Major','Natural Minor','Dorian','Mixolydian','Locrian'];
+// cmd_wrong_note_outcome results (issue #9 "note correction") — mirrors
+// WRONG_NOTE_* in rust/src/music_theory.rs.
+const WRONG_NOTE_RETRY_SAME_NOTE = 0;
+const WRONG_NOTE_RESTART_SEQUENCE = 1;
+const WRONG_NOTE_FAIL = 2;
 // Semitones to add to root chroma to get the implied major key (the major key sharing
 // the scale's pitch classes) — mirrors ScaleType::implied_major_offset in music_theory.rs.
 // null = no shift (a major scale is its own implied major key).
@@ -61,11 +66,16 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   const [sessionSaved, setSessionSaved] = useState(false);
   const [melodyDurations, setMelodyDurations] = useState<number[]>([]);
   const [melodyTitle, setMelodyTitle] = useState('');
+  // Issue #9 "note correction": consecutive wrong tries at the current note position —
+  // read by statusText() while status is 'listening' (the wrong note isn't drawn, so
+  // this is the only visible sign it happened). Reset on a correct note or a restart.
+  const [noteRetryCount, setNoteRetryCount] = useState(0);
   const noteStep = 44;
 
   const currentNoteIndexRef = useRef(0);
   const detectedRef = useRef<DetectedNote[]>([]);
   const currentAttemptRef = useRef(1);
+  const noteRetryCountRef = useRef(0);
   const sequenceRef = useRef<number[]>(exercise.sequence);
   const sessionRunningRef = useRef(true);
   const timersRef = useRef<number[]>([]);
@@ -249,6 +259,8 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     setDisplayedNotes([]);
     setCurrentNoteIndex(0);
     currentNoteIndexRef.current = 0;
+    noteRetryCountRef.current = 0;
+    setNoteRetryCount(0);
     setLiveHz(0);
     await invoke('cmd_tracker_reset');
     await playIntroSound();
@@ -366,12 +378,14 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       cents: centsResult,
       expectedMidi: expected,
     });
-    const newDetected = [...detectedRef.current, { midi, cents: centsResult, correct }];
-    setDetected(newDetected);
-    setDisplayedNotes(newDetected);
-    detectedRef.current = newDetected;
 
     if (correct) {
+      noteRetryCountRef.current = 0;
+      setNoteRetryCount(0);
+      const newDetected = [...detectedRef.current, { midi, cents: centsResult, correct: true }];
+      setDetected(newDetected);
+      setDisplayedNotes(newDetected);
+      detectedRef.current = newDetected;
       const nextIdx = idx + 1;
       if (nextIdx >= sequenceRef.current.length) {
         stopCapture();
@@ -381,19 +395,45 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         setCurrentNoteIndex(nextIdx);
         currentNoteIndexRef.current = nextIdx;
       }
-    } else {
-      stopCapture();
-      setStatus('retry_delay');
-      if (currentAttemptRef.current >= exercise.maxRetries) {
-        completeTest(false, newDetected, currentAttemptRef.current);
-      } else {
-        const myGen = startFreshGenRef.current;
-        schedule(() => {
-          if (sessionRunningRef.current && startFreshGenRef.current === myGen) {
-            void retryCurrentTest(currentAttemptRef.current + 1);
-          }
-        }, exercise.wrongNotePauseMs);
-      }
+      return;
+    }
+
+    // Issue #9 "note correction": a wrong note always consumes an attempt (still hits
+    // the score via cmd_test_score). Within the configured noteRetries budget it just
+    // keeps listening for another try at the SAME note — no capture stop/restart, no
+    // staff mark for the wrong note, no prompt replay — rather than always restarting
+    // the whole test like before this feature. statusText() shows "Wrong note. Try
+    // again…" while status stays 'listening' and noteRetryCount > 0.
+    const noteRetryCount = noteRetryCountRef.current + 1;
+    noteRetryCountRef.current = noteRetryCount;
+    const outcome = await invoke<number>('cmd_wrong_note_outcome', {
+      currentAttempt: currentAttemptRef.current,
+      maxAttempts: exercise.maxRetries,
+      noteRetryCount,
+      noteRetriesAllowed: exercise.noteRetries,
+    });
+    if (outcome === WRONG_NOTE_RETRY_SAME_NOTE) {
+      setNoteRetryCount(noteRetryCount);
+      setCurrentAttempt(prev => prev + 1);
+      currentAttemptRef.current += 1;
+      return;
+    }
+
+    const newDetected = [...detectedRef.current, { midi, cents: centsResult, correct: false }];
+    setDetected(newDetected);
+    setDisplayedNotes(newDetected);
+    detectedRef.current = newDetected;
+    stopCapture();
+    setStatus('retry_delay');
+    if (outcome === WRONG_NOTE_FAIL) {
+      completeTest(false, newDetected, currentAttemptRef.current);
+    } else if (outcome === WRONG_NOTE_RESTART_SEQUENCE) {
+      const myGen = startFreshGenRef.current;
+      schedule(() => {
+        if (sessionRunningRef.current && startFreshGenRef.current === myGen) {
+          void retryCurrentTest(currentAttemptRef.current + 1);
+        }
+      }, exercise.wrongNotePauseMs);
     }
   };
 
@@ -439,7 +479,13 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   const statusText = () => {
     switch (status) {
       case 'playing': return 'Listen carefully…';
-      case 'listening': return `Play note ${currentNoteIndex + 1} of ${sequence.length}`;
+      case 'listening':
+        // Issue #9 "note correction": a wrong note within the noteRetries budget keeps
+        // listening (no capture stop/restart) rather than leaving 'listening' — this is
+        // the only visible sign it happened, since the wrong note isn't drawn.
+        return noteRetryCount > 0
+          ? 'Wrong note. Try again…'
+          : `Play note ${currentNoteIndex + 1} of ${sequence.length}`;
       case 'retry_delay':
         return detected[detected.length - 1]?.correct === false && currentAttempt < exercise.maxRetries
           ? 'Wrong note. Replaying the same test…'

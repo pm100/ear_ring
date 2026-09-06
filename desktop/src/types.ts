@@ -26,6 +26,9 @@ export interface ExerciseSettings {
   keySignatureMode: number;  // 0=inline accidentals, 1=key signature
   introSoundMode: number;    // 0=root note, 1=chord (default), 2=arpeggiated chord, 3=scale, 4=none
   maxRetries: number;         // default 5
+  /** Issue #9 "note correction": consecutive wrong tries allowed at the same note
+   *  position before the whole test restarts. 0 = always restart (old behavior). */
+  noteRetries: number;        // default 2
   silenceThreshold: number;   // default 0.003
   framesToConfirm: number;    // default 3
   warmupFrames: number;       // default 4
@@ -47,6 +50,7 @@ export interface ExerciseState {
   keySignatureMode: number;
   introSoundMode: number;
   maxRetries: number;
+  noteRetries: number;
   silenceThreshold: number;
   framesToConfirm: number;
   warmupFrames: number;
@@ -62,6 +66,9 @@ export interface ExerciseState {
   highlightIndex: number;
   currentAttempt: number;
   maxAttempts: number;
+  /** Consecutive wrong tries at the current note position — not persisted; reset on a
+   *  correct note or whenever the sequence restarts (issue #9 "note correction"). */
+  noteRetryCount: number;
   testsCompleted: number;
   cumulativeScorePercent: number;
   sessionRunning: boolean;

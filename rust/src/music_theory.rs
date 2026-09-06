@@ -452,6 +452,38 @@ pub fn test_score(max_attempts: u8, attempts_used: u8, passed: bool) -> u8 {
     (((weighted as f32) * 100.0) / (max_attempts as f32)).floor() as u8
 }
 
+/// `wrong_note_outcome` result: retry the same note — no sequence replay.
+pub const WRONG_NOTE_RETRY_SAME_NOTE: u8 = 0;
+/// `wrong_note_outcome` result: note-retry budget exceeded — replay the whole sequence from note 1.
+pub const WRONG_NOTE_RESTART_SEQUENCE: u8 = 1;
+/// `wrong_note_outcome` result: max_attempts already reached — the test is over, failed.
+pub const WRONG_NOTE_FAIL: u8 = 2;
+
+/// Decide what happens after a wrong note during a test attempt (issue #9, "note correction").
+///
+/// `current_attempt`/`max_attempts` are the existing per-test attempt counter — unchanged
+/// meaning from before this feature. `note_retry_count` is how many consecutive wrong tries
+/// have now been made at the current note position (including this one — callers increment
+/// it before calling); `note_retries_allowed` is the configurable budget of same-note retries
+/// (0 reproduces the old "always restart on any wrong note" behavior).
+///
+/// Every wrong note still consumes one of `max_attempts`, whether or not it triggers a
+/// sequence restart — that check comes first so it always ends the test on the correct attempt.
+pub fn wrong_note_outcome(
+    current_attempt: u8,
+    max_attempts: u8,
+    note_retry_count: u8,
+    note_retries_allowed: u8,
+) -> u8 {
+    if current_attempt >= max_attempts {
+        WRONG_NOTE_FAIL
+    } else if note_retry_count <= note_retries_allowed {
+        WRONG_NOTE_RETRY_SAME_NOTE
+    } else {
+        WRONG_NOTE_RESTART_SEQUENCE
+    }
+}
+
 // ── Staff position ────────────────────────────────────────────────────────────
 
 /// Treble-clef staff position for a note.
@@ -1185,6 +1217,33 @@ mod tests {
         assert_eq!(test_score(5, 1, true), 100);
         assert_eq!(test_score(5, 3, true), 60);
         assert_eq!(test_score(5, 5, false), 0);
+    }
+
+    #[test]
+    fn test_wrong_note_outcome_retries_same_note_within_budget() {
+        // note_retry_count (1) <= note_retries_allowed (2), plenty of attempts left.
+        assert_eq!(wrong_note_outcome(1, 5, 1, 2), WRONG_NOTE_RETRY_SAME_NOTE);
+        assert_eq!(wrong_note_outcome(1, 5, 2, 2), WRONG_NOTE_RETRY_SAME_NOTE);
+    }
+
+    #[test]
+    fn test_wrong_note_outcome_restarts_sequence_once_budget_exceeded() {
+        // note_retry_count (3) > note_retries_allowed (2) — give up on this note.
+        assert_eq!(wrong_note_outcome(1, 5, 3, 2), WRONG_NOTE_RESTART_SEQUENCE);
+    }
+
+    #[test]
+    fn test_wrong_note_outcome_zero_budget_always_restarts() {
+        // note_retries_allowed = 0 reproduces today's "always restart" behavior.
+        assert_eq!(wrong_note_outcome(1, 5, 1, 0), WRONG_NOTE_RESTART_SEQUENCE);
+    }
+
+    #[test]
+    fn test_wrong_note_outcome_fails_when_max_attempts_reached() {
+        // current_attempt has already reached max_attempts — the test is over,
+        // regardless of how much note-retry budget remains.
+        assert_eq!(wrong_note_outcome(5, 5, 1, 2), WRONG_NOTE_FAIL);
+        assert_eq!(wrong_note_outcome(6, 5, 1, 2), WRONG_NOTE_FAIL);
     }
 
     #[test]

@@ -118,6 +118,18 @@ int32_t ear_ring_is_correct_note(uint8_t detected_midi, int32_t cents, uint8_t e
 /// @param passed          1 if the exercise was passed, 0 otherwise
 int32_t ear_ring_test_score(uint8_t max_attempts, uint8_t attempts_used, int32_t passed);
 
+/// Issue #9 "note correction": what to do after a wrong note.
+/// Returns 0 = retry the same note, 1 = restart the whole sequence,
+/// 2 = fail the test (max_attempts reached).
+/// @param current_attempt       The test's current (not-yet-incremented) attempt number
+/// @param max_attempts          Total attempts allowed for the whole test
+/// @param note_retry_count      Consecutive wrong tries at the current note, including this one
+/// @param note_retries_allowed  Configured same-note retry budget (0 = always restart)
+int32_t ear_ring_wrong_note_outcome(uint8_t current_attempt,
+                                    uint8_t max_attempts,
+                                    uint8_t note_retry_count,
+                                    uint8_t note_retries_allowed);
+
 /// Convert a MIDI note number to a label string like "C#4".
 /// Writes a null-terminated string into out_buf (max buf_len bytes including null).
 /// Returns bytes written (excluding null), or -1 on error.

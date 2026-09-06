@@ -203,6 +203,40 @@ ios-device: _ios-version _ios-keychain-unlock
     xcrun devicectl device install app --device "$IOS_DEVICE_ID" "$APP"
     xcrun devicectl device process launch --device "$IOS_DEVICE_ID" com.jollygoodsw.earring
 
+# Build the iOS app (Debug) and install + launch it on the iOS Simulator.
+# Requires macOS + Xcode. No code signing needed (simulator builds are unsigned),
+# so this doesn't depend on _ios-keychain-unlock. Boots the simulator (and opens
+# Simulator.app so you can see it) if it isn't already running. Defaults to
+# "iPhone 16" — override with IOS_SIMULATOR_NAME=<name> (see available names/UDIDs
+# via `xcrun simctl list devices available`) or IOS_SIMULATOR_UDID=<udid> directly.
+[doc("Build + install + launch on the iOS Simulator — macOS only")]
+ios-sim: _ios-version
+    #!/bin/sh
+    set -eu
+    cd "{{justfile_directory()}}/ios"
+    if [ -n "${IOS_SIMULATOR_UDID:-}" ]; then
+      UDID="$IOS_SIMULATOR_UDID"
+    else
+      NAME="${IOS_SIMULATOR_NAME:-iPhone 16}"
+      UDID=$(xcrun simctl list devices available | awk -F'[()]' -v name="$NAME" '$0 ~ name {print $2; exit}')
+      if [ -z "$UDID" ]; then
+        echo "Simulator '$NAME' not found. List available with: xcrun simctl list devices available" >&2
+        echo "Override with IOS_SIMULATOR_NAME=... or IOS_SIMULATOR_UDID=..." >&2
+        exit 1
+      fi
+    fi
+    xcodebuild build \
+      -project earring.xcodeproj \
+      -scheme earring \
+      -configuration Debug \
+      -destination "id=$UDID" \
+      -derivedDataPath build/DerivedData
+    open -a Simulator --args -CurrentDeviceUDID "$UDID"
+    xcrun simctl bootstatus "$UDID" -b
+    APP="build/DerivedData/Build/Products/Debug-iphonesimulator/earring.app"
+    xcrun simctl install "$UDID" "$APP"
+    xcrun simctl launch "$UDID" com.jollygoodsw.earring
+
 # Archive the iOS app and export a Release IPA.
 # Output: /tmp/earring_export/earring.ipa
 [doc("Archive the iOS app and export a Release IPA — macOS only")]

@@ -11,6 +11,7 @@ interface Props {
 
 const BPM_OPTIONS = [60, 80, 100, 120, 140];
 const RETRY_OPTIONS = [1, 2, 3, 5, 8, 10];
+const NOTE_RETRY_OPTIONS = [0, 1, 2, 3, 4, 5];
 const STABILITY_OPTIONS = [2, 3, 4, 5];
 const WARMUP_OPTIONS = [0, 1, 2, 3, 4, 5, 6];
 const WRONG_PAUSE_OPTIONS = [{ label: '1s', value: 1000 }, { label: '2s', value: 2000 }, { label: '3s', value: 3000 }, { label: '5s', value: 5000 }];
@@ -157,6 +158,16 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
             <button key={n} type="button"
               className={`chip ${settings.maxRetries === n ? 'chip-selected' : ''}`}
               onClick={() => set('maxRetries', n)}>{n}</button>
+          ))}
+        </div>
+
+        <span className="section-label">Retry Same Note</span>
+        <p style={{ fontSize: 12, color: '#757575', marginBottom: 6 }}>Tries allowed on a wrong note before the whole test restarts (0 = off)</p>
+        <div className="chip-row">
+          {NOTE_RETRY_OPTIONS.map(n => (
+            <button key={n} type="button"
+              className={`chip ${settings.noteRetries === n ? 'chip-selected' : ''}`}
+              onClick={() => set('noteRetries', n)}>{n}</button>
           ))}
         </div>
       </CollapsibleSection>

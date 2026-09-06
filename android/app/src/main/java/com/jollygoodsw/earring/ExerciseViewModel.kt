@@ -30,6 +30,9 @@ data class ExerciseState(
     val keySignatureMode: Int = 0,  // 0=inline accidentals, 1=key signature
     val introSoundMode: Int = 1,  // 0=root note, 1=chord (default), 2=arpeggiated chord, 3=scale, 4=none
     val maxRetries: Int = DEFAULT_MAX_ATTEMPTS,
+    /** Issue #9 "note correction": consecutive wrong tries allowed at the same note
+     *  position before the whole test restarts. 0 = always restart (old behavior). */
+    val noteRetries: Int = DEFAULT_NOTE_RETRIES,
     val silenceThreshold: Float = DEFAULT_SILENCE_THRESHOLD,
     val framesToConfirm: Int = DEFAULT_FRAMES_TO_CONFIRM,
     val warmupFrames: Int = DEFAULT_WARMUP_FRAMES,
@@ -46,6 +49,9 @@ data class ExerciseState(
     val highlightIndex: Int = -1,
     val currentAttempt: Int = 1,
     val maxAttempts: Int = DEFAULT_MAX_ATTEMPTS,
+    /** Consecutive wrong tries at the current note position — not persisted; reset on a
+     *  correct note or whenever the sequence restarts (see [EarRingCore.wrongNoteOutcome]). */
+    val noteRetryCount: Int = 0,
     val testsCompleted: Int = 0,
     val cumulativeScorePercent: Int = 0,
     val sessionRunning: Boolean = false,
@@ -76,6 +82,7 @@ data class ExerciseState(
 }
 
 private const val DEFAULT_MAX_ATTEMPTS = 5
+private const val DEFAULT_NOTE_RETRIES = 2
 private const val DEFAULT_SILENCE_THRESHOLD = 0.003f
 private const val DEFAULT_FRAMES_TO_CONFIRM = 3
 private const val DEFAULT_WARMUP_FRAMES = 4
@@ -98,6 +105,7 @@ private const val PREF_PLAY_PASS_FAIL_SOUNDS = "playPassFailSounds"
 private const val PREF_KEY_SIG_MODE = "keySignatureMode"
 private const val PREF_INTRO_SOUND_MODE = "introSoundMode"
 private const val PREF_MAX_RETRIES = "maxRetries"
+private const val PREF_NOTE_RETRIES = "noteRetries"
 private const val PREF_SILENCE_THRESHOLD = "silenceThreshold"
 private const val PREF_FRAMES_TO_CONFIRM = "framesToConfirm"
 private const val PREF_WARMUP_FRAMES = "warmupFrames"
@@ -134,6 +142,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             keySignatureMode = prefs.getInt(PREF_KEY_SIG_MODE, 0),
             introSoundMode = prefs.getInt(PREF_INTRO_SOUND_MODE, 1),
             maxRetries = prefs.getInt(PREF_MAX_RETRIES, DEFAULT_MAX_ATTEMPTS),
+            noteRetries = prefs.getInt(PREF_NOTE_RETRIES, DEFAULT_NOTE_RETRIES),
             silenceThreshold = prefs.getFloat(PREF_SILENCE_THRESHOLD, DEFAULT_SILENCE_THRESHOLD),
             framesToConfirm = prefs.getInt(PREF_FRAMES_TO_CONFIRM, DEFAULT_FRAMES_TO_CONFIRM),
             warmupFrames = prefs.getInt(PREF_WARMUP_FRAMES, DEFAULT_WARMUP_FRAMES),
@@ -164,6 +173,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putInt(PREF_KEY_SIG_MODE, state.keySignatureMode)
             .putInt(PREF_INTRO_SOUND_MODE, state.introSoundMode)
             .putInt(PREF_MAX_RETRIES, state.maxRetries)
+            .putInt(PREF_NOTE_RETRIES, state.noteRetries)
             .putFloat(PREF_SILENCE_THRESHOLD, state.silenceThreshold)
             .putInt(PREF_FRAMES_TO_CONFIRM, state.framesToConfirm)
             .putInt(PREF_WARMUP_FRAMES, state.warmupFrames)
@@ -192,6 +202,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putInt(PREF_KEY_SIG_MODE, defaults.keySignatureMode)
             .putInt(PREF_INTRO_SOUND_MODE, defaults.introSoundMode)
             .putInt(PREF_MAX_RETRIES, defaults.maxRetries)
+            .putInt(PREF_NOTE_RETRIES, defaults.noteRetries)
             .putFloat(PREF_SILENCE_THRESHOLD, defaults.silenceThreshold)
             .putInt(PREF_FRAMES_TO_CONFIRM, defaults.framesToConfirm)
             .putInt(PREF_WARMUP_FRAMES, defaults.warmupFrames)
@@ -233,6 +244,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     fun setKeySignatureMode(mode: Int) { _state.value = _state.value.copy(keySignatureMode = mode); saveSettings(_state.value) }
     fun setIntroSoundMode(mode: Int) { _state.value = _state.value.copy(introSoundMode = mode); saveSettings(_state.value) }
     fun setMaxRetries(n: Int) { _state.value = _state.value.copy(maxRetries = n); saveSettings(_state.value) }
+    fun setNoteRetries(n: Int) { _state.value = _state.value.copy(noteRetries = n); saveSettings(_state.value) }
     fun setSilenceThreshold(v: Float) { _state.value = _state.value.copy(silenceThreshold = v); saveSettings(_state.value) }
     fun setFramesToConfirm(n: Int) { _state.value = _state.value.copy(framesToConfirm = n); saveSettings(_state.value) }
     fun setWarmupFrames(n: Int) { _state.value = _state.value.copy(warmupFrames = n); saveSettings(_state.value) }
@@ -333,6 +345,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
                 detected = emptyList(),
                 currentNoteIndex = 0,
                 currentAttempt = 1,
+                noteRetryCount = 0,
                 status = ExerciseStatus.PLAYING,
                 highlightIndex = -1
             )
@@ -367,6 +380,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
                 detected = emptyList(),
                 currentNoteIndex = 0,
                 currentAttempt = 1,
+                noteRetryCount = 0,
                 seed = seed,
                 status = ExerciseStatus.PLAYING,
                 highlightIndex = -1,
@@ -387,6 +401,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
                 detected = emptyList(),
                 currentNoteIndex = 0,
                 currentAttempt = 1,
+                noteRetryCount = 0,
                 seed = seed,
                 status = ExerciseStatus.PLAYING,
                 highlightIndex = -1,
@@ -403,6 +418,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             detected = emptyList(),
             currentNoteIndex = 0,
             currentAttempt = nextAttempt,
+            noteRetryCount = 0,
             status = ExerciseStatus.PLAYING,
             highlightIndex = -1
         )
@@ -505,10 +521,10 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         if (index >= state.sequence.size) return
 
         val correct = EarRingCore.isCorrectNote(midi, cents, state.sequence[index])
-        val detected = state.detected + DetectedNote(midi, cents, correct)
         vibrate(correct)
 
         if (correct) {
+            val detected = state.detected + DetectedNote(midi, cents, true)
             val nextIndex = index + 1
             if (nextIndex >= state.sequence.size) {
                 completeTest(
@@ -519,23 +535,49 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             } else {
                 _state.value = state.copy(
                     detected = detected,
-                    currentNoteIndex = nextIndex
+                    currentNoteIndex = nextIndex,
+                    noteRetryCount = 0
                 )
             }
         } else {
-            _state.value = state.copy(
-                detected = detected,
-                currentNoteIndex = detected.size,
-                status = ExerciseStatus.RETRY_DELAY
-            )
-            if (state.currentAttempt >= state.maxAttempts) {
-                completeTest(
-                    passed = false,
-                    attemptNotes = detected,
-                    attemptsUsed = state.currentAttempt
-                )
-            } else {
-                scheduleRetry(state.currentAttempt + 1)
+            // Issue #9 "note correction": a wrong note always consumes an attempt (still
+            // hits the score via testScore). Within the configured noteRetries budget it
+            // just keeps listening for another try at the SAME note — no capture stop/
+            // restart, no staff mark for the wrong note, no prompt replay — rather than
+            // always restarting the whole test like before this feature. statusText()
+            // shows "Wrong note. Try again…" while status stays LISTENING and
+            // noteRetryCount > 0.
+            val noteRetryCount = state.noteRetryCount + 1
+            when (EarRingCore.wrongNoteOutcome(state.currentAttempt, state.maxAttempts, noteRetryCount, state.noteRetries)) {
+                EarRingCore.WRONG_NOTE_RETRY_SAME_NOTE -> {
+                    _state.value = state.copy(
+                        currentAttempt = state.currentAttempt + 1,
+                        noteRetryCount = noteRetryCount
+                    )
+                }
+                EarRingCore.WRONG_NOTE_FAIL -> {
+                    val detected = state.detected + DetectedNote(midi, cents, false)
+                    _state.value = state.copy(
+                        detected = detected,
+                        currentNoteIndex = detected.size,
+                        status = ExerciseStatus.RETRY_DELAY
+                    )
+                    completeTest(
+                        passed = false,
+                        attemptNotes = detected,
+                        attemptsUsed = state.currentAttempt
+                    )
+                }
+                else -> {
+                    val detected = state.detected + DetectedNote(midi, cents, false)
+                    _state.value = state.copy(
+                        detected = detected,
+                        currentNoteIndex = detected.size,
+                        noteRetryCount = 0,
+                        status = ExerciseStatus.RETRY_DELAY
+                    )
+                    scheduleRetry(state.currentAttempt + 1)
+                }
             }
         }
     }

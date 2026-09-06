@@ -80,6 +80,7 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
     val state by viewModel.state.collectAsState()
     val bpmOptions = listOf("60", "80", "100", "120", "140")
     val retryOptions = listOf(1, 2, 3, 5, 8, 10)
+    val noteRetryOptions = listOf(0, 1, 2, 3, 4, 5)
     val stabilityOptions = listOf(2, 3, 4, 5)
     val warmupOptions = listOf(0, 1, 2, 3, 4, 5, 6)
     val wrongPauseOptions = listOf(1000L to "1s", 2000L to "2s", 3000L to "3s", 5000L to "5s")
@@ -209,6 +210,16 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
                 items = retryOptions.map { it.toString() },
                 selected = retryOptions.indexOf(state.maxRetries).coerceAtLeast(0),
                 onSelect = { viewModel.setMaxRetries(retryOptions[it]) }
+            )
+
+            SectionLabel("Retry Same Note")
+            Text("Tries allowed on a wrong note before the whole test restarts (0 = off)",
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 6.dp))
+            ChipRow(
+                items = noteRetryOptions.map { it.toString() },
+                selected = noteRetryOptions.indexOf(state.noteRetries).coerceAtLeast(0),
+                onSelect = { viewModel.setNoteRetries(noteRetryOptions[it]) }
             )
         }
 

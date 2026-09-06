@@ -64,6 +64,20 @@ struct EarRingCore {
         Int(ear_ring_test_score(UInt8(maxAttempts), UInt8(attemptsUsed), passed ? 1 : 0))
     }
 
+    /// Issue #9 "note correction": what to do after a wrong note.
+    enum WrongNoteOutcome: Int {
+        case retrySameNote = 0
+        case restartSequence = 1
+        case fail = 2
+    }
+
+    static func wrongNoteOutcome(currentAttempt: Int, maxAttempts: Int, noteRetryCount: Int, noteRetriesAllowed: Int) -> WrongNoteOutcome {
+        let raw = Int(ear_ring_wrong_note_outcome(
+            UInt8(currentAttempt), UInt8(maxAttempts), UInt8(noteRetryCount), UInt8(noteRetriesAllowed)
+        ))
+        return WrongNoteOutcome(rawValue: raw) ?? .restartSequence
+    }
+
     /// Convert a MIDI number to a note label (e.g. "C#4").
     static func midiToLabel(_ midi: Int) -> String {
         var buf = [CChar](repeating: 0, count: 16)

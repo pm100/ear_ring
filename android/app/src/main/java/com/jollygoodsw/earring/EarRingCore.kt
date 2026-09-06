@@ -4,6 +4,11 @@ import com.jollygoodsw.earring.PitchFrame
 
 object EarRingCore {
 
+    // wrongNoteOutcome() results (issue #9 "note correction").
+    const val WRONG_NOTE_RETRY_SAME_NOTE = 0
+    const val WRONG_NOTE_RESTART_SEQUENCE = 1
+    const val WRONG_NOTE_FAIL = 2
+
     private var loaded = false
 
     init {
@@ -24,6 +29,7 @@ object EarRingCore {
     @JvmStatic external fun nativeScaleNotes(rootMidi: Int, scaleId: Int): IntArray
     @JvmStatic external fun nativeIsCorrectNote(detectedMidi: Int, cents: Int, expectedMidi: Int): Int
     @JvmStatic external fun nativeTestScore(maxAttempts: Int, attemptsUsed: Int, passed: Int): Int
+    @JvmStatic external fun nativeWrongNoteOutcome(currentAttempt: Int, maxAttempts: Int, noteRetryCount: Int, noteRetriesAllowed: Int): Int
     @JvmStatic external fun nativeMidiToLabel(midi: Int): String
     @JvmStatic external fun nativeLabelToMidi(label: String): Int
     @JvmStatic external fun nativeNoteName(chroma: Int): String
@@ -148,6 +154,14 @@ object EarRingCore {
     fun testScore(maxAttempts: Int, attemptsUsed: Int, passed: Boolean): Int =
         if (loaded) nativeTestScore(maxAttempts, attemptsUsed, if (passed) 1 else 0) else if (!passed || maxAttempts <= 0) 0
         else (((maxAttempts - attemptsUsed + 1).coerceAtLeast(0)) * 100f / maxAttempts).toInt()
+
+    /** Issue #9 "note correction": what to do after a wrong note. Returns
+     *  WRONG_NOTE_RETRY_SAME_NOTE, WRONG_NOTE_RESTART_SEQUENCE, or WRONG_NOTE_FAIL. */
+    fun wrongNoteOutcome(currentAttempt: Int, maxAttempts: Int, noteRetryCount: Int, noteRetriesAllowed: Int): Int =
+        if (loaded) nativeWrongNoteOutcome(currentAttempt, maxAttempts, noteRetryCount, noteRetriesAllowed)
+        else if (currentAttempt >= maxAttempts) WRONG_NOTE_FAIL
+        else if (noteRetryCount <= noteRetriesAllowed) WRONG_NOTE_RETRY_SAME_NOTE
+        else WRONG_NOTE_RESTART_SEQUENCE
 
     fun midiToLabel(midi: Int): String =
         if (loaded) nativeMidiToLabel(midi) else {

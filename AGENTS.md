@@ -1053,6 +1053,12 @@ just ios-device          # iOS — macOS only; builds Debug, installs + launches
                          # (override device with IOS_DEVICE_ID=<uuid>)
 ```
 
+**Build and install on the iOS Simulator** (no device/USB needed, no code signing):
+```powershell
+just ios-sim              # iOS — macOS only; builds Debug, boots "iPhone 16" sim, installs + launches
+                          # (override with IOS_SIMULATOR_NAME=<name> or IOS_SIMULATOR_UDID=<udid>)
+```
+
 **Publish to Play Store closed testing (alpha)** — the track our real named testers
 and the production-graduation clock are on (`PLAY_TRACK=internal` overrides to the
 no-review internal-only track instead):

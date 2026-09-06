@@ -87,6 +87,9 @@ struct ExerciseView: View {
         case .playing:
             return "Listen carefully…"
         case .listening:
+            if model.isRetryingSameNote {
+                return "Wrong note. Try again…"
+            }
             return "Play note \(model.currentNoteIndex + 1) of \(model.sequence.count)"
         case .retryDelay:
             if model.detectedNotes.last?.isCorrect == false && model.currentAttempt < model.maxAttempts {

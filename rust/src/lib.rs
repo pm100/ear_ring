@@ -10,6 +10,7 @@ pub use music_theory::{
     preferred_midi_label, preferred_note_label, scale_label, scale_name, scale_notes,
     scale_type_from_id, shuffle_melody_indices, staff_position, staff_position_in_key, test_score,
     transpose_display_midi, written_diatonic_chord_label, written_midi_label, written_note_name, written_scale_label,
+    wrong_note_outcome,
     MelodyNote, MelodySnippet, Note, NoteName, ScaleType, FLAT_ORDER,
     FLAT_STAFF_POSITIONS, SHARP_ORDER, SHARP_STAFF_POSITIONS,
 };
@@ -464,6 +465,18 @@ pub extern "C" fn ear_ring_test_score(
     test_score(max_attempts, attempts_used, passed != 0) as c_int
 }
 
+/// Issue #9 "note correction": what to do after a wrong note. Returns 0 = retry the
+/// same note, 1 = restart the whole sequence, 2 = fail the test (max_attempts reached).
+#[no_mangle]
+pub extern "C" fn ear_ring_wrong_note_outcome(
+    current_attempt: c_uchar,
+    max_attempts: c_uchar,
+    note_retry_count: c_uchar,
+    note_retries_allowed: c_uchar,
+) -> c_int {
+    wrong_note_outcome(current_attempt, max_attempts, note_retry_count, note_retries_allowed) as c_int
+}
+
 /// Convert a MIDI number to a note label string (e.g. "C#4").
 /// Writes a null-terminated UTF-8 string into `out_buf`.
 /// Returns the number of bytes written (excluding null), or -1 on error.
@@ -845,7 +858,7 @@ mod android_jni {
         key_accidental_count, key_sig_staff_positions, label_to_midi, melody_count, melody_range_midi,
         melody_to_midi_by_index, midi_to_label, note_name, preferred_midi_label,
         preferred_note_label, scale_label, scale_name, scale_notes, scale_type_from_id, shuffle_melody_indices, staff_position,
-        staff_position_in_key, test_score, written_diatonic_chord_label, written_scale_label, Note, ScaleType,
+        staff_position_in_key, test_score, wrong_note_outcome, written_diatonic_chord_label, written_scale_label, Note, ScaleType,
     };
 
     #[no_mangle]
@@ -1061,6 +1074,23 @@ mod android_jni {
         passed: jint,
     ) -> jint {
         test_score(max_attempts as u8, attempts_used as u8, passed != 0) as jint
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeWrongNoteOutcome(
+        _env: JNIEnv,
+        _class: JClass,
+        current_attempt: jint,
+        max_attempts: jint,
+        note_retry_count: jint,
+        note_retries_allowed: jint,
+    ) -> jint {
+        wrong_note_outcome(
+            current_attempt as u8,
+            max_attempts as u8,
+            note_retry_count as u8,
+            note_retries_allowed as u8,
+        ) as jint
     }
 
     #[no_mangle]

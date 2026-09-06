@@ -243,7 +243,15 @@ fun ExerciseScreen(
 private fun statusText(state: com.jollygoodsw.earring.ExerciseState): String =
     when (state.status) {
         ExerciseStatus.PLAYING -> "Listen carefully…"
-        ExerciseStatus.LISTENING -> "Play note ${state.currentNoteIndex + 1} of ${state.sequence.size}"
+        ExerciseStatus.LISTENING ->
+            // Issue #9 "note correction": a wrong note within the noteRetries budget keeps
+            // listening (no capture stop/restart) rather than leaving LISTENING — this is
+            // the only visible sign it happened, since the wrong note isn't drawn.
+            if (state.noteRetryCount > 0) {
+                "Wrong note. Try again…"
+            } else {
+                "Play note ${state.currentNoteIndex + 1} of ${state.sequence.size}"
+            }
         ExerciseStatus.RETRY_DELAY ->
             if (state.detected.lastOrNull()?.correct == false && state.currentAttempt < state.maxAttempts) {
                 "Wrong note. Replaying the same test…"

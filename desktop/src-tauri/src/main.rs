@@ -4,7 +4,7 @@ use ear_ring_core::{
     accidental_in_key, detect_pitch, diatonic_chord_label, effective_intro_root_midi, freq_to_note, generate_diatonic_chord, generate_sequence, help_sections_json,
     intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions, label_to_midi,
     melody_count, melody_range_midi, melody_title, melody_to_midi_by_index, note_timing, preferred_midi_label,
-    scale_notes, scale_type_from_id, shuffle_melody_indices, staff_position, test_score, written_diatonic_chord_label, written_note_name, written_midi_label, written_scale_label,
+    scale_notes, scale_type_from_id, shuffle_melody_indices, staff_position, test_score, wrong_note_outcome, written_diatonic_chord_label, written_note_name, written_midi_label, written_scale_label,
     Note, PitchTracker, ScaleType,
 };
 use std::sync::Mutex;
@@ -140,6 +140,18 @@ fn cmd_is_correct_note(detected_midi: u8, cents: i32, expected_midi: u8) -> bool
 #[tauri::command]
 fn cmd_test_score(max_attempts: u8, attempts_used: u8, passed: bool) -> u8 {
     test_score(max_attempts, attempts_used, passed)
+}
+
+/// Issue #9 "note correction": what to do after a wrong note. Returns 0 = retry
+/// the same note, 1 = restart the whole sequence, 2 = fail the test.
+#[tauri::command]
+fn cmd_wrong_note_outcome(
+    current_attempt: u8,
+    max_attempts: u8,
+    note_retry_count: u8,
+    note_retries_allowed: u8,
+) -> u8 {
+    wrong_note_outcome(current_attempt, max_attempts, note_retry_count, note_retries_allowed)
 }
 
 #[tauri::command]
@@ -278,6 +290,7 @@ fn main() {
             cmd_scale_notes,
             cmd_is_correct_note,
             cmd_test_score,
+            cmd_wrong_note_outcome,
             cmd_is_sharp_key,
             cmd_key_accidental_count,
             cmd_preferred_midi_label,

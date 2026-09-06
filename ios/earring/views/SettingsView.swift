@@ -4,6 +4,7 @@ struct SettingsView: View {
     @EnvironmentObject var model: ExerciseModel
     private let bpmOptions = [60, 80, 100, 120, 140]
     private let retryOptions = [1, 2, 3, 5, 8, 10]
+    private let noteRetryOptions = [0, 1, 2, 3, 4, 5]
     private let stabilityOptions = [2, 3, 4, 5]
     private let warmupOptions = [0, 1, 2, 3, 4, 5, 6]
     private let wrongPauseOptions: [(UInt64, String)] = [
@@ -102,6 +103,15 @@ struct SettingsView: View {
                              selected: retryOptions.firstIndex(of: model.maxRetries) ?? 0,
                              count: retryOptions.count) { idx in
                         model.maxRetries = retryOptions[idx]
+                    }
+
+                    sectionLabel("Retry Same Note").padding(.top, 8)
+                    Text("Tries allowed on a wrong note before the whole test restarts (0 = off)")
+                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
+                    chipGrid(options: noteRetryOptions.map { "\($0)" },
+                             selected: noteRetryOptions.firstIndex(of: model.noteRetries) ?? 0,
+                             count: noteRetryOptions.count) { idx in
+                        model.noteRetries = noteRetryOptions[idx]
                     }
                 } label: { sectionHeader("Exercise") }
 
