@@ -4,7 +4,7 @@ use ear_ring_core::{
     accidental_in_key, detect_pitch, diatonic_chord_label, effective_intro_root_midi, freq_to_note, generate_diatonic_chord, generate_sequence, help_sections_json,
     intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions, label_to_midi,
     melody_count, melody_range_midi, melody_title, melody_to_midi_by_index, note_timing, preferred_midi_label,
-    scale_notes, scale_type_from_id, shuffle_melody_indices, staff_position, test_score, wrong_note_outcome, written_diatonic_chord_label, written_note_name, written_midi_label, written_scale_label,
+    scale_notes, scale_type_from_id, shuffle_melody_indices, staff_position, test_score, note_retry_penalty, wrong_note_outcome, written_diatonic_chord_label, written_note_name, written_midi_label, written_scale_label,
     Note, PitchTracker, ScaleType,
 };
 use std::sync::Mutex;
@@ -154,6 +154,13 @@ fn cmd_wrong_note_outcome(
     wrong_note_outcome(current_attempt, max_attempts, note_retry_count, note_retries_allowed)
 }
 
+/// Issue #9 "note correction": points to deduct from cmd_test_score's result for
+/// note-level retries used along the way.
+#[tauri::command]
+fn cmd_note_retry_penalty(note_retries_used: u8, note_retries_allowed: u8, max_attempts: u8) -> u8 {
+    note_retry_penalty(note_retries_used, note_retries_allowed, max_attempts)
+}
+
 #[tauri::command]
 fn cmd_is_sharp_key(root_chroma: u8) -> bool {
     is_sharp_key(root_chroma)
@@ -291,6 +298,7 @@ fn main() {
             cmd_is_correct_note,
             cmd_test_score,
             cmd_wrong_note_outcome,
+            cmd_note_retry_penalty,
             cmd_is_sharp_key,
             cmd_key_accidental_count,
             cmd_preferred_midi_label,

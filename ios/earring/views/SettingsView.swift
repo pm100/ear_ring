@@ -106,7 +106,7 @@ struct SettingsView: View {
                     }
 
                     sectionLabel("Retry Same Note").padding(.top, 8)
-                    Text("Tries allowed on a wrong note before the whole test restarts (0 = off)")
+                    Text("Tries allowed on a wrong note before the whole test restarts — each retry costs a few points (0 = off)")
                         .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
                     chipGrid(options: noteRetryOptions.map { "\($0)" },
                              selected: noteRetryOptions.firstIndex(of: model.noteRetries) ?? 0,

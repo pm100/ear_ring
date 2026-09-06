@@ -213,7 +213,7 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             )
 
             SectionLabel("Retry Same Note")
-            Text("Tries allowed on a wrong note before the whole test restarts (0 = off)",
+            Text("Tries allowed on a wrong note before the whole test restarts — each retry costs a few points (0 = off)",
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 6.dp))
             ChipRow(

@@ -124,6 +124,10 @@ class ExerciseModel: ObservableObject {
     /// Consecutive wrong tries at the current note position — not persisted; reset on a
     /// correct note or whenever the sequence restarts (see EarRingCore.wrongNoteOutcome).
     private var noteRetryCount: Int = 0
+    /// Total same-note retries used across the WHOLE current test, including any spent
+    /// during an earlier attempt that then got restarted — feeds EarRingCore.noteRetryPenalty
+    /// at completion. Reset only when a fresh test starts (unlike noteRetryCount).
+    private var totalNoteRetries: Int = 0
     @Published var testsCompleted: Int = 0
     @Published var chordLabel: String = ""  // Set for diatonic mode; empty otherwise
 
@@ -334,6 +338,7 @@ class ExerciseModel: ObservableObject {
         currentNoteIndex = 0
         currentAttempt = 1
         noteRetryCount = 0
+        totalNoteRetries = 0
         status = .playing
         await playPrompt()
     }
@@ -493,7 +498,7 @@ class ExerciseModel: ObservableObject {
             )
             switch outcome {
             case .retrySameNote:
-                break
+                totalNoteRetries += 1
             case .fail:
                 detectedNotes.append(DetectedNote(midi: midi, cents: cents, isCorrect: false))
                 audioCapture.stop()
@@ -517,7 +522,11 @@ class ExerciseModel: ObservableObject {
         if playPassFailSounds {
             if passed { audioPlayback.playPassSound() } else { audioPlayback.playFailSound() }
         }
-        let testScore = EarRingCore.testScore(maxAttempts: maxAttempts, attemptsUsed: attemptsUsed, passed: passed)
+        // Issue #9 "note correction": note-level retries don't consume a test attempt,
+        // but they still cost points — deduct a penalty scaled so burning the whole
+        // per-note budget on one note costs about as much as one full attempt would.
+        let penalty = EarRingCore.noteRetryPenalty(noteRetriesUsed: totalNoteRetries, noteRetriesAllowed: noteRetries, maxAttempts: maxAttempts)
+        let testScore = max(0, EarRingCore.testScore(maxAttempts: maxAttempts, attemptsUsed: attemptsUsed, passed: passed) - penalty)
         cumulativeScore += testScore
         testsCompleted += 1
         score = testsCompleted == 0 ? 0 : cumulativeScore / testsCompleted

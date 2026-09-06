@@ -326,6 +326,7 @@ private struct RangeTextInputs: View {
                 .onSubmit { commitStart() }
                 .onChange(of: startFocused) { focused in if !focused { commitStart() } }
             Text("to")
+                .fixedSize()
             TextField("", text: $endText)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 70)

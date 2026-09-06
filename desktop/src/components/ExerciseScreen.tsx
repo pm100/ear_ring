@@ -76,6 +76,11 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   const detectedRef = useRef<DetectedNote[]>([]);
   const currentAttemptRef = useRef(1);
   const noteRetryCountRef = useRef(0);
+  // Issue #9 "note correction": total same-note retries used across the WHOLE current
+  // test, including any spent during an earlier attempt that then got restarted — feeds
+  // cmd_note_retry_penalty at completion. Reset only when a fresh test starts (unlike
+  // noteRetryCountRef, which resets on every restart via playPromptForSequence).
+  const totalNoteRetriesRef = useRef(0);
   const sequenceRef = useRef<number[]>(exercise.sequence);
   const sessionRunningRef = useRef(true);
   const timersRef = useRef<number[]>([]);
@@ -304,6 +309,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     else setMelodyTitle('');
     setCurrentAttempt(1);
     currentAttemptRef.current = 1;
+    totalNoteRetriesRef.current = 0;
     await playPromptForSequence(result.sequence, result.durations, melodyTimingsRef.current, myGen);
   }, [generateFreshSequence, playPromptForSequence]);
 
@@ -331,11 +337,22 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     if (exercise.playPassFailSounds) {
       if (passed) playPassSound(); else playFailSound();
     }
-    void invoke<number>('cmd_test_score', {
-      maxAttempts: exercise.maxRetries,
-      attemptsUsed,
-      passed,
-    }).then(testScore => {
+    // Issue #9 "note correction": note-level retries don't consume a test attempt, but
+    // they still cost points — deduct a penalty scaled so burning the whole per-note
+    // budget on one note costs about as much as one full attempt would.
+    void Promise.all([
+      invoke<number>('cmd_test_score', {
+        maxAttempts: exercise.maxRetries,
+        attemptsUsed,
+        passed,
+      }),
+      invoke<number>('cmd_note_retry_penalty', {
+        noteRetriesUsed: totalNoteRetriesRef.current,
+        noteRetriesAllowed: exercise.noteRetries,
+        maxAttempts: exercise.maxRetries,
+      }),
+    ]).then(([rawScore, penalty]) => {
+      const testScore = Math.max(0, rawScore - penalty);
       appendTestRecord({
         date: new Date().toISOString(),
         scale: SCALE_NAMES[exercise.scaleId],
@@ -358,7 +375,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         }
       }, exercise.wrongNotePauseMs);
     });
-  }, [exercise.scaleId, exercise.rootNote, exercise.sequenceLength, exercise.maxRetries, exercise.wrongNotePauseMs, exercise.sessionId, exercise.playPassFailSounds, playPassSound, playFailSound, schedule, startFreshTest]);
+  }, [exercise.scaleId, exercise.rootNote, exercise.sequenceLength, exercise.maxRetries, exercise.noteRetries, exercise.wrongNotePauseMs, exercise.sessionId, exercise.playPassFailSounds, playPassSound, playFailSound, schedule, startFreshTest]);
 
   // The audio frame handler — confirmed MIDI comes from the Rust tracker.
   handleFrameRef.current = async (frame: TrackerFrame) => {
@@ -416,6 +433,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     });
     if (outcome === WRONG_NOTE_RETRY_SAME_NOTE) {
       setNoteRetryCount(noteRetryCount);
+      totalNoteRetriesRef.current += 1;
       return;
     }
 

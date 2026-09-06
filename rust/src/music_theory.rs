@@ -484,6 +484,23 @@ pub fn wrong_note_outcome(
     }
 }
 
+/// Points to deduct from a test's score for note-level retries used along the way
+/// (issue #9 "note correction") — subtract the result from `test_score`'s return value.
+///
+/// Calibrated so burning the ENTIRE note-retry budget on one note costs about the same
+/// as one whole-test attempt would (`100 / max_attempts` points): each retry costs
+/// `(100 / max_attempts) / note_retries_allowed` points. Using fewer retries costs
+/// proportionally less; `note_retries_used` accumulates for the whole test, including
+/// retries spent during an earlier attempt that then got restarted anyway.
+pub fn note_retry_penalty(note_retries_used: u8, note_retries_allowed: u8, max_attempts: u8) -> u8 {
+    if note_retries_used == 0 || note_retries_allowed == 0 || max_attempts == 0 {
+        return 0;
+    }
+    let per_attempt = 100.0 / max_attempts as f32;
+    let per_retry = per_attempt / note_retries_allowed as f32;
+    (per_retry * note_retries_used as f32).floor() as u8
+}
+
 // ── Staff position ────────────────────────────────────────────────────────────
 
 /// Treble-clef staff position for a note.
@@ -1253,6 +1270,34 @@ mod tests {
         // reached max_attempts — no test attempts left to restart with, so it fails.
         assert_eq!(wrong_note_outcome(5, 5, 3, 2), WRONG_NOTE_FAIL);
         assert_eq!(wrong_note_outcome(6, 5, 3, 2), WRONG_NOTE_FAIL);
+    }
+
+    #[test]
+    fn test_note_retry_penalty_zero_when_no_retries_used() {
+        assert_eq!(note_retry_penalty(0, 2, 5), 0);
+    }
+
+    #[test]
+    fn test_note_retry_penalty_scales_with_retries_used() {
+        // max_attempts=5 -> each attempt is worth 20 points; note_retries_allowed=2
+        // -> each retry costs 20/2=10 points.
+        assert_eq!(note_retry_penalty(1, 2, 5), 10);
+        assert_eq!(note_retry_penalty(2, 2, 5), 20);
+        // Burning the whole budget on one note (2 retries) costs as much as one
+        // full attempt would (20 points) — retries stay proportionate to restarts.
+        assert_eq!(note_retry_penalty(4, 2, 5), 40);
+    }
+
+    #[test]
+    fn test_note_retry_penalty_zero_when_feature_disabled() {
+        // note_retries_allowed=0 means the feature is off — no retries could have
+        // happened, but guard the division regardless.
+        assert_eq!(note_retry_penalty(3, 0, 5), 0);
+    }
+
+    #[test]
+    fn test_note_retry_penalty_zero_when_max_attempts_zero() {
+        assert_eq!(note_retry_penalty(3, 2, 0), 0);
     }
 
     #[test]

@@ -52,6 +52,10 @@ data class ExerciseState(
     /** Consecutive wrong tries at the current note position — not persisted; reset on a
      *  correct note or whenever the sequence restarts (see [EarRingCore.wrongNoteOutcome]). */
     val noteRetryCount: Int = 0,
+    /** Total same-note retries used across the WHOLE current test, including any spent
+     *  during an earlier attempt that then got restarted — feeds [EarRingCore.noteRetryPenalty]
+     *  at completion. Reset only when a fresh test starts (unlike [noteRetryCount]). */
+    val totalNoteRetries: Int = 0,
     val testsCompleted: Int = 0,
     val cumulativeScorePercent: Int = 0,
     val sessionRunning: Boolean = false,
@@ -346,6 +350,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
                 currentNoteIndex = 0,
                 currentAttempt = 1,
                 noteRetryCount = 0,
+                totalNoteRetries = 0,
                 status = ExerciseStatus.PLAYING,
                 highlightIndex = -1
             )
@@ -381,6 +386,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
                 currentNoteIndex = 0,
                 currentAttempt = 1,
                 noteRetryCount = 0,
+                totalNoteRetries = 0,
                 seed = seed,
                 status = ExerciseStatus.PLAYING,
                 highlightIndex = -1,
@@ -402,6 +408,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
                 currentNoteIndex = 0,
                 currentAttempt = 1,
                 noteRetryCount = 0,
+                totalNoteRetries = 0,
                 seed = seed,
                 status = ExerciseStatus.PLAYING,
                 highlightIndex = -1,
@@ -552,7 +559,10 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             val noteRetryCount = state.noteRetryCount + 1
             when (EarRingCore.wrongNoteOutcome(state.currentAttempt, state.maxAttempts, noteRetryCount, state.noteRetries)) {
                 EarRingCore.WRONG_NOTE_RETRY_SAME_NOTE -> {
-                    _state.value = state.copy(noteRetryCount = noteRetryCount)
+                    _state.value = state.copy(
+                        noteRetryCount = noteRetryCount,
+                        totalNoteRetries = state.totalNoteRetries + 1
+                    )
                 }
                 EarRingCore.WRONG_NOTE_FAIL -> {
                     val detected = state.detected + DetectedNote(midi, cents, false)
@@ -586,7 +596,11 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         if (state.playPassFailSounds) {
             if (passed) audioPlayback.playPassSound() else audioPlayback.playFailSound()
         }
-        val scorePercent = EarRingCore.testScore(state.maxAttempts, attemptsUsed, passed)
+        // Issue #9 "note correction": note-level retries don't consume a test attempt,
+        // but they still cost points — deduct a penalty scaled so burning the whole
+        // per-note budget on one note costs about as much as one full attempt would.
+        val penalty = EarRingCore.noteRetryPenalty(state.totalNoteRetries, state.noteRetries, state.maxAttempts)
+        val scorePercent = (EarRingCore.testScore(state.maxAttempts, attemptsUsed, passed) - penalty).coerceAtLeast(0)
         persistTestRecord(state, attemptNotes, attemptsUsed, passed, scorePercent)
         _state.value = state.copy(
             detected = attemptNotes,

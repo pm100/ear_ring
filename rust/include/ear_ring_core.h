@@ -130,6 +130,15 @@ int32_t ear_ring_wrong_note_outcome(uint8_t current_attempt,
                                     uint8_t note_retry_count,
                                     uint8_t note_retries_allowed);
 
+/// Issue #9 "note correction": points to deduct from ear_ring_test_score's result for
+/// note-level retries used along the way.
+/// @param note_retries_used     Total same-note retries used across the whole test
+/// @param note_retries_allowed  Configured same-note retry budget
+/// @param max_attempts          Total attempts allowed for the whole test
+int32_t ear_ring_note_retry_penalty(uint8_t note_retries_used,
+                                    uint8_t note_retries_allowed,
+                                    uint8_t max_attempts);
+
 /// Convert a MIDI note number to a label string like "C#4".
 /// Writes a null-terminated string into out_buf (max buf_len bytes including null).
 /// Returns bytes written (excluding null), or -1 on error.

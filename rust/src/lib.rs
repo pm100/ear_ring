@@ -10,7 +10,7 @@ pub use music_theory::{
     preferred_midi_label, preferred_note_label, scale_label, scale_name, scale_notes,
     scale_type_from_id, shuffle_melody_indices, staff_position, staff_position_in_key, test_score,
     transpose_display_midi, written_diatonic_chord_label, written_midi_label, written_note_name, written_scale_label,
-    wrong_note_outcome,
+    note_retry_penalty, wrong_note_outcome,
     MelodyNote, MelodySnippet, Note, NoteName, ScaleType, FLAT_ORDER,
     FLAT_STAFF_POSITIONS, SHARP_ORDER, SHARP_STAFF_POSITIONS,
 };
@@ -477,6 +477,17 @@ pub extern "C" fn ear_ring_wrong_note_outcome(
     wrong_note_outcome(current_attempt, max_attempts, note_retry_count, note_retries_allowed) as c_int
 }
 
+/// Issue #9 "note correction": points to deduct from test_score's result for note-level
+/// retries used along the way. Subtract the return value from test_score's output.
+#[no_mangle]
+pub extern "C" fn ear_ring_note_retry_penalty(
+    note_retries_used: c_uchar,
+    note_retries_allowed: c_uchar,
+    max_attempts: c_uchar,
+) -> c_int {
+    note_retry_penalty(note_retries_used, note_retries_allowed, max_attempts) as c_int
+}
+
 /// Convert a MIDI number to a note label string (e.g. "C#4").
 /// Writes a null-terminated UTF-8 string into `out_buf`.
 /// Returns the number of bytes written (excluding null), or -1 on error.
@@ -858,7 +869,7 @@ mod android_jni {
         key_accidental_count, key_sig_staff_positions, label_to_midi, melody_count, melody_range_midi,
         melody_to_midi_by_index, midi_to_label, note_name, preferred_midi_label,
         preferred_note_label, scale_label, scale_name, scale_notes, scale_type_from_id, shuffle_melody_indices, staff_position,
-        staff_position_in_key, test_score, wrong_note_outcome, written_diatonic_chord_label, written_scale_label, Note, ScaleType,
+        staff_position_in_key, test_score, note_retry_penalty, wrong_note_outcome, written_diatonic_chord_label, written_scale_label, Note, ScaleType,
     };
 
     #[no_mangle]
@@ -1091,6 +1102,17 @@ mod android_jni {
             note_retry_count as u8,
             note_retries_allowed as u8,
         ) as jint
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeNoteRetryPenalty(
+        _env: JNIEnv,
+        _class: JClass,
+        note_retries_used: jint,
+        note_retries_allowed: jint,
+        max_attempts: jint,
+    ) -> jint {
+        note_retry_penalty(note_retries_used as u8, note_retries_allowed as u8, max_attempts as u8) as jint
     }
 
     #[no_mangle]

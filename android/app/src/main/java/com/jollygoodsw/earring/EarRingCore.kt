@@ -30,6 +30,7 @@ object EarRingCore {
     @JvmStatic external fun nativeIsCorrectNote(detectedMidi: Int, cents: Int, expectedMidi: Int): Int
     @JvmStatic external fun nativeTestScore(maxAttempts: Int, attemptsUsed: Int, passed: Int): Int
     @JvmStatic external fun nativeWrongNoteOutcome(currentAttempt: Int, maxAttempts: Int, noteRetryCount: Int, noteRetriesAllowed: Int): Int
+    @JvmStatic external fun nativeNoteRetryPenalty(noteRetriesUsed: Int, noteRetriesAllowed: Int, maxAttempts: Int): Int
     @JvmStatic external fun nativeMidiToLabel(midi: Int): String
     @JvmStatic external fun nativeLabelToMidi(label: String): Int
     @JvmStatic external fun nativeNoteName(chroma: Int): String
@@ -159,9 +160,18 @@ object EarRingCore {
      *  WRONG_NOTE_RETRY_SAME_NOTE, WRONG_NOTE_RESTART_SEQUENCE, or WRONG_NOTE_FAIL. */
     fun wrongNoteOutcome(currentAttempt: Int, maxAttempts: Int, noteRetryCount: Int, noteRetriesAllowed: Int): Int =
         if (loaded) nativeWrongNoteOutcome(currentAttempt, maxAttempts, noteRetryCount, noteRetriesAllowed)
-        else if (currentAttempt >= maxAttempts) WRONG_NOTE_FAIL
+        // noteRetryCount budget is independent of currentAttempt and checked first — see
+        // wrong_note_outcome in rust/src/music_theory.rs for why the order matters.
         else if (noteRetryCount <= noteRetriesAllowed) WRONG_NOTE_RETRY_SAME_NOTE
+        else if (currentAttempt >= maxAttempts) WRONG_NOTE_FAIL
         else WRONG_NOTE_RESTART_SEQUENCE
+
+    /** Issue #9 "note correction": points to deduct from testScore()'s result for
+     *  note-level retries used along the way. */
+    fun noteRetryPenalty(noteRetriesUsed: Int, noteRetriesAllowed: Int, maxAttempts: Int): Int =
+        if (loaded) nativeNoteRetryPenalty(noteRetriesUsed, noteRetriesAllowed, maxAttempts)
+        else if (noteRetriesUsed == 0 || noteRetriesAllowed == 0 || maxAttempts == 0) 0
+        else ((100f / maxAttempts) / noteRetriesAllowed * noteRetriesUsed).toInt()
 
     fun midiToLabel(midi: Int): String =
         if (loaded) nativeMidiToLabel(midi) else {

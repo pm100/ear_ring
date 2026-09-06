@@ -162,7 +162,7 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
         </div>
 
         <span className="section-label">Retry Same Note</span>
-        <p style={{ fontSize: 12, color: '#757575', marginBottom: 6 }}>Tries allowed on a wrong note before the whole test restarts (0 = off)</p>
+        <p style={{ fontSize: 12, color: '#757575', marginBottom: 6 }}>Tries allowed on a wrong note before the whole test restarts — each retry costs a few points (0 = off)</p>
         <div className="chip-row">
           {NOTE_RETRY_OPTIONS.map(n => (
             <button key={n} type="button"
