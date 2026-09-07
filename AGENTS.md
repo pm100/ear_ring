@@ -193,20 +193,17 @@ Chip row: 1  2  3  4  5  6  7  8   (single row, equal width)
   — **Disabled (opacity 0.38)** when Test Type = Melody Snippets
   — In Diatonic Arpeggios mode: only chips 3 and 4 are enabled (3=triad, 4=seventh chord); 1, 2, 5–8 are disabled
 
-[16dp space]
-Row (same line): ☐ Display Test Notes    ☐ Use Key Signature
-  — Both checkboxes on one row with a gap between them
-  — "Display Test Notes" default: unchecked (hidden)
-  — "Use Key Signature" (keySignatureMode): default unchecked (= Inline Accidentals mode = 0)
-  — Checked: conventional key sig after clef; only out-of-key notes get an accidental
-  — Unchecked: no key signature drawn; every accidental shown on the note
-
 [32dp space]
 [▶ Start Exercise]    — full-width filled primary button, 52dp tall, 18sp
 [16dp space]
 ```
 
-**Removed from Home (now in Settings tab):** Tempo (BPM), Mic Setup button, Progress button.
+**Removed from Home (now in Settings tab, "Display" section):** Tempo (BPM),
+Mic Setup button, Progress button, the "Display Test Notes" checkbox, and the
+"Use Key Signature" checkbox. All three platforms implement both checkboxes
+under Settings → Display, not Home — see the Settings Screen section below.
+(Filed as issue #26 against this stale doc; closed as not-a-bug — see that
+issue for the resolution.)
 
 Section labels: small/label typography, muted colour, left-aligned, 6dp bottom margin.
 
@@ -468,6 +465,14 @@ Session history:
 
 Layout: vertically scrollable column, 16dp padding.
 
+**Known-stale below:** the shipped screen groups these sections into
+collapsible "User" and "Advanced" accordions (Instrument, Playback, Sound,
+Display, Exercise, Timing under User; Pitch Detection under Advanced), and
+some chip ranges here (e.g. Max Retries) no longer match what's shipped. Full
+reconciliation tracked in issue #30 — the "Display" section immediately below
+is accurate as of this fix; treat the rest of this block as directional, not
+verified.
+
 ```
                         [Settings]         (tab — no back button)
 
@@ -480,6 +485,17 @@ Dropdown (outlined, full width): Piano | Guitar | Transposed Guitar | Soprano Sa
     written pitch instead of concert pitch (display only — detection stays in concert pitch)
   — Selecting a new instrument resets rangeStart/rangeEnd to one octave from the current root note
     closest to middle C (same rule as changing the Key on the Home screen)
+
+[16dp space]
+Section label: "Display"
+Row (same line): ☐ Display Test Notes    ☐ Use Key Signature
+  — Both checkboxes on one row with a gap between them
+  — "Display Test Notes" default: unchecked (hidden)
+  — "Use Key Signature" (keySignatureMode): default unchecked (= Inline Accidentals mode = 0)
+  — Checked: conventional key sig after clef; only out-of-key notes get an accidental
+  — Unchecked: no key signature drawn; every accidental shown on the note
+  — Moved here from Home (was previously documented as a Home screen row — see
+    issue #26); all three platforms implement it under Settings → Display
 
 [16dp space]
 Section label: "Tempo (BPM)"
