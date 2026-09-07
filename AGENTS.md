@@ -83,9 +83,17 @@ the task complete. This keeps the spec accurate for future agents.**
 
 ---
 
-## Navigation — Bottom Tab Bar
+## Navigation — Primary Navigation
 
-All platforms use a **persistent 5-tab bottom navigation bar** visible on every screen except Exercise.
+All platforms provide the same five persistent primary destinations. There are two
+navigation paradigms, chosen by device class, not live orientation:
+- **Phone (Android, iPhone)**: portrait-first UI, bottom tab bar.
+- **Wide (iPad, desktop/Tauri)**: landscape-style UI, left sidebar with the same five
+  destinations. iPad keeps this sidebar in every physical orientation it supports
+  (see "iPad Native Layout" below) — it's a fixed design choice for the device class,
+  not something that flips based on how the device is currently held.
+
+The primary navigation is visible on every screen except Exercise.
 
 | Tab index | Label | Icon |
 |-----------|-------|------|
@@ -95,8 +103,8 @@ All platforms use a **persistent 5-tab bottom navigation bar** visible on every 
 | 3 | Settings | ⚙️ (Gear / settings) |
 | 4 | Help | ❓ (Help / question mark) |
 
-- The bottom bar is **hidden** during Exercise (Exercise is a push route on the Home stack, not a tab).
-- Tapping a tab always navigates to that tab's root screen (not a sub-page of it).
+- The bottom bar/sidebar is **hidden** during Exercise (Exercise is a push route on the Home stack, not a tab).
+- Tapping a tab/sidebar item always navigates to that destination's root screen (not a sub-page of it).
 - The previously separate "Mic Setup" and "Progress" buttons on the Home screen are removed; they are accessed via tabs.
 
 ---
@@ -107,13 +115,13 @@ Every platform must implement all 7 screens:
 
 | Screen | Navigation trigger |
 |--------|--------------------|
-| Home | App launch / leaving Exercise via Back or Stop; Home tab |
-| Exercise | "Start Exercise" button on Home — push route (no tab bar) |
-| Mic Setup | Mic tab |
+| Home | App launch / leaving Exercise via Back or Stop; Home tab/sidebar item |
+| Exercise | "Start Exercise" button on Home — push route (no primary navigation) |
+| Mic Setup | Mic tab/sidebar item |
 | Results | Reserved legacy screen; **not shown during continuous testing mode** |
-| Progress | Progress tab |
-| Settings | Settings tab |
-| Help | Help tab |
+| Progress | Progress tab/sidebar item |
+| Settings | Settings tab/sidebar item |
+| Help | Help tab/sidebar item |
 
 Back navigation must work on Exercise (and Results if reached):
 - **Android & iOS**: system back gesture only — no on-screen "← Back" button.
@@ -917,6 +925,7 @@ The iOS app targets **Universal** (`TARGETED_DEVICE_FAMILY = "1,2"`) — both iP
   - Sidebar uses `Button`-based rows (not `List(selection:)` — that binding initializer is unavailable on iOS)
   - Pushing Exercise from Home via `NavigationStack` collapses the sidebar automatically
   - All 4 orientations enabled (`UISupportedInterfaceOrientations~ipad` in Info.plist)
+- **Desktop/Tauri**: left sidebar with the same five destinations and content area, matching the iPad landscape navigation model
 
 ### iPad detection
 ```swift
@@ -924,19 +933,6 @@ The iOS app targets **Universal** (`TARGETED_DEVICE_FAMILY = "1,2"`) — both iP
 private var isIPad: Bool { hsc == .regular }
 ```
 iPad (all orientations) has `.regular` horizontal size class. iPhone always has `.compact`.
-
-### Landscape detection (use GeometryReader — NOT verticalSizeClass)
-`verticalSizeClass == .compact` only fires on iPhone landscape; on iPad both orientations are `.regular`/`.regular`.
-Use `GeometryReader` to compare actual dimensions:
-```swift
-GeometryReader { geo in
-    if isIPad && geo.size.width > geo.size.height {
-        iPadLandscapeLayout
-    } else {
-        portraitLayout
-    }
-}
-```
 
 ### Adaptive sizing values
 | Property | iPhone | iPad |
@@ -962,9 +958,16 @@ Font size = `min(w,h) * 0.22` (or `0.18` for 3+ char labels).
 - C-label font size = `8 * keyScale`
 - At `keyScale=1.35` total piano width ≈ 1452 pt — horizontal scroll always needed.
 
-### ExerciseView — iPad landscape layout
-Two-column `HStack`: staff+status+attempt on left (flexible), pitch meter+stop on right (fixed width = `meterSize + 48`).
-Portrait layout unchanged; shown on iPad portrait and all iPhone orientations.
+### ExerciseView — iPad layout (single column, no split)
+As designed (see closed issue #23) — ExerciseView does **not** get a bespoke
+two-pane landscape layout. It always renders the same single centred column as
+iPhone, just scaled up via the "Adaptive sizing values" above and capped at
+680pt wide on iPad — the same centering/max-width treatment HomeView and
+SetupView already use, in both iPad orientations. A two-pane split (staff/text
+left, note circle + Stop Testing right) was tried and dropped (commit
+`336c0e1`): confirmed on a real iPad that it read as broken/misaligned rather
+than an intentional dashboard, and no other iPad-aware screen in the app uses
+a split layout — so ExerciseView was brought back in line with the rest.
 
 ---
 
@@ -1213,4 +1216,3 @@ Rules:
 **Key reference values (lineSpacing=31.5px at ~420dpi emulator):**
 - `staffTop = 147px`, `staffCenter (B4) = 210px`, `staffBottom (E4) = 273px`
 - Canvas height = 420px, lineSpacing = 31.5px
-
