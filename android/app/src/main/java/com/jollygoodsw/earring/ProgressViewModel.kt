@@ -72,11 +72,27 @@ class ProgressViewModel(application: Application) : AndroidViewModel(application
         _state.value = ProgressState()
     }
 
+    /**
+     * Consecutive calendar days (in the device's local timezone) with one or more
+     * recorded sessions, independent of score — matching desktop's reference
+     * implementation. Multiple sessions on one day count once; a gap of even one
+     * day breaks the streak; today must have a session for the streak to be > 0.
+     */
     private fun computeStreak(sessions: List<SessionRecord>): Int {
-        val sorted = sessions.sortedByDescending { it.timestamp }
+        val zoneId = java.time.ZoneId.systemDefault()
+        val days = sessions
+            .map { java.time.Instant.ofEpochMilli(it.timestamp).atZone(zoneId).toLocalDate() }
+            .toSet()
+            .sortedDescending()
         var streak = 0
-        for (s in sorted) {
-            if (s.score >= 0.8f) streak++ else break
+        var expected = java.time.LocalDate.now(zoneId)
+        for (day in days) {
+            if (day == expected) {
+                streak++
+                expected = expected.minusDays(1)
+            } else {
+                break
+            }
         }
         return streak
     }

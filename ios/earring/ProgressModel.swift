@@ -74,11 +74,19 @@ class ProgressModel: ObservableObject {
         load()
     }
 
+    /// Consecutive calendar days (in the device's local timezone) with one or more
+    /// recorded sessions, independent of score — matching desktop's reference
+    /// implementation. Multiple sessions on one day count once; a gap of even one
+    /// day breaks the streak; today must have a session for the streak to be > 0.
     var streak: Int {
+        let calendar = Calendar.current
+        let days = Set(history.map { calendar.startOfDay(for: $0.date) }).sorted(by: >)
         var count = 0
-        for record in history.sorted(by: { $0.date > $1.date }) {
-            if record.score >= 80 {
+        var expected = calendar.startOfDay(for: Date())
+        for day in days {
+            if day == expected {
                 count += 1
+                expected = calendar.date(byAdding: .day, value: -1, to: expected)!
             } else {
                 break
             }
