@@ -120,15 +120,20 @@ extension View {
 /// `ExposedDropdownMenuBox` + `OutlinedTextField(readOnly = true)` pattern (see
 /// `android/.../ui/HomeScreen.kt`), which SwiftUI's bare `Picker(.menu)` style does
 /// not (it renders as small unboxed text with no border — see issue #30).
+struct DropdownOption<Value: Hashable>: Hashable {
+    let value: Value
+    let label: String
+}
+
 struct OutlinedDropdown<Value: Hashable>: View {
     let selectedLabel: String
-    let options: [(value: Value, label: String)]
+    let options: [DropdownOption<Value>]
     let enabled: Bool
     let onSelect: (Value) -> Void
 
     var body: some View {
         Menu {
-            ForEach(options, id: \.value) { option in
+            ForEach(options, id: \.self) { option in
                 Button(option.label) { onSelect(option.value) }
             }
         } label: {
@@ -188,7 +193,7 @@ struct HomeView: View {
                 sectionLabel("Test Type").padding(.top, 28)
                 OutlinedDropdown(
                     selectedLabel: model.testType == 2 ? "Diatonic Arpeggios" : "Random Notes",
-                    options: [(value: 0, label: "Random Notes"), (value: 2, label: "Diatonic Arpeggios")],
+                    options: [DropdownOption(value: 0, label: "Random Notes"), DropdownOption(value: 2, label: "Diatonic Arpeggios")],
                     enabled: true,
                     onSelect: { newType in
                         model.testType = newType
@@ -210,13 +215,13 @@ struct HomeView: View {
                                     ? "\(MusicTheory.NOTE_NAMES[writtenRoot]) (concert \(MusicTheory.NOTE_NAMES[model.rootNote]))"
                                     : MusicTheory.NOTE_NAMES[model.rootNote]
                             }(),
-                            options: (0..<12).map { wc -> (value: Int, label: String) in
+                            options: (0..<12).map { wc -> DropdownOption<Int> in
                                 let concertChroma = (wc - instrKeyTranspose + 12) % 12
                                 let writtenName = MusicTheory.NOTE_NAMES[wc]
                                 let label = instrKeyTranspose != 0
                                     ? "\(writtenName) (concert \(MusicTheory.NOTE_NAMES[concertChroma]))"
                                     : writtenName
-                                return (value: concertChroma, label: label)
+                                return DropdownOption(value: concertChroma, label: label)
                             },
                             enabled: true,
                             onSelect: { model.rootNote = $0; model.updateRangeForKey() }
@@ -229,7 +234,7 @@ struct HomeView: View {
                         OutlinedDropdown(
                             selectedLabel: EarRingCore.writtenScaleLabel(concertRootChroma: model.rootNote, scaleId: model.scaleId, instrumentIndex: model.instrumentIndex),
                             options: MusicTheory.SELECTABLE_SCALE_IDS.map { i in
-                                (value: i, label: EarRingCore.writtenScaleLabel(concertRootChroma: model.rootNote, scaleId: i, instrumentIndex: model.instrumentIndex))
+                                DropdownOption(value: i, label: EarRingCore.writtenScaleLabel(concertRootChroma: model.rootNote, scaleId: i, instrumentIndex: model.instrumentIndex))
                             },
                             enabled: model.testType != 1,
                             onSelect: { model.scaleId = $0 }
