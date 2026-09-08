@@ -8,6 +8,11 @@ struct HelpView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                Text("Help")
+                    .font(.title2.bold())
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.bottom, 8)
+
                 ForEach(sections, id: \.title) { section in
                     HelpSection(title: section.title) {
                         VStack(alignment: .leading, spacing: 8) {

@@ -102,6 +102,17 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
     ) {
         Spacer(Modifier.height(8.dp))
 
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Spacer(Modifier.weight(1f))
+            Text("Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+        }
+
+        Spacer(Modifier.height(16.dp))
+
         GroupHeader("User")
 
         ExpandableSection("Instrument") {

@@ -34,6 +34,11 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                Text("Settings")
+                    .font(.title2.bold())
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.bottom, 8)
+
                 groupHeader("User")
 
                 DisclosureGroup(isExpanded: $expandInstrument) {
