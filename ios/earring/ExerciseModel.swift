@@ -25,7 +25,7 @@ class ExerciseModel: ObservableObject {
     @Published var rangeStart: Int = ud.object(forKey: "rangeStart") != nil ? ud.integer(forKey: "rangeStart") : 60 {
         didSet { UserDefaults.standard.set(rangeStart, forKey: "rangeStart") }
     }
-    @Published var rangeEnd: Int = ud.object(forKey: "rangeEnd") != nil ? ud.integer(forKey: "rangeEnd") : 71 {
+    @Published var rangeEnd: Int = ud.object(forKey: "rangeEnd") != nil ? ud.integer(forKey: "rangeEnd") : 72 {
         didSet { UserDefaults.standard.set(rangeEnd, forKey: "rangeEnd") }
     }
     @Published var scaleId: Int = ud.object(forKey: "scaleId") != nil ? ud.integer(forKey: "scaleId") : 0 {
