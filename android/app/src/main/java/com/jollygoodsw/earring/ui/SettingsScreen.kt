@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -45,6 +46,7 @@ private fun GroupHeader(title: String) {
 @Composable
 private fun ExpandableSection(title: String, summary: String? = null, content: @Composable ColumnScope.() -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    val borderColor = MaterialTheme.colorScheme.outlineVariant
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -78,8 +80,22 @@ private fun ExpandableSection(title: String, summary: String? = null, content: @
             enter = expandVertically() + fadeIn(),
             exit = shrinkVertically() + fadeOut()
         ) {
-            Column(modifier = Modifier.padding(bottom = 12.dp), content = content)
+            Column(
+                modifier = Modifier
+                    .padding(start = 12.dp, bottom = 12.dp)
+                    .drawBehind {
+                        drawLine(
+                            color = borderColor,
+                            start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                            end = androidx.compose.ui.geometry.Offset(0f, size.height),
+                            strokeWidth = 2.dp.toPx()
+                        )
+                    }
+                    .padding(start = 12.dp),
+                content = content
+            )
         }
+        HorizontalDivider(color = borderColor.copy(alpha = 0.4f))
     }
 }
 

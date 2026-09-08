@@ -40,7 +40,11 @@ function CollapsibleSection({ title, summary, children }: { title: string; summa
         </span>
         <span style={{ fontSize: 12, color: '#9e9e9e', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>▶</span>
       </button>
-      {open && <div style={{ paddingBottom: 12 }}>{children}</div>}
+      {open && (
+        <div style={{ paddingBottom: 12, paddingLeft: 12, marginLeft: 12, borderLeft: '2px solid #e0e0e0' }}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }

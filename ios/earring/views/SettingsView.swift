@@ -1,5 +1,25 @@
 import SwiftUI
 
+private struct SectionContainer: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(.leading, 12)
+            .overlay(alignment: .leading) {
+                Rectangle().fill(Color.erMuted.opacity(0.4)).frame(width: 2)
+            }
+            .padding(.leading, 12)
+            .padding(.bottom, 4)
+    }
+}
+
+extension View {
+    /// Indents and left-rules a DisclosureGroup's expanded content so it reads as
+    /// visually contained under its header, matching Android's ExpandableSection.
+    func sectionContained() -> some View {
+        modifier(SectionContainer())
+    }
+}
+
 struct SettingsView: View {
     @EnvironmentObject var model: ExerciseModel
     private let bpmOptions = [60, 80, 100, 120, 140]
@@ -46,47 +66,58 @@ struct SettingsView: View {
                 groupHeader("User")
 
                 DisclosureGroup(isExpanded: $expandInstrument) {
-                    sectionLabel("Instrument").padding(.top, 8)
-                    Picker("Instrument", selection: $model.instrumentIndex) {
-                        ForEach(instruments) { inst in
-                            Text(inst.name).tag(inst.id)
+                    VStack(alignment: .leading, spacing: 0) {
+                        sectionLabel("Instrument").padding(.top, 8)
+                        Picker("Instrument", selection: $model.instrumentIndex) {
+                            ForEach(instruments) { inst in
+                                Text(inst.name).tag(inst.id)
+                            }
                         }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.bottom, 4)
                     }
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.bottom, 4)
+                    .sectionContained()
                 } label: { sectionHeader("Instrument", summary: currentInstrumentName, expanded: expandInstrument) }
+                Divider()
 
                 DisclosureGroup(isExpanded: $expandPlayback) {
-                    sectionLabel("Tempo (BPM)").padding(.top, 8)
-                    chipGrid(options: bpmOptions.map { "\($0)" },
-                             selected: bpmOptions.firstIndex(of: model.tempoBpm) ?? 0,
-                             count: bpmOptions.count) { idx in
-                        model.tempoBpm = bpmOptions[idx]
-                    }
-                } label: { sectionHeader("Playback", summary: "\(model.tempoBpm) BPM", expanded: expandPlayback) }
-
-                DisclosureGroup(isExpanded: $expandSound) {
-                    Toggle(isOn: Binding(
-                        get: { model.playPassFailSounds },
-                        set: { model.playPassFailSounds = $0 }
-                    )) {
-                        Text("Play Pass/Fail Sounds")
-                    }
-                    Text("A chime when a test is passed, a different tone when it fails")
-                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
-
-                    sectionLabel("Intro Sound").padding(.top, 8)
-                    Text("What plays before each test")
-                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
-                    Picker("Intro Sound", selection: $model.introSoundMode) {
-                        ForEach(introSoundOptions.indices, id: \.self) { idx in
-                            Text(introSoundOptions[idx]).tag(idx)
+                    VStack(alignment: .leading, spacing: 0) {
+                        sectionLabel("Tempo (BPM)").padding(.top, 8)
+                        chipGrid(options: bpmOptions.map { "\($0)" },
+                                 selected: bpmOptions.firstIndex(of: model.tempoBpm) ?? 0,
+                                 count: bpmOptions.count) { idx in
+                            model.tempoBpm = bpmOptions[idx]
                         }
                     }
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.bottom, 4)
+                    .sectionContained()
+                } label: { sectionHeader("Playback", summary: "\(model.tempoBpm) BPM", expanded: expandPlayback) }
+                Divider()
+
+                DisclosureGroup(isExpanded: $expandSound) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Toggle(isOn: Binding(
+                            get: { model.playPassFailSounds },
+                            set: { model.playPassFailSounds = $0 }
+                        )) {
+                            Text("Play Pass/Fail Sounds")
+                        }
+                        Text("A chime when a test is passed, a different tone when it fails")
+                            .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
+
+                        sectionLabel("Intro Sound").padding(.top, 8)
+                        Text("What plays before each test")
+                            .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
+                        Picker("Intro Sound", selection: $model.introSoundMode) {
+                            ForEach(introSoundOptions.indices, id: \.self) { idx in
+                                Text(introSoundOptions[idx]).tag(idx)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.bottom, 4)
+                    }
+                    .sectionContained()
                 } label: {
                     sectionHeader(
                         "Sound",
@@ -94,20 +125,24 @@ struct SettingsView: View {
                         expanded: expandSound
                     )
                 }
+                Divider()
 
                 DisclosureGroup(isExpanded: $expandDisplay) {
-                    Toggle(isOn: Binding(
-                        get: { model.showTestNotes },
-                        set: { model.showTestNotes = $0 }
-                    )) {
-                        Text("Display Test Notes")
+                    VStack(alignment: .leading, spacing: 0) {
+                        Toggle(isOn: Binding(
+                            get: { model.showTestNotes },
+                            set: { model.showTestNotes = $0 }
+                        )) {
+                            Text("Display Test Notes")
+                        }
+                        Toggle(isOn: Binding(
+                            get: { model.keySignatureMode == 1 },
+                            set: { model.keySignatureMode = $0 ? 1 : 0 }
+                        )) {
+                            Text("Use Key Signature")
+                        }
                     }
-                    Toggle(isOn: Binding(
-                        get: { model.keySignatureMode == 1 },
-                        set: { model.keySignatureMode = $0 ? 1 : 0 }
-                    )) {
-                        Text("Use Key Signature")
-                    }
+                    .sectionContained()
                 } label: {
                     sectionHeader(
                         "Display",
@@ -120,44 +155,52 @@ struct SettingsView: View {
                         expanded: expandDisplay
                     )
                 }
+                Divider()
 
                 DisclosureGroup(isExpanded: $expandExercise) {
-                    sectionLabel("Max Retries").padding(.top, 8)
-                    Text("Attempts per test before moving on")
-                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
-                    chipGrid(options: retryOptions.map { "\($0)" },
-                             selected: retryOptions.firstIndex(of: model.maxRetries) ?? 0,
-                             count: retryOptions.count) { idx in
-                        model.maxRetries = retryOptions[idx]
-                    }
+                    VStack(alignment: .leading, spacing: 0) {
+                        sectionLabel("Max Retries").padding(.top, 8)
+                        Text("Attempts per test before moving on")
+                            .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
+                        chipGrid(options: retryOptions.map { "\($0)" },
+                                 selected: retryOptions.firstIndex(of: model.maxRetries) ?? 0,
+                                 count: retryOptions.count) { idx in
+                            model.maxRetries = retryOptions[idx]
+                        }
 
-                    sectionLabel("Retry Same Note").padding(.top, 8)
-                    Text("Tries allowed on a wrong note before the whole test restarts — each retry costs a few points (0 = off)")
-                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
-                    chipGrid(options: noteRetryOptions.map { "\($0)" },
-                             selected: noteRetryOptions.firstIndex(of: model.noteRetries) ?? 0,
-                             count: noteRetryOptions.count) { idx in
-                        model.noteRetries = noteRetryOptions[idx]
+                        sectionLabel("Retry Same Note").padding(.top, 8)
+                        Text("Tries allowed on a wrong note before the whole test restarts — each retry costs a few points (0 = off)")
+                            .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
+                        chipGrid(options: noteRetryOptions.map { "\($0)" },
+                                 selected: noteRetryOptions.firstIndex(of: model.noteRetries) ?? 0,
+                                 count: noteRetryOptions.count) { idx in
+                            model.noteRetries = noteRetryOptions[idx]
+                        }
                     }
+                    .sectionContained()
                 } label: { sectionHeader("Exercise", summary: "\(model.maxRetries) retries, \(model.noteRetries) same-note", expanded: expandExercise) }
+                Divider()
 
                 DisclosureGroup(isExpanded: $expandTiming) {
-                    sectionLabel("Pause Before Playing").padding(.top, 8)
-                    Text("Gap between chord and test sequence: \(model.postChordGapNanoseconds / 1_000_000)ms")
-                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 4)
-                    Slider(value: Binding(
-                        get: { Double(model.postChordGapNanoseconds / 1_000_000) },
-                        set: { model.postChordGapNanoseconds = UInt64($0) * 1_000_000 }
-                    ), in: 400...2000, step: 100)
+                    VStack(alignment: .leading, spacing: 0) {
+                        sectionLabel("Pause Before Playing").padding(.top, 8)
+                        Text("Gap between chord and test sequence: \(model.postChordGapNanoseconds / 1_000_000)ms")
+                            .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 4)
+                        Slider(value: Binding(
+                            get: { Double(model.postChordGapNanoseconds / 1_000_000) },
+                            set: { model.postChordGapNanoseconds = UInt64($0) * 1_000_000 }
+                        ), in: 400...2000, step: 100)
 
-                    sectionLabel("Wrong Note Pause").padding(.top, 8)
-                    Text("How long to display a wrong note before replaying")
-                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
-                    chipGrid(options: wrongPauseOptions.map { $0.1 },
-                             selected: wrongPauseOptions.firstIndex(where: { $0.0 == model.wrongNotePauseNanoseconds }) ?? 0,
-                             count: wrongPauseOptions.count) { idx in
-                        model.wrongNotePauseNanoseconds = wrongPauseOptions[idx].0
+                        sectionLabel("Wrong Note Pause").padding(.top, 8)
+                        Text("How long to display a wrong note before replaying")
+                            .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
+                        chipGrid(options: wrongPauseOptions.map { $0.1 },
+                                 selected: wrongPauseOptions.firstIndex(where: { $0.0 == model.wrongNotePauseNanoseconds }) ?? 0,
+                                 count: wrongPauseOptions.count) { idx in
+                            model.wrongNotePauseNanoseconds = wrongPauseOptions[idx].0
+                        }
                     }
+                    .sectionContained()
                 } label: {
                     sectionHeader(
                         "Timing",
@@ -165,36 +208,41 @@ struct SettingsView: View {
                         expanded: expandTiming
                     )
                 }
+                Divider()
 
                 groupHeader("Advanced")
 
                 DisclosureGroup(isExpanded: $expandPitchDetection) {
-                    sectionLabel("Mic Sensitivity").padding(.top, 8)
-                    Text("Sensitivity: \(sensitivity) / 10")
-                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 4)
-                    Slider(value: Binding(
-                        get: { Double(sensitivity) },
-                        set: { model.silenceThreshold = Float(max(0.001, min(0.010, 0.011 - $0 * 0.001))) }
-                    ), in: 1...10, step: 1)
+                    VStack(alignment: .leading, spacing: 0) {
+                        sectionLabel("Mic Sensitivity").padding(.top, 8)
+                        Text("Sensitivity: \(sensitivity) / 10")
+                            .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 4)
+                        Slider(value: Binding(
+                            get: { Double(sensitivity) },
+                            set: { model.silenceThreshold = Float(max(0.001, min(0.010, 0.011 - $0 * 0.001))) }
+                        ), in: 1...10, step: 1)
 
-                    sectionLabel("Note Stability").padding(.top, 8)
-                    Text("Consecutive stable frames before confirming a note")
-                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
-                    chipGrid(options: stabilityOptions.map { "\($0)" },
-                             selected: stabilityOptions.firstIndex(of: model.framesToConfirm) ?? 0,
-                             count: stabilityOptions.count) { idx in
-                        model.framesToConfirm = stabilityOptions[idx]
-                    }
+                        sectionLabel("Note Stability").padding(.top, 8)
+                        Text("Consecutive stable frames before confirming a note")
+                            .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
+                        chipGrid(options: stabilityOptions.map { "\($0)" },
+                                 selected: stabilityOptions.firstIndex(of: model.framesToConfirm) ?? 0,
+                                 count: stabilityOptions.count) { idx in
+                            model.framesToConfirm = stabilityOptions[idx]
+                        }
 
-                    sectionLabel("Mic Warmup Frames").padding(.top, 8)
-                    Text("Frames discarded when mic opens (both Exercise and Mic Setup)")
-                        .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
-                    chipGrid(options: warmupOptions.map { "\($0)" },
-                             selected: warmupOptions.firstIndex(of: model.warmupFrames) ?? 4,
-                             count: warmupOptions.count) { idx in
-                        model.warmupFrames = warmupOptions[idx]
+                        sectionLabel("Mic Warmup Frames").padding(.top, 8)
+                        Text("Frames discarded when mic opens (both Exercise and Mic Setup)")
+                            .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
+                        chipGrid(options: warmupOptions.map { "\($0)" },
+                                 selected: warmupOptions.firstIndex(of: model.warmupFrames) ?? 4,
+                                 count: warmupOptions.count) { idx in
+                            model.warmupFrames = warmupOptions[idx]
+                        }
                     }
+                    .sectionContained()
                 } label: { sectionHeader("Pitch Detection", summary: "Sensitivity \(sensitivity)/10", expanded: expandPitchDetection) }
+                Divider()
 
                 Spacer(minLength: 32)
 
