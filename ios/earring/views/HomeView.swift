@@ -329,7 +329,7 @@ struct HomeView: View {
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
             .font(.caption)
-            .foregroundColor(.erMuted)
+            .foregroundColor(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 6)
     }
