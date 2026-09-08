@@ -121,7 +121,7 @@ struct SettingsView: View {
                 } label: {
                     sectionHeader(
                         "Sound",
-                        summary: "\(introSoundOptions[model.introSoundMode]) intro, chime \(model.playPassFailSounds ? "on" : "off")",
+                        summary: "\(introSoundOptions.indices.contains(model.introSoundMode) ? introSoundOptions[model.introSoundMode] : "Chord") intro, chime \(model.playPassFailSounds ? "on" : "off")",
                         expanded: expandSound
                     )
                 }

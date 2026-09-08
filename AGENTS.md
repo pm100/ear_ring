@@ -475,8 +475,10 @@ Two group headers ("User", "Advanced") each own a set of collapsible sections,
 all starting collapsed. Tapping a section's header row toggles it. While collapsed,
 the header shows a muted current-value summary after the title (e.g.
 "Instrument · Piano", "Exercise · 5 retries, 2 same-note") instead of just the
-category name; the summary disappears once expanded, since the value is now visible
-in the section's own content. Expanded content is indented with a thin left rule,
+category name (the title portion renders uppercase on all three platforms; the
+example above shows the underlying text before that transform); the summary
+disappears once expanded, since the value is now visible in the section's own
+content. Expanded content is indented with a thin left rule,
 and every section (collapsed or expanded) is separated from the next by a divider.
 
 **User group:**
@@ -513,7 +515,7 @@ and every section (collapsed or expanded) is separated from the next by a divide
 - **Pitch Detection** — slider "Mic Sensitivity": 1–10 integer steps, default 8; right
   = more sensitive; internally maps to silence threshold via
   `threshold = 0.011 − sensitivity × 0.001` (e.g. sensitivity 8 → threshold 0.003).
-  Chip row "Note Stability" (consecutive stable frames before confirming a note): 2 3
+  Chip row "Note Stability (frames to confirm)" (consecutive stable frames before confirming a note): 2 3
   4 5, default 3. Chip row "Mic Warmup Frames" (frames discarded when the mic opens,
   both Exercise and Mic Setup): 0 1 2 3 4 5 6, default 4.
 
