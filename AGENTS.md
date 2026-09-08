@@ -463,95 +463,77 @@ Session history:
 
 ### Settings Screen
 
-Layout: vertically scrollable column, 16dp padding.
+Layout: vertically scrollable column, 16dp padding, centered bold title ("Settings")
+at the top — no back button, since it's a bottom-tab/sidebar destination, not a
+pushed screen (Android: matches `ProgressScreen.kt`'s title treatment; iOS: same
+centered-bold style since the native nav bar is hidden on every screen; desktop:
+shows the title via its standard `screen-header` bar, which also has a back button
+there since desktop's Settings is reached by navigating away from Home rather than
+via a persistent tab).
 
-**Known-stale below:** the shipped screen groups these sections into
-collapsible "User" and "Advanced" accordions (Instrument, Playback, Sound,
-Display, Exercise, Timing under User; Pitch Detection under Advanced), and
-some chip ranges here (e.g. Max Retries) no longer match what's shipped. Full
-reconciliation tracked in issue #30 — the "Display" section immediately below
-is accurate as of this fix; treat the rest of this block as directional, not
-verified.
+Two group headers ("User", "Advanced") each own a set of collapsible sections,
+all starting collapsed. Tapping a section's header row toggles it. While collapsed,
+the header shows a muted current-value summary after the title (e.g.
+"Instrument · Piano", "Exercise · 5 retries, 2 same-note") instead of just the
+category name; the summary disappears once expanded, since the value is now visible
+in the section's own content. Expanded content is indented with a thin left rule,
+and every section (collapsed or expanded) is separated from the next by a divider.
 
-```
-                        [Settings]         (tab — no back button)
+**User group:**
 
-[16dp space]
-Section label: "Instrument"
-Dropdown (outlined, full width): Piano | Guitar | Transposed Guitar | Soprano Sax | Alto Sax |
-                                  Tenor Sax | Trumpet | Clarinet
-  — Default: Piano (index 0)
-  — Selecting a transposing instrument causes Mic Setup and Exercise screens to display
-    written pitch instead of concert pitch (display only — detection stays in concert pitch)
-  — Selecting a new instrument resets rangeStart/rangeEnd to one octave from the current root note
-    closest to middle C (same rule as changing the Key on the Home screen)
+- **Instrument** — outlined dropdown, full width: Piano | Guitar | Transposed Guitar |
+  Soprano Sax | Alto Sax | Tenor Sax | Trumpet | Clarinet (default: Piano, index 0).
+  Selecting a transposing instrument causes Mic Setup and Exercise screens to display
+  written pitch instead of concert pitch (display only — detection stays in concert
+  pitch). Selecting a new instrument resets rangeStart/rangeEnd to one octave from the
+  current root note closest to middle C (same rule as changing the Key on Home).
+  Desktop folds Tempo/BPM into this same section rather than giving it a separate
+  "Playback" section (a pre-existing structural difference from mobile, not changed
+  by the UI review); Android and iOS have a distinct "Playback" section for it.
+- **Playback** (Android/iOS only — see above) — chip row, Tempo (BPM): 60 80 100 120 140,
+  default 100.
+- **Sound** — checkbox "Play Pass/Fail Sounds" (a chime when a test is passed, a
+  different tone when it fails) plus an "Intro Sound" dropdown: Root Note | Chord |
+  Arpeggio | Scale | None (what plays before each test; default: Chord).
+- **Display** — two checkboxes: "Display Test Notes" (default unchecked/hidden) and
+  "Use Key Signature" (`keySignatureMode`; default unchecked = Inline Accidentals
+  mode = 0; checked = conventional key signature after the clef with only out-of-key
+  notes getting an accidental). Moved here from Home — see issue #26; all three
+  platforms implement it under Settings → Display.
+- **Exercise** — chip row "Max Retries" (attempts per test before moving on): 1 2 3 5
+  8 10, default 5. Chip row "Retry Same Note" (tries allowed on a wrong note before
+  the whole test restarts — each retry costs a few points; 0 = off): 0 1 2 3 4 5,
+  default 2.
+- **Timing** — slider "Pause Before Playing" (gap between chord and test sequence):
+  400ms–2000ms, step 100ms, default 800ms. Chip row "Wrong Note Pause" (how long to
+  display a wrong note before replaying): 1s 2s 3s 5s, default 3s.
 
-[16dp space]
-Section label: "Display"
-Row (same line): ☐ Display Test Notes    ☐ Use Key Signature
-  — Both checkboxes on one row with a gap between them
-  — "Display Test Notes" default: unchecked (hidden)
-  — "Use Key Signature" (keySignatureMode): default unchecked (= Inline Accidentals mode = 0)
-  — Checked: conventional key sig after clef; only out-of-key notes get an accidental
-  — Unchecked: no key signature drawn; every accidental shown on the note
-  — Moved here from Home (was previously documented as a Home screen row — see
-    issue #26); all three platforms implement it under Settings → Display
+**Advanced group:**
 
-[16dp space]
-Section label: "Tempo (BPM)"
-Chip row: 60  80  100  120  140   (single row, equal width)
-  — Default selection: 100 BPM
+- **Pitch Detection** — slider "Mic Sensitivity": 1–10 integer steps, default 8; right
+  = more sensitive; internally maps to silence threshold via
+  `threshold = 0.011 − sensitivity × 0.001` (e.g. sensitivity 8 → threshold 0.003).
+  Chip row "Note Stability" (consecutive stable frames before confirming a note): 2 3
+  4 5, default 3. Chip row "Mic Warmup Frames" (frames discarded when the mic opens,
+  both Exercise and Mic Setup): 0 1 2 3 4 5 6, default 4.
 
-[16dp space]
-Section label: "Max Retries"
-Chip row: 1  2  3  4  5  6  7   (single row, equal width)
-  — Default: 5
+Below both groups: "Reset to Defaults" button (confirmation dialog before it takes
+effect; resets settings only, progress history is unaffected), then
+"Build {gitHash}" (short 7-char git commit hash, muted, centered — sourced from the
+shared Rust core's `GIT_HASH` const, embedded by `rust/build.rs` from
+`git rev-parse --short=7 HEAD` at compile time; "unknown" if git wasn't available;
+exposed via `EarRingCore.gitHash()` on Android/iOS, `cmd_git_hash` on desktop).
 
-[16dp space]
-Section label: "Mic Sensitivity"
-Slider: 1 – 10 (integer steps), default 8
-  — Right = more sensitive (picks up quieter sound)
-  — Internally maps to silence threshold: threshold = (0.011 − sensitivity × 0.001)
-    e.g. sensitivity 8 → threshold 0.003 (default), sensitivity 10 → threshold 0.001 (most sensitive)
-  — Current value shown as label (e.g. "8 / 10")
-
-[16dp space]
-Section label: "Note Stability (Frames to Confirm)"
-Chip row: 1  2  3  4  5  6  7   (single row, equal width)
-  — Default: 3
-
-[16dp space]
-Section label: "Post-Chord Gap"
-Slider: 200ms – 2000ms, step 100ms, default 800ms
-  — Gap between chord and test sequence playback
-  — Current value shown as label (e.g. "800 ms")
-
-[16dp space]
-Section label: "Wrong-Note Pause"
-Slider: 500ms – 5000ms, step 500ms, default 3000ms
-  — Pause before replaying sequence after a wrong note
-  — Current value shown as label (e.g. "3000 ms")
-
-[16dp space]
-"Build {gitHash}"   — 11sp, muted colour, centred, below "Reset to Defaults"
-  — Short (7-char) git commit hash of the build, e.g. "Build a1b2c3d"
-  — Sourced from the shared Rust core: GIT_HASH const (rust/build.rs embeds it
-    from `git rev-parse --short=7 HEAD` at compile time; "unknown" if git
-    wasn't available at build time)
-  — Exposed to each platform via EarRingCore.gitHash() (Android/iOS) /
-    cmd_git_hash (desktop Tauri command)
-```
-
-All settings persist across app restarts.
-- Android: SharedPreferences
-- iOS: UserDefaults
-- Desktop: localStorage
+All settings persist across app restarts: Android via SharedPreferences, iOS via
+UserDefaults, desktop via localStorage.
 
 ---
 
 ### Help Screen
 
-Layout: vertically scrollable column, 16dp padding.
+Layout: vertically scrollable column, 16dp padding. A centered bold "Help" title
+(same treatment as Settings) sits above the first section on Android and iOS;
+desktop shows it via its standard `screen-header` bar.
 
 ```
                         [Help]             (tab — no back button)
