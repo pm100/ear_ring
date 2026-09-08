@@ -179,12 +179,18 @@ struct HomeView: View {
 
                 // ── Title ──────────────────────────────────────────────────
                 VStack(spacing: 6) {
-                    Text("Ear Ring 🎵")
-                        .font(.system(size: 32, weight: .bold))
-                        .foregroundColor(.erPrimary)
+                    HStack(spacing: 12) {
+                        Image("AppLogo")
+                            .resizable()
+                            .frame(width: 48, height: 48)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        Text("Ear Ring")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundColor(.erPrimary)
+                    }
                     Text("Ear Training")
                         .font(.system(size: 16))
-                        .foregroundColor(.erMuted)
+                        .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.top, 24)
