@@ -990,9 +990,9 @@ a split layout — so ExerciseView was brought back in line with the rest.
 
 
 ### iOS — Home Screen title row
-SwiftUI cannot directly reference the app icon from `Assets.xcassets/AppIcon` as a UI
-image (that asset-catalog entry type is special-cased for the OS's own use). The icon
-artwork is instead duplicated into a normal image set, `Assets.xcassets/AppLogo`
+SwiftUI cannot directly reference the app icon from `Images.xcassets/AppIcon.appiconset`
+as a UI image (that asset-catalog entry type is special-cased for the OS's own use). The
+icon artwork is instead duplicated into a normal image set, `Images.xcassets/AppLogo`
 (same PNG as the Android launcher icon), which has no such restriction — so the title
 row matches Android's icon-left-of-text layout exactly: a 48pt `Image("AppLogo")`
 (10pt corner radius) to the left of "Ear Ring" (32pt bold, primary colour). No

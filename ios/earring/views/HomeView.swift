@@ -115,16 +115,16 @@ extension View {
 
 // MARK: - Outlined dropdown (matches Android's ExposedDropdownMenuBox styling)
 
-/// A full-width outlined box showing the current selection with a trailing chevron,
-/// opening a native menu of options on tap — visually matches Android's
-/// `ExposedDropdownMenuBox` + `OutlinedTextField(readOnly = true)` pattern (see
-/// `android/.../ui/HomeScreen.kt`), which SwiftUI's bare `Picker(.menu)` style does
-/// not (it renders as small unboxed text with no border — see issue #30).
 struct DropdownOption<Value: Hashable>: Hashable {
     let value: Value
     let label: String
 }
 
+/// A full-width outlined box showing the current selection with a trailing chevron,
+/// opening a native menu of options on tap — visually matches Android's
+/// `ExposedDropdownMenuBox` + `OutlinedTextField(readOnly = true)` pattern (see
+/// `android/.../ui/HomeScreen.kt`), which SwiftUI's bare `Picker(.menu)` style does
+/// not (it renders as small unboxed text with no border — see issue #30).
 struct OutlinedDropdown<Value: Hashable>: View {
     let selectedLabel: String
     let options: [DropdownOption<Value>]
@@ -140,7 +140,7 @@ struct OutlinedDropdown<Value: Hashable>: View {
             HStack(spacing: 6) {
                 Text(selectedLabel)
                     .font(.system(size: 16))
-                    .foregroundColor(enabled ? .erDark : .erMuted)
+                    .foregroundColor(enabled ? .primary : .erMuted)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer()
