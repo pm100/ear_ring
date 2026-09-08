@@ -113,6 +113,48 @@ extension View {
     func cardStyle() -> some View { modifier(CardModifier()) }
 }
 
+// MARK: - Outlined dropdown (matches Android's ExposedDropdownMenuBox styling)
+
+/// A full-width outlined box showing the current selection with a trailing chevron,
+/// opening a native menu of options on tap — visually matches Android's
+/// `ExposedDropdownMenuBox` + `OutlinedTextField(readOnly = true)` pattern (see
+/// `android/.../ui/HomeScreen.kt`), which SwiftUI's bare `Picker(.menu)` style does
+/// not (it renders as small unboxed text with no border — see issue #30).
+struct OutlinedDropdown<Value: Hashable>: View {
+    let selectedLabel: String
+    let options: [(value: Value, label: String)]
+    let enabled: Bool
+    let onSelect: (Value) -> Void
+
+    var body: some View {
+        Menu {
+            ForEach(options, id: \.value) { option in
+                Button(option.label) { onSelect(option.value) }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text(selectedLabel)
+                    .font(.system(size: 16))
+                    .foregroundColor(enabled ? .erDark : .erMuted)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.erMuted)
+            }
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(Color.erMuted, lineWidth: 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .disabled(!enabled)
+    }
+}
+
 // MARK: - HomeView
 
 struct HomeView: View {
@@ -144,58 +186,54 @@ struct HomeView: View {
 
                 // ── Test Type ─────────────────────────────────────────────
                 sectionLabel("Test Type").padding(.top, 28)
-                Picker("Test Type", selection: Binding(
-                    get: { model.testType },
-                    set: { newType in
+                OutlinedDropdown(
+                    selectedLabel: model.testType == 2 ? "Diatonic Arpeggios" : "Random Notes",
+                    options: [(value: 0, label: "Random Notes"), (value: 2, label: "Diatonic Arpeggios")],
+                    enabled: true,
+                    onSelect: { newType in
                         model.testType = newType
                         // Auto-clamp seqLen for diatonic mode
                         if newType == 2 && model.sequenceLength != 3 && model.sequenceLength != 4 {
                             model.sequenceLength = 3
                         }
                     }
-                )) {
-                    Text("Random Notes").tag(0)
-                    Text("Diatonic Arpeggios").tag(2)
-                }
-                .pickerStyle(.menu)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                )
 
                 // ── Key + Scale (side by side) ────────────────────────────
                 HStack(alignment: .top, spacing: 8) {
                     VStack(alignment: .leading, spacing: 0) {
                         sectionLabel("Key").padding(.top, 28)
-                        Picker("Key", selection: Binding(
-                            get: { model.rootNote },
-                            set: { model.rootNote = $0; model.updateRangeForKey() }
-                        )) {
-                            // Options in written-chroma order; value is concert chroma.
-                            ForEach(0..<12, id: \.self) { wc in
+                        OutlinedDropdown(
+                            selectedLabel: {
+                                let writtenRoot = (model.rootNote + instrKeyTranspose) % 12
+                                return instrKeyTranspose != 0
+                                    ? "\(MusicTheory.NOTE_NAMES[writtenRoot]) (concert \(MusicTheory.NOTE_NAMES[model.rootNote]))"
+                                    : MusicTheory.NOTE_NAMES[model.rootNote]
+                            }(),
+                            options: (0..<12).map { wc -> (value: Int, label: String) in
                                 let concertChroma = (wc - instrKeyTranspose + 12) % 12
                                 let writtenName = MusicTheory.NOTE_NAMES[wc]
                                 let label = instrKeyTranspose != 0
                                     ? "\(writtenName) (concert \(MusicTheory.NOTE_NAMES[concertChroma]))"
                                     : writtenName
-                                Text(label).tag(concertChroma)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                                return (value: concertChroma, label: label)
+                            },
+                            enabled: true,
+                            onSelect: { model.rootNote = $0; model.updateRangeForKey() }
+                        )
                     }
                     .frame(maxWidth: .infinity)
 
                     VStack(alignment: .leading, spacing: 0) {
                         sectionLabel("Scale").padding(.top, 28)
-                        Picker("Scale", selection: Binding(
-                            get: { model.scaleId },
-                            set: { model.scaleId = $0 }
-                        )) {
-                            ForEach(MusicTheory.SELECTABLE_SCALE_IDS, id: \.self) { i in
-                                Text(EarRingCore.writtenScaleLabel(concertRootChroma: model.rootNote, scaleId: i, instrumentIndex: model.instrumentIndex)).tag(i)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .disabled(model.testType == 1)
+                        OutlinedDropdown(
+                            selectedLabel: EarRingCore.writtenScaleLabel(concertRootChroma: model.rootNote, scaleId: model.scaleId, instrumentIndex: model.instrumentIndex),
+                            options: MusicTheory.SELECTABLE_SCALE_IDS.map { i in
+                                (value: i, label: EarRingCore.writtenScaleLabel(concertRootChroma: model.rootNote, scaleId: i, instrumentIndex: model.instrumentIndex))
+                            },
+                            enabled: model.testType != 1,
+                            onSelect: { model.scaleId = $0 }
+                        )
                         .opacity(model.testType == 1 ? 0.38 : 1.0)
                     }
                     .frame(maxWidth: .infinity)
