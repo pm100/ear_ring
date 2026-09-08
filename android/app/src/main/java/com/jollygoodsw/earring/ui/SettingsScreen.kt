@@ -40,9 +40,10 @@ private fun GroupHeader(title: String) {
     HorizontalDivider()
 }
 
-/** A section that starts collapsed; tapping the header title toggles it open/closed. */
+/** A section that starts collapsed; tapping the header title toggles it open/closed.
+ *  When collapsed and [summary] is non-null, the header shows "Title · summary". */
 @Composable
-private fun ExpandableSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+private fun ExpandableSection(title: String, summary: String? = null, content: @Composable ColumnScope.() -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -52,12 +53,20 @@ private fun ExpandableSection(title: String, content: @Composable ColumnScope.()
                 .clickable { expanded = !expanded }
                 .padding(vertical = 10.dp)
         ) {
-            Text(
-                title,
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.weight(1f)
-            )
+            Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                if (!expanded && summary != null) {
+                    Text(
+                        " · $summary",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             Icon(
                 imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                 contentDescription = if (expanded) "Collapse" else "Expand",
@@ -84,6 +93,7 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
     val stabilityOptions = listOf(2, 3, 4, 5)
     val warmupOptions = listOf(0, 1, 2, 3, 4, 5, 6)
     val wrongPauseOptions = listOf(1000L to "1s", 2000L to "2s", 3000L to "3s", 5000L to "5s")
+    val introSoundOptions = listOf("Root Note", "Chord", "Arpeggio", "Scale", "None")
 
     // Parse instrument list from Rust core once
     val instrumentNames = remember {
@@ -115,7 +125,7 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
 
         GroupHeader("User")
 
-        ExpandableSection("Instrument") {
+        ExpandableSection("Instrument", summary = instrumentNames.getOrElse(state.instrumentIndex) { "Piano" }) {
             SectionLabel("Instrument")
             ExposedDropdownMenuBox(
                 expanded = instrumentExpanded,
@@ -143,7 +153,7 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             }
         }
 
-        ExpandableSection("Playback") {
+        ExpandableSection("Playback", summary = "${state.tempoBpm} BPM") {
             SectionLabel("Tempo (BPM)")
             ChipRow(
                 items = bpmOptions,
@@ -152,7 +162,10 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             )
         }
 
-        ExpandableSection("Sound") {
+        ExpandableSection(
+            "Sound",
+            summary = "${introSoundOptions.getOrElse(state.introSoundMode) { "Chord" }} intro, chime ${if (state.playPassFailSounds) "on" else "off"}"
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(
                     checked = state.playPassFailSounds,
@@ -168,7 +181,6 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             Text("What plays before each test",
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 6.dp))
-            val introSoundOptions = listOf("Root Note", "Chord", "Arpeggio", "Scale", "None")
             var introSoundExpanded by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(
                 expanded = introSoundExpanded,
@@ -196,7 +208,13 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             }
         }
 
-        ExpandableSection("Display") {
+        ExpandableSection(
+            "Display",
+            summary = buildList {
+                if (state.showTestNotes) add("Test notes shown")
+                if (state.keySignatureMode == 1) add("Key signature")
+            }.let { if (it.isEmpty()) "Off" else it.joinToString(", ") }
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(
                     checked = state.showTestNotes,
@@ -213,7 +231,7 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             }
         }
 
-        ExpandableSection("Exercise") {
+        ExpandableSection("Exercise", summary = "${state.maxRetries} retries, ${state.noteRetries} same-note") {
             SectionLabel("Max Retries")
             Text("Attempts per test before moving on", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 6.dp))
@@ -234,7 +252,10 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             )
         }
 
-        ExpandableSection("Timing") {
+        ExpandableSection(
+            "Timing",
+            summary = "${state.postChordGapMs}ms gap, ${wrongPauseOptions.firstOrNull { it.first == state.wrongNotePauseMs }?.second ?: "3s"} pause"
+        ) {
             SectionLabel("Pause Before Playing")
             Text("Gap between chord and test sequence (${state.postChordGapMs}ms)",
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -260,7 +281,10 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
 
         GroupHeader("Advanced")
 
-        ExpandableSection("Pitch Detection") {
+        ExpandableSection(
+            "Pitch Detection",
+            summary = "Sensitivity ${((0.011f - state.silenceThreshold) / 0.001f).roundToInt().coerceIn(1, 10)}/10"
+        ) {
             SectionLabel("Mic Sensitivity")
             val sensitivity = ((0.011f - state.silenceThreshold) / 0.001f).roundToInt().coerceIn(1, 10)
             Text("${sensitivity} / 10",

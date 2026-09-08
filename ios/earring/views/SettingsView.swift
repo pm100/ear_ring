@@ -31,6 +31,10 @@ struct SettingsView: View {
     @State private var expandTiming = false
     @State private var expandPitchDetection = false
 
+    private var sensitivity: Int {
+        min(10, max(1, Int(((0.011 - Double(model.silenceThreshold)) / 0.001).rounded())))
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -51,7 +55,7 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.bottom, 4)
-                } label: { sectionHeader("Instrument") }
+                } label: { sectionHeader("Instrument", summary: currentInstrumentName, expanded: expandInstrument) }
 
                 DisclosureGroup(isExpanded: $expandPlayback) {
                     sectionLabel("Tempo (BPM)").padding(.top, 8)
@@ -60,7 +64,7 @@ struct SettingsView: View {
                              count: bpmOptions.count) { idx in
                         model.tempoBpm = bpmOptions[idx]
                     }
-                } label: { sectionHeader("Playback") }
+                } label: { sectionHeader("Playback", summary: "\(model.tempoBpm) BPM", expanded: expandPlayback) }
 
                 DisclosureGroup(isExpanded: $expandSound) {
                     Toggle(isOn: Binding(
@@ -83,7 +87,13 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.bottom, 4)
-                } label: { sectionHeader("Sound") }
+                } label: {
+                    sectionHeader(
+                        "Sound",
+                        summary: "\(introSoundOptions[model.introSoundMode]) intro, chime \(model.playPassFailSounds ? "on" : "off")",
+                        expanded: expandSound
+                    )
+                }
 
                 DisclosureGroup(isExpanded: $expandDisplay) {
                     Toggle(isOn: Binding(
@@ -98,7 +108,18 @@ struct SettingsView: View {
                     )) {
                         Text("Use Key Signature")
                     }
-                } label: { sectionHeader("Display") }
+                } label: {
+                    sectionHeader(
+                        "Display",
+                        summary: {
+                            var flags: [String] = []
+                            if model.showTestNotes { flags.append("Test notes shown") }
+                            if model.keySignatureMode == 1 { flags.append("Key signature") }
+                            return flags.isEmpty ? "Off" : flags.joined(separator: ", ")
+                        }(),
+                        expanded: expandDisplay
+                    )
+                }
 
                 DisclosureGroup(isExpanded: $expandExercise) {
                     sectionLabel("Max Retries").padding(.top, 8)
@@ -118,7 +139,7 @@ struct SettingsView: View {
                              count: noteRetryOptions.count) { idx in
                         model.noteRetries = noteRetryOptions[idx]
                     }
-                } label: { sectionHeader("Exercise") }
+                } label: { sectionHeader("Exercise", summary: "\(model.maxRetries) retries, \(model.noteRetries) same-note", expanded: expandExercise) }
 
                 DisclosureGroup(isExpanded: $expandTiming) {
                     sectionLabel("Pause Before Playing").padding(.top, 8)
@@ -137,13 +158,18 @@ struct SettingsView: View {
                              count: wrongPauseOptions.count) { idx in
                         model.wrongNotePauseNanoseconds = wrongPauseOptions[idx].0
                     }
-                } label: { sectionHeader("Timing") }
+                } label: {
+                    sectionHeader(
+                        "Timing",
+                        summary: "\(model.postChordGapNanoseconds / 1_000_000)ms gap, \(wrongPauseOptions.first(where: { $0.0 == model.wrongNotePauseNanoseconds })?.1 ?? "3s") pause",
+                        expanded: expandTiming
+                    )
+                }
 
                 groupHeader("Advanced")
 
                 DisclosureGroup(isExpanded: $expandPitchDetection) {
                     sectionLabel("Mic Sensitivity").padding(.top, 8)
-                    let sensitivity = min(10, max(1, Int(((0.011 - Double(model.silenceThreshold)) / 0.001).rounded())))
                     Text("Sensitivity: \(sensitivity) / 10")
                         .font(.caption).foregroundColor(.erMuted).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 4)
                     Slider(value: Binding(
@@ -168,7 +194,7 @@ struct SettingsView: View {
                              count: warmupOptions.count) { idx in
                         model.warmupFrames = warmupOptions[idx]
                     }
-                } label: { sectionHeader("Pitch Detection") }
+                } label: { sectionHeader("Pitch Detection", summary: "Sensitivity \(sensitivity)/10", expanded: expandPitchDetection) }
 
                 Spacer(minLength: 32)
 
@@ -204,6 +230,10 @@ struct SettingsView: View {
         }
     }
 
+    private var currentInstrumentName: String {
+        instruments.first(where: { $0.id == model.instrumentIndex })?.name ?? "Piano"
+    }
+
     private func loadInstruments() {
         guard let json = try? JSONSerialization.jsonObject(with: Data(EarRingCore.instrumentList().utf8)),
               let arr = json as? [[String: Any]] else {
@@ -231,11 +261,18 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title.uppercased())
-            .font(.caption.weight(.bold))
-            .foregroundColor(.erPrimary)
-            .padding(.vertical, 8)
+    private func sectionHeader(_ title: String, summary: String? = nil, expanded: Bool) -> some View {
+        HStack(spacing: 4) {
+            Text(title.uppercased())
+                .font(.caption.weight(.bold))
+                .foregroundColor(.erPrimary)
+            if !expanded, let summary {
+                Text("· \(summary)")
+                    .font(.caption)
+                    .foregroundColor(.erMuted)
+            }
+        }
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder

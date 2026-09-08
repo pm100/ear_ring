@@ -21,17 +21,23 @@ function GroupHeader({ children }: { children: React.ReactNode }) {
   return <h2 style={{ fontSize: 13, fontWeight: 700, color: '#212121', textTransform: 'uppercase', letterSpacing: 1.5, margin: '24px 0 4px', borderBottom: '2px solid #e0e0e0', paddingBottom: 4 }}>{children}</h2>;
 }
 
-/** Collapsible section — starts collapsed; click the header to toggle. */
-function CollapsibleSection({ title, children }: { title: string; children: React.ReactNode }) {
+/** Collapsible section — starts collapsed; click the header to toggle. Shows a muted
+ *  value summary next to the title while collapsed, when `summary` is given. */
+function CollapsibleSection({ title, summary, children }: { title: string; summary?: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ borderBottom: '1px solid #eee' }}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: '10px 0', cursor: 'pointer', fontSize: 14, fontWeight: 700, color: '#757575', textTransform: 'uppercase', letterSpacing: 1 }}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: '10px 0', cursor: 'pointer' }}
       >
-        {title}
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#757575', textTransform: 'uppercase', letterSpacing: 1 }}>
+          {title}
+          {!open && summary && (
+            <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: '#9e9e9e' }}> · {summary}</span>
+          )}
+        </span>
         <span style={{ fontSize: 12, color: '#9e9e9e', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>▶</span>
       </button>
       {open && <div style={{ paddingBottom: 12 }}>{children}</div>}
@@ -76,7 +82,10 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
 
       <GroupHeader>User</GroupHeader>
 
-      <CollapsibleSection title="Instrument">
+      <CollapsibleSection
+        title="Instrument"
+        summary={`${instruments.find(i => i.id === settings.instrumentIndex)?.name ?? 'Piano'}, ${settings.tempoBpm} BPM`}
+      >
         <span className="section-label" style={{ marginTop: 0 }}>Instrument</span>
         <select
           value={settings.instrumentIndex}
@@ -104,7 +113,7 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
         </div>
       </CollapsibleSection>
 
-      <CollapsibleSection title="Sound">
+      <CollapsibleSection title="Sound" summary={`${INTRO_SOUND_OPTIONS[settings.introSoundMode]} intro, chime ${settings.playPassFailSounds ? 'on' : 'off'}`}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginTop: 0 }}>
           <input
             type="checkbox"
@@ -129,7 +138,14 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
         </select>
       </CollapsibleSection>
 
-      <CollapsibleSection title="Display">
+      <CollapsibleSection
+        title="Display"
+        summary={
+          [settings.showTestNotes && 'Test notes shown', settings.keySignatureMode === 1 && 'Key signature']
+            .filter(Boolean)
+            .join(', ') || 'Off'
+        }
+      >
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginTop: 0 }}>
           <input
             type="checkbox"
@@ -150,7 +166,7 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
         </label>
       </CollapsibleSection>
 
-      <CollapsibleSection title="Exercise">
+      <CollapsibleSection title="Exercise" summary={`${settings.maxRetries} retries, ${settings.noteRetries} same-note`}>
         <span className="section-label" style={{ marginTop: 0 }}>Max Retries</span>
         <p style={{ fontSize: 12, color: '#757575', marginBottom: 6 }}>Attempts per test before moving on</p>
         <div className="chip-row">
@@ -172,7 +188,10 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
         </div>
       </CollapsibleSection>
 
-      <CollapsibleSection title="Timing">
+      <CollapsibleSection
+        title="Timing"
+        summary={`${settings.postChordGapMs}ms gap, ${WRONG_PAUSE_OPTIONS.find(o => o.value === settings.wrongNotePauseMs)?.label ?? '3s'} pause`}
+      >
         <span className="section-label" style={{ marginTop: 0 }}>Pause Before Singing</span>
         <p style={{ fontSize: 12, color: '#757575', marginBottom: 6 }}>Gap between chord and test sequence (ms)</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -196,7 +215,7 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
 
       <GroupHeader>Advanced</GroupHeader>
 
-      <CollapsibleSection title="Pitch Detection">
+      <CollapsibleSection title="Pitch Detection" summary={`Sensitivity ${Math.round((0.011 - settings.silenceThreshold) / 0.001)}/10`}>
         <span className="section-label" style={{ marginTop: 0 }}>Mic Sensitivity</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <input type="range" min={1} max={10} step={1}
