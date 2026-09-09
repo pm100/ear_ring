@@ -370,20 +370,26 @@ pub extern "C" fn ear_ring_shuffle_melody_indices(seed: u64, out_buf: *mut c_uch
 }
 
 /// Convert melody snippet at `index` to MIDI notes + durations for `root_chroma`.
-/// out_midi and out_dur must each be at least melody_max_notes bytes / floats.
-/// Returns note count written, or -1 on error.
+/// out_midi and out_dur must each be at least `capacity` bytes / floats — the
+/// caller's actual allocated length, not an assumed constant. Returns note count
+/// written, or -1 on error, INCLUDING when the melody is longer than `capacity`
+/// (issue #24 — this used to write `midi_notes.len()` elements regardless of the
+/// caller's real buffer size, corrupting memory on any melody longer than the
+/// iOS caller's fixed 32-note buffer).
 #[no_mangle]
 pub extern "C" fn ear_ring_pick_melody_by_index(
     index: c_uchar,
     root_chroma: c_uchar,
     out_midi: *mut c_uchar,
     out_dur: *mut c_float,
+    capacity: c_int,
 ) -> c_int {
-    if out_midi.is_null() || out_dur.is_null() { return -1; }
+    if out_midi.is_null() || out_dur.is_null() || capacity < 0 { return -1; }
     match melody_to_midi_by_index(index, root_chroma) {
         None => -1,
         Some((midi_notes, durations)) => {
             let n = midi_notes.len();
+            if n > capacity as usize { return -1; }
             let midi_out = unsafe { std::slice::from_raw_parts_mut(out_midi, n) };
             let dur_out = unsafe { std::slice::from_raw_parts_mut(out_dur, n) };
             for i in 0..n {
@@ -1532,5 +1538,60 @@ mod android_jni {
             env.set_int_array_region(&arr, 0, &[min as jint, max as jint]).unwrap();
         }
         arr.into_raw()
+    }
+}
+
+#[cfg(test)]
+mod ffi_tests {
+    use super::*;
+
+    // Issue #24: ear_ring_pick_melody_by_index used to write midi_notes.len()
+    // elements into the caller's buffer with no regard for how large that
+    // buffer actually was — a too-small capacity meant an out-of-bounds write.
+    // These exercise the raw FFI boundary directly (unsafe, matching how a real
+    // C/Swift caller invokes it) rather than the safe melody_to_midi_by_index
+    // core it wraps.
+
+    #[test]
+    fn pick_melody_by_index_fits_when_capacity_is_sufficient() {
+        assert!(melody_count() > 0, "test needs at least one melody in the library");
+        let (expected_midi, _) = melody_to_midi_by_index(0, 0).expect("melody 0 exists");
+        let n = expected_midi.len();
+
+        let mut out_midi = vec![0u8; n];
+        let mut out_dur = vec![0f32; n];
+        let written =
+            ear_ring_pick_melody_by_index(0, 0, out_midi.as_mut_ptr(), out_dur.as_mut_ptr(), n as c_int);
+
+        assert_eq!(written, n as c_int);
+        assert_eq!(&out_midi[..], &expected_midi[..]);
+    }
+
+    #[test]
+    fn pick_melody_by_index_rejects_undersized_capacity_without_overflow() {
+        let (expected_midi, _) = melody_to_midi_by_index(0, 0).expect("melody 0 exists");
+        let n = expected_midi.len();
+        assert!(n > 0, "test needs a non-empty melody");
+
+        // Buffer sized one short of what the melody actually needs — allocated
+        // at exactly `n - 1` so ASan/Miri-style tooling (and a real overflow)
+        // would catch any write past it, not just an assertion after the fact.
+        let capacity = n - 1;
+        let mut out_midi = vec![0u8; capacity];
+        let mut out_dur = vec![0f32; capacity];
+        let written =
+            ear_ring_pick_melody_by_index(0, 0, out_midi.as_mut_ptr(), out_dur.as_mut_ptr(), capacity as c_int);
+
+        assert_eq!(written, -1, "must refuse to write when the melody exceeds the caller's capacity");
+    }
+
+    #[test]
+    fn pick_melody_by_index_rejects_negative_capacity() {
+        let mut out_midi = vec![0u8; 1];
+        let mut out_dur = vec![0f32; 1];
+        let written =
+            ear_ring_pick_melody_by_index(0, 0, out_midi.as_mut_ptr(), out_dur.as_mut_ptr(), -1);
+
+        assert_eq!(written, -1, "a negative capacity must not bypass the bounds check via usize wraparound");
     }
 }

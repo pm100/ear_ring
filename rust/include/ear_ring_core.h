@@ -246,10 +246,12 @@ uint32_t ear_ring_melody_count(void);
 int32_t ear_ring_shuffle_melody_indices(uint64_t seed, uint8_t *out_buf);
 
 /// Convert melody snippet at `index` to MIDI notes + durations for `root_chroma`.
-/// out_midi and out_dur must each be at least 32 bytes / floats.
-/// Returns note count written, or -1 on error.
+/// out_midi and out_dur must each be at least `capacity` bytes / floats — the
+/// caller's actual allocated length, not an assumed constant. Returns note count
+/// written, or -1 on error, INCLUDING when the melody is longer than `capacity`.
 int32_t ear_ring_pick_melody_by_index(uint8_t index, uint8_t root_chroma,
-                                       uint8_t *out_midi, float *out_dur);
+                                       uint8_t *out_midi, float *out_dur,
+                                       int32_t capacity);
 
 // ── PitchTracker ─────────────────────────────────────────────────────────────
 // Opaque stateful tracker. Create once, feed audio buffers, react to the

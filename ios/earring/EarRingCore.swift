@@ -214,10 +214,14 @@ struct EarRingCore {
     }
 
     static func pickMelodyByIndex(index: Int, rootChroma: Int) -> (midi: [Int], durations: [Float])? {
+        // Passed through to Rust as the actual buffer capacity (issue #24) — the FFI
+        // now refuses to write past it instead of trusting midi_notes.len() blindly,
+        // so a melody longer than maxNotes fails cleanly (count <= 0) rather than
+        // corrupting memory past midiBuf/durBuf.
         let maxNotes = 32
         var midiBuf = [UInt8](repeating: 0, count: maxNotes)
         var durBuf = [Float](repeating: 0, count: maxNotes)
-        let count = ear_ring_pick_melody_by_index(UInt8(index), UInt8(rootChroma), &midiBuf, &durBuf)
+        let count = ear_ring_pick_melody_by_index(UInt8(index), UInt8(rootChroma), &midiBuf, &durBuf, Int32(maxNotes))
         guard count > 0 else { return nil }
         let n = Int(count)
         return (midiBuf.prefix(n).map { Int($0) }, Array(durBuf.prefix(n)))
