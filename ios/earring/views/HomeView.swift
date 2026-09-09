@@ -82,9 +82,15 @@ struct OutlinedButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - Error (red filled) button
+// Legacy alias so existing call-sites compile unchanged
+typealias SecondaryButtonStyle = OutlinedButtonStyle
 
-struct ErrorButtonStyle: ButtonStyle {
+// MARK: - Tonal button
+// A light-filled secondary style, for pairing next to a PrimaryButtonStyle
+// sibling (e.g. Exercise's Repeat next to Stop Testing) where a bare outline
+// reads as the "colorless"/lesser one instead of a deliberate secondary
+// action. Same fill as Android's primaryContainer (Indigo 50, #E8EAF6).
+struct TonalButtonStyle: ButtonStyle {
     var height: CGFloat = 52
     var fontSize: CGFloat = 17
 
@@ -92,15 +98,12 @@ struct ErrorButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: fontSize, weight: .semibold))
             .frame(maxWidth: .infinity, minHeight: height)
-            .background(RoundedRectangle(cornerRadius: 12).fill(Color.erError))
-            .foregroundColor(.white)
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color(red: 0.910, green: 0.918, blue: 0.965)))
+            .foregroundColor(.erPrimary)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
-
-// Legacy alias so existing call-sites compile unchanged
-typealias SecondaryButtonStyle = OutlinedButtonStyle
 
 // MARK: - Card modifier (kept for any callers that need it)
 

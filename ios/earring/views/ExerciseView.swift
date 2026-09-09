@@ -148,15 +148,28 @@ struct ExerciseView: View {
             Button("↻ Repeat") {
                 model.repeatCurrentTest()
             }
-            .buttonStyle(OutlinedButtonStyle(height: 52, fontSize: 17))
+            // Tonal (light-filled), not bare outline — next to Stop Testing's solid
+            // fill, a plain outline read as the "colorless"/lesser button rather than
+            // a deliberate secondary action.
+            .buttonStyle(TonalButtonStyle(height: 52, fontSize: 17))
             .disabled(model.status != .listening)
 
-            Button("⏹ Stop Testing") {
+            // "■" (Geometric Shapes, same family as "▶" on Home's Start Exercise), not
+            // "⏹" (Miscellaneous Technical), which renders as a colour emoji by default —
+            // an outlier next to Repeat's plain "↻".
+            //
+            // PrimaryButtonStyle, not ErrorButtonStyle — stopping a test is a normal,
+            // reversible navigation action (it saves the session, same as leaving any
+            // other way), not a destructive one like Settings' Reset to Defaults or
+            // Progress' Clear All Progress. Red here was also a real accessibility
+            // problem: a colour-blind (red/green) user can't distinguish it from Start
+            // Exercise's intent by colour alone, and it wrongly signals danger.
+            Button("■ Stop Testing") {
                 model.stopExerciseSession()
                 progressModel.reload()
                 path = NavigationPath()
             }
-            .buttonStyle(ErrorButtonStyle(height: 52, fontSize: 17))
+            .buttonStyle(PrimaryButtonStyle(height: 52, fontSize: 17))
         }
     }
 
@@ -207,10 +220,10 @@ struct ExerciseView: View {
             metaText
             Spacer().frame(height: 16)
             HStack { Spacer(); pitchMeter; Spacer() }
-            Spacer().frame(height: 24)
-            stopButton
             Spacer().frame(height: 20)
             currentAttemptRow
+            Spacer().frame(height: 24)
+            stopButton
             Spacer()
         }
         .padding(.horizontal, 16)

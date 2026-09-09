@@ -207,7 +207,7 @@ ios-device: _ios-version _ios-keychain-unlock
 # Requires macOS + Xcode. No code signing needed (simulator builds are unsigned),
 # so this doesn't depend on _ios-keychain-unlock. Boots the simulator (and opens
 # Simulator.app so you can see it) if it isn't already running. Defaults to
-# "iPhone 16" — override with IOS_SIMULATOR_NAME=<name> (see available names/UDIDs
+# "iPhone 17" — override with IOS_SIMULATOR_NAME=<name> (see available names/UDIDs
 # via `xcrun simctl list devices available`) or IOS_SIMULATOR_UDID=<udid> directly.
 [doc("Build + install + launch on the iOS Simulator — macOS only")]
 ios-sim: _ios-version
@@ -217,8 +217,10 @@ ios-sim: _ios-version
     if [ -n "${IOS_SIMULATOR_UDID:-}" ]; then
       UDID="$IOS_SIMULATOR_UDID"
     else
-      NAME="${IOS_SIMULATOR_NAME:-iPhone 16}"
-      UDID=$(xcrun simctl list devices available | awk -F'[()]' -v name="$NAME" '$0 ~ name {print $2; exit}')
+      NAME="${IOS_SIMULATOR_NAME:-iPhone 17}"
+      # Match the device name exactly (not as a substring) so "iPhone 17" doesn't
+      # accidentally match "iPhone 17 Pro" / "iPhone 17 Pro Max", which sort first.
+      UDID=$(xcrun simctl list devices available | awk -F'[()]' -v name="$NAME" '{n=$1; sub(/^ +/,"",n); sub(/ +$/,"",n)} n == name {print $2; exit}')
       if [ -z "$UDID" ]; then
         echo "Simulator '$NAME' not found. List available with: xcrun simctl list devices available" >&2
         echo "Override with IOS_SIMULATOR_NAME=... or IOS_SIMULATOR_UDID=..." >&2

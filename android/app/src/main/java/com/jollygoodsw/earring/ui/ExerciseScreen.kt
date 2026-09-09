@@ -195,28 +195,6 @@ fun ExerciseScreen(
             detectedHz = liveHz
         )
 
-        Spacer(Modifier.height(24.dp))
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            OutlinedButton(
-                onClick = { viewModel.repeatCurrentTest() },
-                enabled = state.status == ExerciseStatus.LISTENING,
-                modifier = Modifier.weight(1f).height(52.dp)
-            ) {
-                Text("↻ Repeat", fontSize = 17.sp)
-            }
-            Button(
-                onClick = { exitSession() },
-                modifier = Modifier.weight(1f).height(52.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-            ) {
-                Text("⏹ Stop Testing", color = MaterialTheme.colorScheme.onErrorContainer, fontSize = 17.sp)
-            }
-        }
-
         if (state.detected.isNotEmpty()) {
             Spacer(Modifier.height(20.dp))
             Text(
@@ -235,6 +213,39 @@ fun ExerciseScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            OutlinedButton(
+                onClick = { viewModel.repeatCurrentTest() },
+                enabled = state.status == ExerciseStatus.LISTENING,
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ),
+                modifier = Modifier.weight(1f).height(52.dp)
+            ) {
+                Text("↻ Repeat", fontSize = 17.sp)
+            }
+            Button(
+                onClick = { exitSession() },
+                // Default (primary-filled) colors, not error/danger red — stopping a test
+                // is a normal, reversible navigation action (it saves the session, same as
+                // leaving any other way), not a destructive one like Reset to Defaults or
+                // Clear All Progress. Red here was also a real accessibility problem: a
+                // colour-blind (red/green) user can't distinguish it from Start Exercise's
+                // intent by colour alone, and it wrongly signals danger for a safe action.
+                modifier = Modifier.weight(1f).height(52.dp)
+            ) {
+                // "■" (Geometric Shapes, same block as "▶" on Start Exercise), not "⏹"
+                // (Miscellaneous Technical), which renders as a colour emoji by default —
+                // an outlier next to Repeat's plain "↻" and Start's plain "▶".
+                Text("■ Stop Testing", fontSize = 17.sp)
             }
         }
     }

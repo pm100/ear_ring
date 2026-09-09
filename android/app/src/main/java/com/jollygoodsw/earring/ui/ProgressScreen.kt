@@ -175,9 +175,11 @@ fun ProgressScreen(
         Button(
             onClick = { showClearConfirm = true },
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            // .error/.onError — see ExerciseScreen.kt's Stop Testing button for why not
+            // the errorContainer/onErrorContainer pair (issue #30).
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
         ) {
-            Text("Clear All Progress", color = MaterialTheme.colorScheme.onErrorContainer)
+            Text("Clear All Progress", color = MaterialTheme.colorScheme.onError)
         }
 
         Spacer(Modifier.height(16.dp))

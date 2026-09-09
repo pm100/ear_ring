@@ -270,21 +270,43 @@ Meta line             — bodyMedium, muted colour, centred
 [16dp space]
 PitchMeter            — 90dp circle (see Pitch Meter spec below)
 
-[24dp space]
-[⏹ Stop Testing]      — full-width filled ERROR colour, 52dp, 17sp — **all platforms**
-  - On Android & iOS, the system back gesture/button also ends the session (same
-    exit path as the on-screen button) — but the on-screen button is shown too,
-    since it's not obvious from the UI that back-navigation exits an active test
-  - Ends the continuous testing session immediately
-  - Returns the user to Home
-  - Saves the session summary if at least one test was completed
-
 [20dp space]
 Current attempt row (if one or more notes were detected this attempt):
   Label: "Current attempt"
   Render played note labels only
   Correct labels: green
   Wrong labels: red
+  - Sits ABOVE the button row (not below it) — feedback on what was just played
+    reads before the controls, not after (fixed during the UI review, issue #30)
+
+[24dp space]
+[↻ Repeat] [■ Stop Testing]   — button row, 52dp tall, 17sp, equal width — **all platforms**
+  - Repeat: TONAL fill (light tint of primary, e.g. Indigo 50 #E8EAF6 / Android
+    primaryContainer), primary-coloured text/icon, no border. Enabled only while
+    LISTENING. Replays the current test without counting against attempts.
+  - Stop Testing: full-width filled PRIMARY colour (same as Start Exercise)
+  - Repeat is tonal rather than a bare outline specifically because it sits next
+    to Stop Testing's solid fill — a plain outline next to a solid button reads as
+    the "colorless"/lesser one rather than a deliberate secondary action (fixed
+    during the UI review, issue #30)
+  - "■" (Geometric Shapes, same block as "▶" on Home's Start Exercise), not "⏹"
+    (Miscellaneous Technical) — the latter renders as a colour emoji by default on
+    most platforms, an outlier next to "▶" and Repeat's "↻" (Arrows), both plain
+    monochrome glyphs with no emoji presentation (fixed during the UI review,
+    issue #30)
+  - Stop Testing is filled with the app's primary colour (matching Start
+    Exercise), NOT the danger red used for Settings' Reset to Defaults or
+    Progress' Clear All Progress — stopping a test is a normal, reversible action
+    (it saves the session), not a destructive one, and red here also failed for
+    red/green colour-blind users, who couldn't distinguish it from a normal action
+    by colour alone (fixed during the UI review, issue #30 — an earlier pass had
+    mistakenly given it error styling)
+  - On Android & iOS, the system back gesture/button also ends the session (same
+    exit path as the on-screen Stop Testing button) — but the on-screen button is
+    shown too, since it's not obvious from the UI that back-navigation exits an
+    active test
+  - Stop Testing ends the continuous testing session immediately, returns the
+    user to Home, and saves the session summary if at least one test was completed
 ```
 
 Exercise dynamics:
@@ -1099,7 +1121,7 @@ just ios-device          # iOS — macOS only; builds Debug, installs + launches
 
 **Build and install on the iOS Simulator** (no device/USB needed, no code signing):
 ```powershell
-just ios-sim              # iOS — macOS only; builds Debug, boots "iPhone 16" sim, installs + launches
+just ios-sim              # iOS — macOS only; builds Debug, boots "iPhone 17" sim, installs + launches
                           # (override with IOS_SIMULATOR_NAME=<name> or IOS_SIMULATOR_UDID=<udid>)
 ```
 

@@ -563,21 +563,6 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         <PitchMeter hz={liveHz} />
       </div>
 
-      <div style={{ display: 'flex', gap: 10 }}>
-        <button
-          onClick={repeatCurrentTest}
-          disabled={status !== 'listening'}
-          style={{
-            flex: 1, height: 52, fontSize: 17, fontWeight: 600, borderRadius: 8, marginTop: 8,
-            background: 'none', border: '1.5px solid var(--primary)', color: 'var(--primary)',
-            cursor: status !== 'listening' ? 'default' : 'pointer', opacity: status !== 'listening' ? 0.38 : 1,
-          }}
-        >
-          {'\u21bb'} Repeat
-        </button>
-        <button className="btn-danger" onClick={stopSession} style={{ flex: 1 }}>{'\u23f9'} Stop Testing</button>
-      </div>
-
       {detected.length > 0 && (
         <div style={{ marginTop: 20 }}>
           <div className="note-tracker-label">Current attempt</div>
@@ -590,6 +575,43 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
           </div>
         </div>
       )}
+
+      <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+        {/* Tonal (light-filled), not bare outline \u2014 next to Stop Testing's solid
+            fill, a plain outline read as the "colorless"/lesser button rather than a
+            deliberate secondary action. Same fill as Android's primaryContainer
+            (Indigo 50, #E8EAF6). */}
+        <button
+          onClick={repeatCurrentTest}
+          disabled={status !== 'listening'}
+          style={{
+            flex: 1, height: 52, fontSize: 17, fontWeight: 600, borderRadius: 8,
+            background: '#E8EAF6', border: 'none', color: 'var(--primary)',
+            cursor: status !== 'listening' ? 'default' : 'pointer', opacity: status !== 'listening' ? 0.38 : 1,
+          }}
+        >
+          {'\u21bb'} Repeat
+        </button>
+        {/* '\u25a0' (Geometric Shapes, same family as '\u25b6' on Home's Start Exercise),
+            not '\u23f9' (Miscellaneous Technical), which renders as a colour emoji by
+            default in most browsers \u2014 an outlier next to Repeat's plain '\u21bb'.
+
+            Filled primary, not '.btn-danger' red \u2014 stopping a test is a normal,
+            reversible navigation action (it saves the session, same as leaving any
+            other way), not a destructive one like Settings' Reset to Defaults or
+            Progress' Clear All Progress. Red here was also a real accessibility
+            problem: a colour-blind (red/green) user can't distinguish it from Start
+            Exercise's intent by colour alone, and it wrongly signals danger. */}
+        <button
+          onClick={stopSession}
+          style={{
+            flex: 1, height: 52, fontSize: 17, fontWeight: 600, borderRadius: 8,
+            background: 'var(--primary)', border: 'none', color: 'white', cursor: 'pointer',
+          }}
+        >
+          {'\u25a0'} Stop Testing
+        </button>
+      </div>
     </div>
   );
 }
