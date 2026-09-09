@@ -85,11 +85,11 @@ struct SettingsView: View {
                             Text("Play Pass/Fail Sounds")
                         }
                         Text("A chime when a test is passed, a different tone when it fails")
-                            .font(.caption).foregroundColor(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
+                            .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
 
                         sectionLabel("Intro Sound").padding(.top, 8)
                         Text("What plays before each test")
-                            .font(.caption).foregroundColor(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
+                            .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
                         Picker("Intro Sound", selection: $model.introSoundMode) {
                             ForEach(introSoundOptions.indices, id: \.self) { idx in
                                 Text(introSoundOptions[idx]).tag(idx)
@@ -121,7 +121,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         sectionLabel("Max Retries").padding(.top, 8)
                         Text("Attempts per test before moving on")
-                            .font(.caption).foregroundColor(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
+                            .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
                         chipGrid(options: retryOptions.map { "\($0)" },
                                  selected: retryOptions.firstIndex(of: model.maxRetries) ?? 0,
                                  count: retryOptions.count) { idx in
@@ -130,7 +130,7 @@ struct SettingsView: View {
 
                         sectionLabel("Retry Same Note").padding(.top, 8)
                         Text("Tries allowed on a wrong note before the whole test restarts — each retry costs a few points (0 = off)")
-                            .font(.caption).foregroundColor(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
+                            .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
                         chipGrid(options: noteRetryOptions.map { "\($0)" },
                                  selected: noteRetryOptions.firstIndex(of: model.noteRetries) ?? 0,
                                  count: noteRetryOptions.count) { idx in
@@ -139,7 +139,7 @@ struct SettingsView: View {
 
                         sectionLabel("Pause Before Playing").padding(.top, 8)
                         Text("Gap between chord and test sequence: \(model.postChordGapNanoseconds / 1_000_000)ms")
-                            .font(.caption).foregroundColor(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 4)
+                            .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 4)
                         Slider(value: Binding(
                             get: { Double(model.postChordGapNanoseconds / 1_000_000) },
                             set: { model.postChordGapNanoseconds = UInt64($0) * 1_000_000 }
@@ -147,7 +147,7 @@ struct SettingsView: View {
 
                         sectionLabel("Wrong Note Pause").padding(.top, 8)
                         Text("How long to display a wrong note before replaying")
-                            .font(.caption).foregroundColor(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
+                            .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
                         chipGrid(options: wrongPauseOptions.map { $0.1 },
                                  selected: wrongPauseOptions.firstIndex(where: { $0.0 == model.wrongNotePauseNanoseconds }) ?? 0,
                                  count: wrongPauseOptions.count) { idx in
@@ -219,12 +219,12 @@ struct SettingsView: View {
         // Distinctly larger than the .caption explanatory text below each control
         // (matches Android's SectionLabel, which uses labelLarge vs a 12sp caption —
         // same-size text differing only by weight reads as near-identical at a glance).
-        // .secondary, not .erMuted — erMuted (#BDBDBD) is too pale for prompt text
-        // that's meant to be read, not just glanced at; matches Android's
-        // onSurfaceVariant, which is a dark, legible gray, not a light one.
+        // .erCaption, not .erMuted — erMuted (#BDBDBD) is too pale for prompt text
+        // that's meant to be read, not just glanced at; erCaption is a literal match
+        // for Android's onSurfaceVariant, which is a dark, legible gray.
         Text(text)
             .font(.subheadline.weight(.semibold))
-            .foregroundColor(.secondary)
+            .foregroundColor(.erCaption)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 6)
     }

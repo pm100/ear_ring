@@ -10,6 +10,13 @@ extension Color {
     static let erWarning = Color(red: 1.000, green: 0.596, blue: 0.000)  // #FF9800
     static let erMuted   = Color(red: 0.741, green: 0.741, blue: 0.741)  // #BDBDBD
     static let erDark    = Color(red: 0.129, green: 0.129, blue: 0.129)  // #212121
+    // Matches Android's Material3 onSurfaceVariant default (#49454F) exactly, for
+    // labels/captions/status text that must stay legible — erMuted (#BDBDBD) is a
+    // light gray meant for borders/icons/idle-state visuals, not text meant to be
+    // read; SwiftUI's semantic .secondary renders noticeably lighter than Android's
+    // onSurfaceVariant on this app's background, so a literal color match is used
+    // here instead of relying on it.
+    static let erCaption = Color(red: 0.286, green: 0.271, blue: 0.310)  // #49454F
 }
 
 // MARK: - Chip style (selected = filled primary, unselected = outlined primary)

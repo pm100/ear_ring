@@ -83,7 +83,7 @@ struct SetupView: View {
             Spacer().frame(height: 12)
             sectionLabel("Mic Sensitivity")
             Text("\(sensitivity) / 10")
-                .font(.caption).foregroundColor(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 4)
+                .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 4)
             Slider(value: Binding(
                 get: { Double(sensitivity) },
                 set: { model.silenceThreshold = Float(max(0.001, min(0.010, 0.011 - $0 * 0.001))) }
@@ -151,12 +151,12 @@ struct SetupView: View {
 
     @ViewBuilder
     private func sectionLabel(_ text: String) -> some View {
-        // .secondary, not .erMuted — erMuted (#BDBDBD) is too pale for prompt text
-        // that's meant to be read, not just glanced at; matches Android's
-        // onSurfaceVariant, which is a dark, legible gray, not a light one.
+        // .erCaption, not .erMuted — erMuted (#BDBDBD) is too pale for prompt text
+        // that's meant to be read, not just glanced at; erCaption is a literal match
+        // for Android's onSurfaceVariant, which is a dark, legible gray.
         Text(text)
             .font(.subheadline.weight(.semibold))
-            .foregroundColor(.secondary)
+            .foregroundColor(.erCaption)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 6)
     }
