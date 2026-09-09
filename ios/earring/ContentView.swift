@@ -2,7 +2,6 @@ import SwiftUI
 
 enum AppRoute: Hashable {
     case exercise
-    case results
 }
 
 extension View {
@@ -114,13 +113,8 @@ struct HomeTabView: View {
     var body: some View {
         NavigationStack(path: $path) {
             HomeView(path: $path)
-                .navigationDestination(for: AppRoute.self) { route in
-                    switch route {
-                    case .exercise:
-                        ExerciseView(path: $path)
-                    case .results:
-                        ResultsView(path: $path)
-                    }
+                .navigationDestination(for: AppRoute.self) { _ in
+                    ExerciseView(path: $path)
                 }
         }
         .tint(.indigo)

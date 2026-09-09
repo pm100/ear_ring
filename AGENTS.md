@@ -103,6 +103,12 @@ The primary navigation is visible on every screen except Exercise.
 | 3 | Settings | ⚙️ (Gear / settings) |
 | 4 | Help | ❓ (Help / question mark) |
 
+All five icons render at the same solid/filled weight — e.g. Android uses
+`Icons.Filled.BarChart` for Progress, not `Icons.AutoMirrored.Filled.ShowChart`,
+whose thin zigzag-line glyph reads as hairline next to the other four tabs' solid
+shapes despite nominally being from the same "Filled" icon family (fixed during
+the UI review, issue #30 — check this each time a tab icon changes).
+
 - The bottom bar/sidebar is **hidden** during Exercise (Exercise is a push route on the Home stack, not a tab).
 - Tapping a tab/sidebar item always navigates to that destination's root screen (not a sub-page of it).
 - The previously separate "Mic Setup" and "Progress" buttons on the Home screen are removed; they are accessed via tabs.
@@ -111,19 +117,24 @@ The primary navigation is visible on every screen except Exercise.
 
 ## Screen Inventory
 
-Every platform must implement all 7 screens:
+Every platform must implement all 6 screens:
 
 | Screen | Navigation trigger |
 |--------|--------------------|
 | Home | App launch / leaving Exercise via Back or Stop; Home tab/sidebar item |
 | Exercise | "Start Exercise" button on Home — push route (no primary navigation) |
 | Mic Setup | Mic tab/sidebar item |
-| Results | Reserved legacy screen; **not shown during continuous testing mode** |
 | Progress | Progress tab/sidebar item |
 | Settings | Settings tab/sidebar item |
 | Help | Help tab/sidebar item |
 
-Back navigation must work on Exercise (and Results if reached):
+(A separate "Results" screen — a post-test score summary with Try Again/New
+Exercise/View Progress buttons — existed on all 3 platforms but was pure dead
+code: nothing ever navigated to it, on any platform, since Exercise became a
+continuous hands-free loop that only exits via Stop/Back. Deleted during the
+UI review, issue #30, rather than continuing to carry unreachable code.)
+
+Back navigation must work on Exercise:
 - **Android & iOS**: system back gesture only — no on-screen "← Back" button.
 - **Desktop/Tauri**: on-screen "← Back" button (no system back gesture available).
 
@@ -370,7 +381,6 @@ Exercise control flow (canonical state machine):
 6. **Stopping**
    - `Stop Testing`, on-screen Back, or system Back ends the continuous session immediately.
    - If one or more tests were completed, persist the session summary plus per-test history to local storage before returning Home.
-   - Do **not** navigate to Results as part of this flow.
 
 ---
 
@@ -453,45 +463,6 @@ everywhere else these values are edited — Android reads/writes them through th
 `SettingsScreen`); iOS reads/writes `ExerciseModel`'s `@Published` properties directly (this
 screen already holds an `@EnvironmentObject` reference to it); desktop takes a new
 `onUpdateSettings` callback prop, matching `SettingsScreen`'s.
-
----
-
-### Results Screen
-
-This screen remains in the codebase for compatibility, but it is **not** used by the continuous testing flow above.
-
-Layout: vertically scrollable column, 16dp padding, centred.
-
-```
-[32dp space]
-Score emoji           — 64sp   (🏆 100% | 🎉 ≥80% | 👍 ≥50% | 💪 <50%)
-Score percentage      — 56sp bold, colour-coded
-  ≥80% → green (#4CAF50)
-  ≥50% → orange (#FF9800)
-  <50%  → red (#F44336)
-"Score"               — titleMedium, muted
-[8dp space]
-"RootNoteOctave  ScaleName"   — bodyLarge
-
-[24dp space]
-Divider
-
-[16dp space]
-"Note by Note"        — titleMedium, semibold
-
-For each note (index, expectedLabel, detectedLabel, correct):
-  Row:  "N."  |  "Expected: X"  |  "Played: Y"  |  ✓/✗/—
-  ✓ = green, ✗ = red, — = muted (not attempted)
-  Divider between rows (muted colour)
-
-[28dp space]
-[🔄 Try Again]        — full-width filled, 52dp, 17sp
-[🏠 New Exercise]     — full-width outlined, 48dp, 16sp
-[📊 View Progress]    — full-width outlined, 48dp, 16sp
-[16dp space]
-```
-
-Do not rely on this screen for persistence in continuous testing mode.
 
 ---
 
@@ -801,8 +772,8 @@ Circular widget, **90dp/px diameter**.
 |-------|-------|-------|
 | Primary | #3F51B5 (indigo) | Buttons, selected chips, active notes, ACTIVE note state |
 | Success / Correct | #4CAF50 (green) | Correct notes, pitch meter ring when active |
-| Error / Incorrect | #F44336 (red) | Wrong notes, Stop Listening button |
-| Warning | #FF9800 (orange) | Mid-range score on Results screen |
+| Error / Incorrect | #F44336 (red) | Wrong notes, destructive actions (Clear All Progress, Reset to Defaults) — NOT Stop Testing, which is neutral primary (see Exercise Screen) |
+| Warning | #FF9800 (orange) | Mid-range score badges on Progress screen |
 | Surface text | #333333 | Staff lines, expected note heads |
 | Muted text | #BDBDBD / onSurfaceVariant | Labels, secondary text, pitch meter when idle |
 
@@ -916,7 +887,7 @@ Every individual completed test must also be stored locally as history for futur
 Persistence rules:
 - Save a `TestRecord` every time a test ends, whether passed or failed.
 - Save the session summary when the user stops/leaves Exercise after completing at least one test.
-- Continuous testing mode does **not** show Results before persistence; users later inspect outcomes from Home -> Progress.
+- Continuous testing mode has no post-test summary screen; users inspect outcomes from Home -> Progress.
 
 Streak = number of consecutive calendar days with at least one session.
 

@@ -3,7 +3,7 @@ package com.jollygoodsw.earring.ui
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
-import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
@@ -26,7 +26,6 @@ object Routes {
     const val HOME = "home"
     const val EXERCISE = "exercise"
     const val SETUP = "setup"
-    const val RESULTS = "results"
     const val PROGRESS = "progress"
     const val SETTINGS = "settings"
     const val HELP = "help"
@@ -90,7 +89,11 @@ fun EarRingApp() {
                                 restoreState = true
                             }
                         },
-                        icon = { Icon(Icons.AutoMirrored.Filled.ShowChart, contentDescription = "Progress") },
+                        // Filled.BarChart, not AutoMirrored.Filled.ShowChart — ShowChart's
+                        // thin zigzag-line glyph reads as hairline next to the other four
+                        // tabs' solid/filled icons, even though it's nominally from the
+                        // same "Filled" icon family (fixed during the UI review, issue #30).
+                        icon = { Icon(Icons.Filled.BarChart, contentDescription = "Progress") },
                         label = { Text("Progress") }
                     )
                     NavigationBarItem(
@@ -161,25 +164,6 @@ fun EarRingApp() {
                     framesToConfirm = state.framesToConfirm,
                     warmupFrames = state.warmupFrames,
                     instrumentIndex = state.instrumentIndex
-                )
-            }
-            composable(Routes.RESULTS) {
-                ResultsScreen(
-                    viewModel = exerciseViewModel,
-                    progressViewModel = progressViewModel,
-                    onTryAgain = {
-                        exerciseViewModel.newRound()
-                        navController.popBackStack(Routes.EXERCISE, inclusive = false)
-                        navController.navigate(Routes.EXERCISE) {
-                            popUpTo(Routes.EXERCISE) { inclusive = true }
-                        }
-                    },
-                    onNewExercise = {
-                        navController.popBackStack(Routes.HOME, inclusive = false)
-                    },
-                    onProgress = {
-                        navController.navigate(Routes.PROGRESS)
-                    }
                 )
             }
             composable(Routes.PROGRESS) {

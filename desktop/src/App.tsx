@@ -4,7 +4,6 @@ import { Screen, ExerciseSettings, ExerciseState } from './types';
 import HomeScreen from './components/HomeScreen';
 import ExerciseScreen from './components/ExerciseScreen';
 import SetupScreen from './components/SetupScreen';
-import ResultsScreen from './components/ResultsScreen';
 import ProgressScreen from './components/ProgressScreen';
 import SettingsScreen from './components/SettingsScreen';
 import HelpScreen from './components/HelpScreen';
@@ -226,14 +225,6 @@ export default function App() {
           framesToConfirm={settings.framesToConfirm}
           warmupFrames={settings.warmupFrames}
           instrumentIndex={settings.instrumentIndex}
-        />
-      )}
-      {screen === 'results' && (
-        <ResultsScreen
-          exercise={exercise}
-          onTryAgain={() => setScreen('exercise')}
-          onNewExercise={() => setScreen('home')}
-          onProgress={() => setScreen('progress')}
         />
       )}
       {screen === 'progress' && (
