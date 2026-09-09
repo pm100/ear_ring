@@ -261,26 +261,36 @@ function RangeTextInputs({ rangeStart, rangeEnd, onChange, disabled }: {
     }
   };
   const inputStyle: React.CSSProperties = { width: 70, padding: '6px 8px', fontSize: 14, borderRadius: 6, border: '1px solid #ccc', textAlign: 'center' };
+  const captionStyle: React.CSSProperties = { fontSize: 11, color: '#757575', marginBottom: 2 };
 
+  // A small caption above each field is the only visible cue that these are
+  // editable text entry (not a static display) — a plain bordered <input> alone
+  // reads as static, and there's no built-in floating-label affordance in HTML.
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <input
-        value={startText}
-        disabled={disabled}
-        onChange={e => setStartText(e.target.value)}
-        onBlur={commitStart}
-        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-        style={inputStyle}
-      />
-      <span style={{ color: '#757575' }}>to</span>
-      <input
-        value={endText}
-        disabled={disabled}
-        onChange={e => setEndText(e.target.value)}
-        onBlur={commitEnd}
-        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-        style={inputStyle}
-      />
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <span style={captionStyle}>Start</span>
+        <input
+          value={startText}
+          disabled={disabled}
+          onChange={e => setStartText(e.target.value)}
+          onBlur={commitStart}
+          onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+          style={inputStyle}
+        />
+      </div>
+      <span style={{ color: '#757575', paddingBottom: 6 }}>to</span>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <span style={captionStyle}>End</span>
+        <input
+          value={endText}
+          disabled={disabled}
+          onChange={e => setEndText(e.target.value)}
+          onBlur={commitEnd}
+          onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+          style={inputStyle}
+        />
+      </div>
     </div>
   );
 }
@@ -415,7 +425,10 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
       </div>
 
       <span className="section-label">Range</span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+      {/* flex-end, not center — RangeTextInputs now has a small caption above each
+          field, so the piano button needs to align with the actual text-entry row,
+          not the row's overall top. */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 4 }}>
         <RangeTextInputs
           rangeStart={settings.rangeStart}
           rangeEnd={settings.rangeEnd}

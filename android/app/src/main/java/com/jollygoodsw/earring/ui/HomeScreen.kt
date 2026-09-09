@@ -233,6 +233,10 @@ fun HomeScreen(
                     focusManager.clearFocus()
                     showRangePicker = true
                 },
+                // Match the range fields' corner radius — OutlinedButton defaults to
+                // Material3's fully-rounded "shapes.full" (a stadium/pill shape), an
+                // outlier next to the OutlinedTextFields' small-radius rounded rects.
+                shape = MaterialTheme.shapes.small,
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 Text("🎹", fontSize = 20.sp)  // 🎹
@@ -303,6 +307,9 @@ private fun RangeTextInputs(
             onValueChange = { startText = it },
             enabled = enabled,
             singleLine = true,
+            // A floating label is the field's only visible cue that it's editable text
+            // entry (not a static display) — without one it reads as a plain box.
+            label = { Text("Start") },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { commitStart() }),
             modifier = Modifier.width(90.dp).onFocusChanged { if (!it.isFocused) commitStart() }
@@ -313,6 +320,7 @@ private fun RangeTextInputs(
             onValueChange = { endText = it },
             enabled = enabled,
             singleLine = true,
+            label = { Text("End") },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { commitEnd() }),
             modifier = Modifier.width(90.dp).onFocusChanged { if (!it.isFocused) commitEnd() }

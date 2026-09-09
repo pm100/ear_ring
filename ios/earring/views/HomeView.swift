@@ -197,7 +197,7 @@ struct HomeView: View {
                     }
                     Text("Ear Training")
                         .font(.system(size: 16))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.erCaption)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.top, 24)
@@ -261,7 +261,10 @@ struct HomeView: View {
                 // keyboard full-screen (it needs all the room it can get to stay tappable —
                 // see PianoRangePickerFullScreen below for why this isn't a small sheet). ──
                 sectionLabel("Range").padding(.top, 16)
-                HStack(spacing: 10) {
+                // .bottom, not the default .center — RangeTextInputs now has a small
+                // caption above each field (see below), so the piano button needs to
+                // align with the actual text-entry row, not the row's overall top.
+                HStack(alignment: .bottom, spacing: 10) {
                     RangeTextInputs(
                         rangeStart: model.rangeStart,
                         rangeEnd: model.rangeEnd,
@@ -282,7 +285,10 @@ struct HomeView: View {
                             .padding(.vertical, 8)
                             .padding(.horizontal, 12)
                             .background(
-                                RoundedRectangle(cornerRadius: 8)
+                                // cornerRadius 6, not 8 — matches OutlinedDropdown's border
+                                // radius elsewhere on this screen instead of being a
+                                // slightly-off outlier next to it.
+                                RoundedRectangle(cornerRadius: 6)
                                     .strokeBorder(Color.erMuted, lineWidth: 1)
                             )
                     }
@@ -342,7 +348,7 @@ struct HomeView: View {
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
             .font(.caption)
-            .foregroundColor(.secondary)
+            .foregroundColor(.erCaption)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 6)
     }
@@ -372,25 +378,40 @@ private struct RangeTextInputs: View {
     @FocusState private var endFocused: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
-            TextField("", text: $startText)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 70)
-                .multilineTextAlignment(.center)
-                .disabled(!enabled)
-                .focused($startFocused)
-                .onSubmit { commitStart() }
-                .onChange(of: startFocused) { focused in if !focused { commitStart() } }
+        // A small caption above each field is the only visible cue that these are
+        // editable text entry (not a static display) — SwiftUI's plain roundedBorder
+        // TextField has no built-in floating label like Android's OutlinedTextField,
+        // and the field's own text is never empty, so a placeholder would never show.
+        HStack(alignment: .bottom, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Start")
+                    .font(.caption2)
+                    .foregroundColor(.erCaption)
+                TextField("", text: $startText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 70)
+                    .multilineTextAlignment(.center)
+                    .disabled(!enabled)
+                    .focused($startFocused)
+                    .onSubmit { commitStart() }
+                    .onChange(of: startFocused) { focused in if !focused { commitStart() } }
+            }
             Text("to")
                 .fixedSize()
-            TextField("", text: $endText)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 70)
-                .multilineTextAlignment(.center)
-                .disabled(!enabled)
-                .focused($endFocused)
-                .onSubmit { commitEnd() }
-                .onChange(of: endFocused) { focused in if !focused { commitEnd() } }
+                .padding(.bottom, 6)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("End")
+                    .font(.caption2)
+                    .foregroundColor(.erCaption)
+                TextField("", text: $endText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 70)
+                    .multilineTextAlignment(.center)
+                    .disabled(!enabled)
+                    .focused($endFocused)
+                    .onSubmit { commitEnd() }
+                    .onChange(of: endFocused) { focused in if !focused { commitEnd() } }
+            }
         }
         .onAppear {
             startText = MusicTheory.midiToLabel(rangeStart)

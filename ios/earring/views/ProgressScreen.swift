@@ -42,7 +42,7 @@ struct ProgressScreen: View {
                             .font(.system(size: 28, weight: .bold))
                         Text("consecutive days with a session")
                             .font(.caption)
-                            .foregroundColor(.erMuted)
+                            .foregroundColor(.erCaption)
                     }
                     Spacer()
                 }
@@ -59,7 +59,7 @@ struct ProgressScreen: View {
                             .font(.system(size: 22, weight: .bold))
                         Text("Average test score \(progressModel.averageTestScore)%")
                             .font(.caption)
-                            .foregroundColor(.erMuted)
+                            .foregroundColor(.erCaption)
                     }
                     Spacer()
                 }
@@ -75,7 +75,7 @@ struct ProgressScreen: View {
                 if progressModel.history.isEmpty {
                     Text("No sessions yet. Complete an exercise to see your progress!")
                         .font(.body)
-                        .foregroundColor(.erMuted)
+                        .foregroundColor(.erCaption)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 40)
                         .multilineTextAlignment(.center)
@@ -93,7 +93,7 @@ struct ProgressScreen: View {
                                             .font(.body.weight(.medium))
                                         Text("\(Self.dateFormatter.string(from: record.date))  •  \(record.testsCompleted) tests  •  \(record.length) notes")
                                             .font(.caption)
-                                            .foregroundColor(.erMuted)
+                                            .foregroundColor(.erCaption)
                                     }
                                     Spacer()
                                     Text("\(record.score)%")
@@ -152,7 +152,7 @@ struct ProgressScreen: View {
                             .font(.title3.weight(.bold))
                         Text(Self.dateFormatter.string(from: session.date))
                             .font(.caption)
-                            .foregroundColor(.erMuted)
+                            .foregroundColor(.erCaption)
                     }
                     Spacer()
                 }
@@ -163,7 +163,7 @@ struct ProgressScreen: View {
                 if sessionTests.isEmpty {
                     Text("No individual test details recorded for this session.")
                         .font(.body)
-                        .foregroundColor(.erMuted)
+                        .foregroundColor(.erCaption)
                 } else {
                     ForEach(sessionTests) { record in
                         VStack(spacing: 0) {
@@ -173,15 +173,15 @@ struct ProgressScreen: View {
                                         .font(.body.weight(.medium))
                                     Text(Self.dateFormatter.string(from: record.date))
                                         .font(.caption)
-                                        .foregroundColor(.erMuted)
+                                        .foregroundColor(.erCaption)
                                     Text(record.passed ? "Passed in \(record.attemptsUsed)/\(record.maxAttempts) tries" : "Failed after \(record.maxAttempts) tries")
                                         .font(.caption)
-                                        .foregroundColor(.erMuted)
+                                        .foregroundColor(.erCaption)
                                     Text("Expected: \(record.expectedNotes.joined(separator: ", "))")
                                         .font(.caption)
                                     Text("Detected: \(record.detectedNotes.joined(separator: ", "))")
                                         .font(.caption)
-                                        .foregroundColor(.erMuted)
+                                        .foregroundColor(.erCaption)
                                 }
                                 Spacer()
                                 Text("\(record.score)%")

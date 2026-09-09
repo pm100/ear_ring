@@ -174,8 +174,25 @@ Row (equal width, 8dp gap):
                  — **Disabled (opacity 0.38)** when Test Type = Melody Snippets or Diatonic Arpeggios
 
 [16dp space]
-Section label: "Range  (RangeLow – RangeHigh)"   — label updates dynamically with current range
-PianoRangePicker
+Section label: "Range" (plain — does not embed the current range values; those live
+                        in the row below)
+Row (full width, left-aligned like every other Home block — this was previously the
+     one row centred as a floating cluster instead, fixed during the UI review, issue
+     #30): two typed text fields ("Start"/"End", labeled — Android's floating
+     OutlinedTextField label, iOS's small caption above each field, desktop's caption
+     above each `<input>` — since a plain bordered box with no label reads as static
+     display, not editable text entry) showing note labels like "C4"/"C5", editable
+     directly by typing a note name; plus a small outlined 🎹 button matching the
+     fields' own corner radius (6dp/6pt small-rounded-rect — NOT Material3's default
+     stadium/pill button shape, an outlier previously left unfixed on Android) that
+     opens a full-screen piano keyboard picker (below) for dragging the range visually
+     instead of typing it.
+  — Typed value must be a valid note name and keep the range at least 12 semitones
+    wide, or the edit reverts to the last valid value on commit (Enter/blur)
+  — Disabled when Test Type = Melody Snippets
+
+[16dp space]
+PianoRangePicker (full-screen, opened via the 🎹 button above)
   — Interactive piano keyboard, MIDI 36 (C2) to MIDI 84 (C6), 4 octaves, 29 white keys
   — Horizontally scrollable; white keys 22dp wide × 80dp tall; black keys 14dp wide × 52dp tall
   — Primary-colour handle circles (9dp radius) above each endpoint (rangeStart, rangeEnd)
