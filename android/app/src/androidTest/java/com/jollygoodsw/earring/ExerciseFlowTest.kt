@@ -44,12 +44,12 @@ class ExerciseFlowTest {
         composeRule.waitUntil(timeoutMillis = 8_000) {
             composeRule.onAllNodesWithText("Attempt", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("⏹ Stop Testing").assertIsDisplayed()
+        composeRule.onNodeWithText("■ Stop Testing").assertIsDisplayed()
 
-        composeRule.onNodeWithText("⏹ Stop Testing").performClick()
+        composeRule.onNodeWithText("■ Stop Testing").performClick()
 
         // Back on Home, and the exercise screen's controls are gone.
         composeRule.onNodeWithText("▶ Start Exercise").assertIsDisplayed()
-        composeRule.onAllNodesWithText("⏹ Stop Testing").assertCountEquals(0)
+        composeRule.onAllNodesWithText("■ Stop Testing").assertCountEquals(0)
     }
 }

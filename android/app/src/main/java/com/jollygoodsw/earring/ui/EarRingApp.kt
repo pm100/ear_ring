@@ -42,9 +42,14 @@ fun EarRingApp() {
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute in TAB_ROUTES
 
-    // Navigate to Help on very first launch
-    LaunchedEffect(Unit) {
-        if (exerciseViewModel.consumeFirstLaunch()) {
+    // Navigate to Help on very first launch. Keyed on navBackStackEntry (not Unit) and
+    // gated on it being non-null: navBackStackEntry only becomes non-null once NavHost
+    // below has actually installed the graph and landed on the start destination — on a
+    // fresh install, this LaunchedEffect could otherwise run its navigate() call before
+    // that happens, crashing with "Navigation graph has not been set for NavController"
+    // (issue #13).
+    LaunchedEffect(navBackStackEntry) {
+        if (navBackStackEntry != null && exerciseViewModel.consumeFirstLaunch()) {
             navController.navigate(Routes.HELP) {
                 popUpTo(Routes.HOME) { saveState = true }
                 launchSingleTop = true
