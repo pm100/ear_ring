@@ -3,7 +3,10 @@ import { invoke } from '@tauri-apps/api/tauri';
 import PitchMeter from './PitchMeter';
 import MusicStaff from './MusicStaff';
 import { useAudioCapture, TrackerFrame } from '../hooks/useAudioCapture';
-import { preferredMidiLabel } from '../music';
+import { ExerciseSettings } from '../types';
+
+const STABILITY_OPTIONS = [2, 3, 4, 5];
+const WARMUP_OPTIONS = [0, 1, 2, 3, 4, 5, 6];
 
 interface InstrumentInfo { id: number; name: string; semitones: number; }
 
@@ -20,6 +23,7 @@ function effectiveKeyChroma(rootChroma: number, scaleId: number): number {
 
 interface Props {
   onBack: () => void;
+  onUpdateSettings: React.Dispatch<React.SetStateAction<ExerciseSettings>>;
   rangeStart: number;
   rangeEnd: number;
   rootChroma?: number;
@@ -31,11 +35,11 @@ interface Props {
   instrumentIndex?: number;
 }
 
+export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rangeEnd, rootChroma = 0, scaleId = 0, keySignatureMode = 0, silenceThreshold = 0.003, framesToConfirm = 3, warmupFrames = 4, instrumentIndex = 0 }: Props) {
+  const set = <K extends keyof ExerciseSettings>(key: K, value: ExerciseSettings[K]) =>
+    onUpdateSettings(prev => ({ ...prev, [key]: value }));
 
-export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma = 0, scaleId = 0, keySignatureMode = 0, silenceThreshold = 0.003, framesToConfirm = 3, warmupFrames = 4, instrumentIndex = 0 }: Props) {
   const [hz, setHz] = useState(0);
-  const [currentMidi, setCurrentMidi] = useState<number>(-1);
-  const [currentHz, setCurrentHz] = useState<number>(0);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
   const { start, stop, destroy } = useAudioCapture();
 
@@ -45,11 +49,6 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
     setHz(frame.liveHz);
     if (frame.confirmedMidi >= 0) {
       const midi = frame.confirmedMidi;
-      // Text/Hz always reflect the truth. The staff, though, stays confined to
-      // the configured exercise range — it's read as "where am I in my range",
-      // not "what can the mic hear".
-      setCurrentMidi(midi);
-      setCurrentHz(frame.liveHz);
       if (midi >= rangeStart && midi <= rangeEnd) {
         setNoteHistory(prev => {
           const next = [...prev, midi];
@@ -57,9 +56,6 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
           return next;
         });
       }
-    } else if (frame.liveMidi < 0) {
-      // Silent frame: clear the live display only (history remains)
-      setCurrentMidi(-1);
     }
   }, [rangeStart, rangeEnd]);
 
@@ -89,21 +85,14 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
 
   const transpMidi = (midi: number) => Math.max(0, Math.min(127, midi + transpSemitones));
   // Staff notation shows written pitch, like a transposing instrument's part.
-  const displayMidi = currentMidi >= 0 ? transpMidi(currentMidi) : -1;
   const displayHistory = noteHistory.map(transpMidi);
   const instrKeyTranspose = ((transpSemitones % 12) + 12) % 12;
   const effChroma = (effectiveKeyChroma(rootChroma, scaleId) + instrKeyTranspose) % 12;
-  // The big text readout always states the actual (concert) pitch, regardless of
-  // instrument transposition — unlike the staff above, it's not notation to read/play.
-  const noteLabel = currentMidi >= 0 ? preferredMidiLabel(currentMidi, effectiveKeyChroma(rootChroma, scaleId)) : '—';
-  // The actual measured frequency (not recomputed from currentMidi) so it can
-  // reveal a mislabeled note instead of just parroting back whatever label was chosen.
-  const noteHz = currentMidi >= 0 ? currentHz : null;
 
   return (
     <div className="screen">
       <div className="screen-header">
-        <button className="btn-back" onClick={onBack}>{'\u2190'} Back</button>
+        <button className="btn-back" onClick={onBack}>{'←'} Back</button>
         <span className="screen-title">Mic Setup</span>
       </div>
 
@@ -124,20 +113,42 @@ export default function SetupScreen({ onBack, rangeStart, rangeEnd, rootChroma =
         keySignatureMode={keySignatureMode}
       />
 
-      <div className="setup-note-display">
-        <div className={`setup-note-name${displayMidi >= 0 ? ' detected' : ''}`}
-             style={{ fontSize: noteLabel.length >= 3 ? '56px' : '72px' }}>
-          {noteLabel}
-        </div>
-        {noteHz !== null && (
-          <div className="setup-note-hz">{noteHz.toFixed(1)} Hz</div>
-        )}
-      </div>
-
+      {/* The pitch meter alone carries "what's being detected right now" below the
+          staff — the large note-name/Hz text that used to sit here was removed to
+          make room for the always-visible Pitch Detection controls, without this
+          screen needing to scroll. */}
       <div className="pitch-meter-circle">
         <PitchMeter hz={hz} />
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <span className="section-label" style={{ marginTop: 0 }}>Mic Sensitivity</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <input type="range" min={1} max={10} step={1}
+            value={Math.round((0.011 - silenceThreshold) / 0.001)}
+            onChange={e => set('silenceThreshold', parseFloat((0.011 - parseInt(e.target.value) * 0.001).toFixed(3)))}
+            style={{ flex: 1 }} />
+          <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{Math.round((0.011 - silenceThreshold) / 0.001)} / 10</span>
+        </div>
+
+        <span className="section-label">Note Stability (frames to confirm)</span>
+        <div className="chip-row">
+          {STABILITY_OPTIONS.map(n => (
+            <button key={n} type="button"
+              className={`chip ${framesToConfirm === n ? 'chip-selected' : ''}`}
+              onClick={() => set('framesToConfirm', n)}>{n}</button>
+          ))}
+        </div>
+
+        <span className="section-label">Mic Warmup Frames</span>
+        <div className="chip-row">
+          {WARMUP_OPTIONS.map(n => (
+            <button key={n} type="button"
+              className={`chip ${warmupFrames === n ? 'chip-selected' : ''}`}
+              onClick={() => set('warmupFrames', n)}>{n}</button>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
-

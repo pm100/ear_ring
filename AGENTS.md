@@ -337,21 +337,27 @@ Exercise control flow (canonical state machine):
 
 ### Mic Setup Screen
 
-Layout: vertical column, 16dp padding.
+Layout: vertical column, 16dp padding, **fits entirely without scrolling** — every
+element on this screen was sized/chosen deliberately to fit in the viewport at once
+(no `ScrollView`/`verticalScroll` on any platform), since the Pitch Detection controls
+below need to stay visible alongside the staff/meter while the user is actively testing.
 
 ```
                         [Mic Setup]        (tab — no back button on iOS/Android;
                                             Mic tab on all platforms)
 
-[24dp space]
+[16dp space]
 "Play a note to test your microphone."   — bodyMedium, centred
 
-[16dp space]
+[12dp space]
 👂 Listening…           — ear emoji (28sp) + "Listening…" label (subheadline semibold, primary colour)
                           always visible while on screen (listening is always active)
 
-[16dp space]
-MusicStaff            — 160dp tall, shows rolling note history left to right
+[12dp space]
+MusicStaff            — 130dp tall on phones (160dp on iPad/desktop — trimmed from
+                        the original 160dp on phones to help this screen fit
+                        without scrolling once Pitch Detection controls were added
+                        below), shows rolling note history left to right
                         Notes are placed at fixed 44dp spacing from the LEFT end of the staff
                         Each newly stable note is appended on the right
                         When staff is full (8 notes), oldest scrolls off left, new note appears right
@@ -363,18 +369,29 @@ MusicStaff            — 160dp tall, shows rolling note history left to right
                         Empty staff when nothing detected yet
                         Same note repeated after silence is always appended again
 
-[8dp space]
-Large note name       — 72sp bold, primary colour when detected, muted "—" when silent
-                        (use 56sp if label is 3+ chars, e.g. "C#4")
-                        Shows ANY confirmed note regardless of the configured range — unlike
-                        the staff, this is not filtered, so it always reflects the truth
-Hz display            — bodyMedium, muted, shown only when pitch detected
-                        The actual measured frequency from the same tracker frame that
-                        produced the note (not recomputed from the displayed MIDI) — a
-                        mislabeled note will show a Hz value that disagrees with the label
+[10dp space]
+PitchMeter            — 80dp circle on phones (90dp before this trim; 130-150dp on
+                        iPad/desktop, unchanged). The large note-name/Hz text that
+                        used to sit between the staff and the meter was removed
+                        (UI review, issue #30) — it duplicated what the staff and
+                        Exercise screen already show, and freed room for the
+                        always-visible Pitch Detection controls below without
+                        needing this screen to scroll.
 
-[24dp space]
-PitchMeter            — 90dp circle
+[12dp space]
+Mic Sensitivity, Note Stability, Mic Warmup Frames — always visible, NOT collapsible
+                        (no chevron, no tap-to-expand, and NO section heading above
+                        them either — just each control's own label) since adjusting
+                        these live against the staff/meter's feedback is this
+                        screen's whole purpose. Slider "Mic Sensitivity": 1–10
+                        integer steps, default 8; internally maps to silence
+                        threshold via threshold = 0.011 − sensitivity × 0.001. Chip
+                        row "Note Stability (frames to confirm)": 2 3 4 5, default 3.
+                        Chip row "Mic Warmup Frames": 0 1 2 3 4 5 6, default 4. The
+                        explanatory captions these controls have in other contexts
+                        are omitted here — vertical space is at a premium on this
+                        no-scroll screen, and each control's own label already says
+                        enough.
 
 Mic Setup **starts listening automatically on entry** — there is NO Start Listening button
 and NO Stop button. The user exits by tapping another tab.
@@ -385,8 +402,18 @@ NO test note buttons.
 The staff visual style, horizontal spacing, and note-detection pipeline are
 **shared with the Exercise screen** — both screens use identical detection and display
 dynamics. The only differences are what happens after a note is confirmed:
-- **Mic Setup**: append the confirmed note to the rolling staff history (no judgement)
+- **Mic Setup**: append the confirmed note to the rolling staff history and drive the pitch meter; no judgement or comparison
 - **Exercise**: compare the confirmed note against the expected sequence (see Exercise screen spec)
+
+**Pitch Detection lives here, not in Settings** — this is the one screen that gives live
+feedback on what the mic actually hears, so sensitivity/stability/warmup can be tuned by ear
+against that feedback instead of adjusted blind in a static settings list (moved from
+Settings during the UI review, issue #30). Changes here persist immediately, the same as
+everywhere else these values are edited — Android reads/writes them through the shared
+`ExerciseViewModel` (already in scope at this screen's nav-host call site, same pattern as
+`SettingsScreen`); iOS reads/writes `ExerciseModel`'s `@Published` properties directly (this
+screen already holds an `@EnvironmentObject` reference to it); desktop takes a new
+`onUpdateSettings` callback prop, matching `SettingsScreen`'s.
 
 ---
 
@@ -471,55 +498,47 @@ shows the title via its standard `screen-header` bar, which also has a back butt
 there since desktop's Settings is reached by navigating away from Home rather than
 via a persistent tab).
 
-Two group headers ("User", "Advanced") each own a set of collapsible sections,
-all starting collapsed. Tapping a section's header row toggles it. While collapsed,
-the header shows a muted current-value summary after the title (e.g.
-"Instrument · Piano", "Exercise · 5 retries, 2 same-note") instead of just the
-category name (the title portion renders uppercase on all three platforms; the
-example above shows the underlying text before that transform); the summary
-disappears once expanded, since the value is now visible in the section's own
-content. Expanded content is indented with a thin left rule,
-and every section (collapsed or expanded) is separated from the next by a divider.
+A flat list of three collapsible sections, all starting collapsed — no group
+headers above them (an earlier iteration grouped sections under "User"/"Advanced"
+headings, but with the section count this small the grouping added a layer of
+structure without adding clarity, so it was dropped; see the UI review, issue
+#30). Tapping a section's header row toggles it — the header shows only the
+section title, with no value summary (an earlier iteration also tried a
+"Title · current value" summary on each collapsed header, but it didn't scale
+once a section held more than one or two settings, so that was dropped too).
+Expanded content is indented with a thin left rule, and every section (collapsed
+or expanded) is separated from the next by a divider.
 
-**User group:**
+Each section groups several related settings under one heading — deliberately
+fewer, larger sections rather than one section per setting, so the accordion
+doesn't fragment into a dozen near-empty entries:
 
-- **Instrument** — outlined dropdown, full width: Piano | Guitar | Transposed Guitar |
-  Soprano Sax | Alto Sax | Tenor Sax | Trumpet | Clarinet (default: Piano, index 0).
-  Selecting a transposing instrument causes Mic Setup and Exercise screens to display
-  written pitch instead of concert pitch (display only — detection stays in concert
-  pitch). Selecting a new instrument resets rangeStart/rangeEnd to one octave from the
-  current root note closest to middle C (same rule as changing the Key on Home).
-  Desktop folds Tempo/BPM into this same section rather than giving it a separate
-  "Playback" section (a pre-existing structural difference from mobile, not changed
-  by the UI review); Android and iOS have a distinct "Playback" section for it.
-- **Playback** (Android/iOS only — see above) — chip row, Tempo (BPM): 60 80 100 120 140,
-  default 100.
-- **Sound** — checkbox "Play Pass/Fail Sounds" (a chime when a test is passed, a
-  different tone when it fails) plus an "Intro Sound" dropdown: Root Note | Chord |
-  Arpeggio | Scale | None (what plays before each test; default: Chord).
-- **Display** — two checkboxes: "Display Test Notes" (default unchecked/hidden) and
-  "Use Key Signature" (`keySignatureMode`; default unchecked = Inline Accidentals
-  mode = 0; checked = conventional key signature after the clef with only out-of-key
-  notes getting an accidental). Moved here from Home — see issue #26; all three
-  platforms implement it under Settings → Display.
-- **Exercise** — chip row "Max Retries" (attempts per test before moving on): 1 2 3 5
-  8 10, default 5. Chip row "Retry Same Note" (tries allowed on a wrong note before
-  the whole test restarts — each retry costs a few points; 0 = off): 0 1 2 3 4 5,
-  default 2.
-- **Timing** — slider "Pause Before Playing" (gap between chord and test sequence):
-  400ms–2000ms, step 100ms, default 800ms. Chip row "Wrong Note Pause" (how long to
-  display a wrong note before replaying): 1s 2s 3s 5s, default 3s.
+- **Instrument & Playback** — outlined dropdown, full width: Piano | Guitar |
+  Transposed Guitar | Soprano Sax | Alto Sax | Tenor Sax | Trumpet | Clarinet
+  (default: Piano, index 0). Selecting a transposing instrument causes Mic Setup
+  and Exercise screens to display written pitch instead of concert pitch (display
+  only — detection stays in concert pitch). Selecting a new instrument resets
+  rangeStart/rangeEnd to one octave from the current root note closest to middle C
+  (same rule as changing the Key on Home). Below the dropdown, a chip row for Tempo
+  (BPM): 60 80 100 120 140, default 100.
+- **Sound & Display** — checkbox "Play Pass/Fail Sounds" (a chime when a test is
+  passed, a different tone when it fails); an "Intro Sound" dropdown: Root Note |
+  Chord | Arpeggio | Scale | None (what plays before each test; default: Chord);
+  then two checkboxes, "Display Test Notes" (default unchecked/hidden) and "Use Key
+  Signature" (`keySignatureMode`; default unchecked = Inline Accidentals mode = 0;
+  checked = conventional key signature after the clef with only out-of-key notes
+  getting an accidental — moved here from Home, see issue #26).
+- **Exercise & Timing** — chip row "Max Retries" (attempts per test before moving
+  on): 1 2 3 5 8 10, default 5. Chip row "Retry Same Note" (tries allowed on a wrong
+  note before the whole test restarts — each retry costs a few points; 0 = off):
+  0 1 2 3 4 5, default 2. Slider "Pause Before Playing" (gap between chord and test
+  sequence): 400ms–2000ms, step 100ms, default 800ms. Chip row "Wrong Note Pause"
+  (how long to display a wrong note before replaying): 1s 2s 3s 5s, default 3s.
 
-**Advanced group:**
+Pitch Detection (Mic Sensitivity, Note Stability, Mic Warmup Frames) lives on the
+Mic Setup screen, not here — see the Mic Setup Screen section above for why.
 
-- **Pitch Detection** — slider "Mic Sensitivity": 1–10 integer steps, default 8; right
-  = more sensitive; internally maps to silence threshold via
-  `threshold = 0.011 − sensitivity × 0.001` (e.g. sensitivity 8 → threshold 0.003).
-  Chip row "Note Stability (frames to confirm)" (consecutive stable frames before confirming a note): 2 3
-  4 5, default 3. Chip row "Mic Warmup Frames" (frames discarded when the mic opens,
-  both Exercise and Mic Setup): 0 1 2 3 4 5 6, default 4.
-
-Below both groups: "Reset to Defaults" button (confirmation dialog before it takes
+Below the sections: "Reset to Defaults" button (confirmation dialog before it takes
 effect; resets settings only, progress history is unaffected), then
 "Build {gitHash}" (short 7-char git commit hash, muted, centered — sourced from the
 shared Rust core's `GIT_HASH` const, embedded by `rust/build.rs` from
@@ -751,12 +770,12 @@ Circular widget, **90dp/px diameter**.
 - Sample rate: 44100 Hz
 - Buffer size: 4096 samples
 - Pass raw f32 PCM to Rust `detect_pitch()`
-- Silence threshold: RMS < silenceThreshold (default 0.003, configurable in Settings) → ignore frame
-- Require N consecutive frames with the same pitch class (midi % 12) before confirming a note (default N=3, configurable in Settings as "Note Stability")
+- Silence threshold: RMS < silenceThreshold (default 0.003, configurable on the Mic Setup screen as "Mic Sensitivity") → ignore frame
+- Require N consecutive frames with the same pitch class (midi % 12) before confirming a note (default N=3, configurable on the Mic Setup screen as "Note Stability")
 - After confirming a pitch, do not confirm it again until the pitch class changes or silence resets stability
 - The detection and display dynamics (stability rules, note rendering, staff updates) must use the same code path on each platform; only the post-confirmation action differs per screen
 
-**On confirm — Mic Setup**: append the detected note to the rolling staff history; no judgement or comparison.
+**On confirm — Mic Setup**: append the detected note to the rolling staff history and drive the pitch meter; no judgement or comparison.
 
 **On confirm — Exercise**: compare the pitch class of the detected note against the pitch class of the current expected sequence note; render correct (green) or incorrect (red) accordingly.
 
@@ -854,7 +873,8 @@ The app supports transposing instruments. The canonical instrument list is defin
 
 **Transposition is display-only.** Concert pitch is used for all pitch detection, comparison,
 key/range settings, and audio playback. Transposition is applied at the last moment before
-rendering note labels and staff notes in Mic Setup and Exercise screens.
+rendering staff notes in Mic Setup and Exercise screens (Mic Setup no longer shows a large
+note-name/Hz readout, only the staff and pitch meter — see its own section above).
 
 **Written = Concert + Semitones**
 
