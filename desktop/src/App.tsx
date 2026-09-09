@@ -216,6 +216,7 @@ export default function App() {
       {screen === 'setup' && (
         <SetupScreen
           onBack={() => setScreen('home')}
+          onUpdateSettings={setSettings}
           rangeStart={settings.rangeStart}
           rangeEnd={settings.rangeEnd}
           rootChroma={settings.rootNote}

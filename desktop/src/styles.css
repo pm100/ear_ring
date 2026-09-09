@@ -95,9 +95,11 @@ html, body, #root {
   overflow: hidden;
 }
 
-/* Section labels */
+/* Section labels — distinctly larger than the 12px explanatory <p> text below each
+   control (matches Android's SectionLabel, which uses a bigger size than its 12sp
+   caption — same-size text differing only by weight reads as near-identical). */
 .section-label {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--muted);
   text-align: left;

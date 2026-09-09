@@ -151,6 +151,7 @@ fun EarRingApp() {
                     } catch (_: Exception) { 0 }
                 }
                 SetupScreen(
+                    viewModel = exerciseViewModel,
                     onBack = { navController.popBackStack() },
                     rangeStart = state.rangeStart,
                     rangeEnd = state.rangeEnd,

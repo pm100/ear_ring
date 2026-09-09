@@ -212,7 +212,11 @@ fun HomeScreen(
         // keyboard full-screen (it needs all the room it can get to stay tappable —
         // see PianoRangePickerScreen below for why this isn't a small dialog).
         SectionLabel("Range")
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             RangeTextInputs(
                 rangeStart = state.rangeStart,
                 rangeEnd = state.rangeEnd,
