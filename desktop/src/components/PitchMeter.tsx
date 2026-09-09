@@ -7,9 +7,14 @@ interface Props {
 }
 
 export default function PitchMeter({ hz }: Props) {
-  const noteName = useMemo(() => hzToLabel(hz), [hz]);
-
   const active = hz > 0;
+  // '♪' (plain monochrome glyph, no emoji presentation — same family as
+  // the app's '▶'/'■'/'↻' button glyphs), not the bare '—'
+  // hzToLabel() returns when idle, so the idle state reads as "no note
+  // detected yet" rather than a misplaced divider (fixed during the UI
+  // review, issue #30).
+  const noteName = useMemo(() => (active ? hzToLabel(hz) : '♪'), [hz, active]);
+
   const ringColor = active ? '#4CAF50' : '#BDBDBD';
   const textColor = active ? '#212121' : '#BDBDBD';
   const fontSize = noteName.length >= 3 ? 16 : 20;

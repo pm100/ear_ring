@@ -21,7 +21,11 @@ fun PitchMeter(
     modifier: Modifier = Modifier
 ) {
     val isDetecting = detectedMidi >= 0
-    val label = if (isDetecting) MusicTheory.midiToLabel(detectedMidi) else "—"
+    // "♪" (plain monochrome glyph, no emoji presentation — same family as the app's
+    // ▶/■/↻ button glyphs), not a bare "—", so the idle state reads as "no note
+    // detected yet" rather than a misplaced divider (fixed during the UI review,
+    // issue #30).
+    val label = if (isDetecting) MusicTheory.midiToLabel(detectedMidi) else "♪"
     val borderColor = if (isDetecting) Color(0xFF4CAF50) else Color(0xFFBDBDBD)
 
     Box(

@@ -762,7 +762,10 @@ Circular widget, **90dp/px diameter**.
 - Centre text: note label (e.g. "A4", "C#4")
   - Bold, 20sp (16sp if label is 3+ chars)
   - Dark (#212121) when detected, grey (#BDBDBD) when not
-- Shows "—" when no pitch detected
+- Shows "♪" (plain monochrome glyph, no emoji presentation — same family as
+  the app's "▶"/"■"/"↻" button glyphs) when no pitch detected, not a bare
+  "—" — a bare dash read as a misplaced divider rather than "no note
+  detected yet" (fixed during the UI review, issue #30)
 
 ---
 
@@ -1077,12 +1080,15 @@ verification). Wait for the logcat message `Displayed com.jollygoodsw.earring/.M
 Known approximate tap targets on the Home screen (1080×2400):
 - "Start Exercise" button: (540, 1810)
 
-Bottom nav tab bar tap targets (approx, bottom of 1080×2400 screen):
-- Home tab:     (108, 2340)
-- Mic tab:      (324, 2340)
-- Progress tab: (540, 2340)
-- Settings tab: (756, 2340)
-- Help tab:     (972, 2340)
+Bottom nav tab bar tap targets (approx, bottom of 1080×2400 screen) — verified
+2026-09-09 via `adb shell uiautomator dump`; if a tap ever misses, re-derive
+from a fresh dump rather than trusting these numbers or eyeballing a
+screenshot (both have gone stale/wrong before):
+- Home tab:     (108, 2274)
+- Mic tab:      (320, 2274)
+- Progress tab: (540, 2274)
+- Settings tab: (756, 2274)
+- Help tab:     (972, 2274)
 
 **Back navigation:**
 ```powershell

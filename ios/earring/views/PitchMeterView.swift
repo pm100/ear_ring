@@ -4,8 +4,12 @@ struct PitchMeterView: View {
     var midi: Int?       // nil = silent / not detected
     var isActive: Bool
 
+    // "♪" (plain monochrome glyph, no emoji presentation — same family as the
+    // app's ▶/■/↻ button glyphs), not a bare "—", so the idle state reads as
+    // "no note detected yet" rather than a misplaced divider (fixed during the
+    // UI review, issue #30).
     private var noteLabel: String {
-        guard let midi = midi else { return "—" }
+        guard let midi = midi else { return "♪" }
         return MusicTheory.midiToLabel(midi)
     }
 
