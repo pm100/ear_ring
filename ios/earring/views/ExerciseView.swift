@@ -128,12 +128,12 @@ struct ExerciseView: View {
         VStack(spacing: 4) {
             Text(statusMessage)
                 .font(.body)
-                .foregroundColor(.erMuted)
+                .foregroundColor(.erCaption)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
             Text("Attempt \(model.currentAttempt) of \(model.maxAttempts)  •  Tests \(model.testsCompleted)  •  Score \(model.score)%")
                 .font(.subheadline)
-                .foregroundColor(.erMuted)
+                .foregroundColor(.erCaption)
                 .frame(maxWidth: .infinity)
         }
     }
@@ -167,7 +167,7 @@ struct ExerciseView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Current attempt")
                     .font(.caption)
-                    .foregroundColor(.erMuted)
+                    .foregroundColor(.erCaption)
                 HStack(spacing: 10) {
                     ForEach(Array(model.detectedNotes.enumerated()), id: \.offset) { _, note in
                         // Always the actual (concert) pitch, regardless of instrument

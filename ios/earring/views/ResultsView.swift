@@ -37,7 +37,7 @@ struct ResultsView: View {
                         .foregroundColor(scoreColor)
                     Text("Score")
                         .font(.title3)
-                        .foregroundColor(.erMuted)
+                        .foregroundColor(.erCaption)
                     Spacer().frame(height: 8)
                     Text(exerciseLabel)
                         .font(.body)
@@ -59,7 +59,7 @@ struct ResultsView: View {
                         HStack(spacing: 8) {
                             Text("\(index + 1).")
                                 .font(.body)
-                                .foregroundColor(.erMuted)
+                                .foregroundColor(.erCaption)
                                 .frame(width: 24, alignment: .leading)
 
                             Text("Expected: \(MusicTheory.midiToLabel(expectedMidi))")
@@ -77,10 +77,10 @@ struct ResultsView: View {
                             } else {
                                 Text("Played: —")
                                     .font(.body)
-                                    .foregroundColor(.erMuted)
+                                    .foregroundColor(.erCaption)
                                 Text("—")
                                     .font(.body)
-                                    .foregroundColor(.erMuted)
+                                    .foregroundColor(.erCaption)
                             }
                         }
                         .padding(.vertical, 10)
