@@ -503,13 +503,23 @@ Layout: vertically scrollable column, 16dp padding.
                         [Progress]         (tab — no back button)
 
 Streak card:
-  🔥 N day streak     — prominent display
+  🔥 N day streak     — same plain card treatment as the recorded-tests card below
+                        it (an earlier iteration tinted this one with the primary
+                        colour while the other stayed a plain surface, which made
+                        the plain one read as "disabled" by comparison — fixed
+                        during the UI review, issue #30)
 
 Recorded tests summary:
   Show total recorded test count and average test score
 
 Session history:
-  If empty: "No sessions yet. Complete an exercise to see your progress!"
+  If empty:
+    "No sessions yet. Complete an exercise to see your progress!"
+    [▶ Start your first exercise]  — full-width filled PRIMARY button below the
+                                     message, routes to Home (fixed during the UI
+                                     review, issue #30 — previously there was no
+                                     way to get to Home from an empty Progress
+                                     screen except the tab bar)
   Otherwise: list of tappable SessionRecord cards showing:
     Scale name + root note
     Score percentage
@@ -523,6 +533,13 @@ Session history:
   detail only appears inside a session's drill-down. Sessions persisted before
   sessionId existed have no matching tests; their detail view shows "No individual
   test details recorded for this session."
+
+Clear All Progress:
+  Hidden entirely when there are no sessions yet — there's nothing to clear, and
+  it was previously the most visually prominent control a brand-new user saw
+  (fixed during the UI review, issue #30). Appears (danger red — see Exercise
+  Screen's Stop Testing note on error vs errorContainer) once at least one
+  session exists.
 ```
 
 ---

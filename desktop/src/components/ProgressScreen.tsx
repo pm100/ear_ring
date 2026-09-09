@@ -4,9 +4,10 @@ import { SessionRecord, TestRecord } from '../types';
 interface Props {
   onBack: () => void;
   onClearProgress: () => void;
+  onStartExercise: () => void;
 }
 
-export default function ProgressScreen({ onBack, onClearProgress }: Props) {
+export default function ProgressScreen({ onBack, onClearProgress, onStartExercise }: Props) {
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [tests, setTests] = useState<TestRecord[]>([]);
   const [streak, setStreak] = useState(0);
@@ -121,7 +122,12 @@ export default function ProgressScreen({ onBack, onClearProgress }: Props) {
       <div className="card">
         <h3 className="section-label">Session History</h3>
         {sessions.length === 0 ? (
-          <p className="empty-state">No sessions yet. Complete an exercise to see history!</p>
+          <>
+            <p className="empty-state">No sessions yet. Complete an exercise to see history!</p>
+            <button type="button" className="btn-primary" onClick={onStartExercise}>
+              {'▶'} Start your first exercise
+            </button>
+          </>
         ) : (
           sessions.map((s, i) => (
               <div
@@ -147,30 +153,35 @@ export default function ProgressScreen({ onBack, onClearProgress }: Props) {
         )}
       </div>
 
-      <div style={{ marginTop: 24, paddingBottom: 16 }}>
-        {confirmingClear ? (
-          <div style={{ border: '1px solid #f44336', borderRadius: 8, padding: 16 }}>
-            <p style={{ margin: '0 0 12px', fontSize: 14, color: '#212121' }}>
-              This will permanently delete all session history and test records. This cannot be undone.
-            </p>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" onClick={() => { onClearProgress(); setSessions([]); setTests([]); setStreak(0); setConfirmingClear(false); }}
-                style={{ flex: 1, padding: '8px 0', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>
-                Clear
-              </button>
-              <button type="button" onClick={() => setConfirmingClear(false)}
-                style={{ flex: 1, padding: '8px 0', background: '#e0e0e0', color: '#212121', border: 'none', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>
-                Cancel
-              </button>
+      {/* Only shown once there's actually something to clear (issue #30: this was
+          previously always visible — the most prominent control on the screen for a
+          brand-new user with nothing to clear). */}
+      {sessions.length > 0 && (
+        <div style={{ marginTop: 24, paddingBottom: 16 }}>
+          {confirmingClear ? (
+            <div style={{ border: '1px solid #f44336', borderRadius: 8, padding: 16 }}>
+              <p style={{ margin: '0 0 12px', fontSize: 14, color: '#212121' }}>
+                This will permanently delete all session history and test records. This cannot be undone.
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" onClick={() => { onClearProgress(); setSessions([]); setTests([]); setStreak(0); setConfirmingClear(false); }}
+                  style={{ flex: 1, padding: '8px 0', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>
+                  Clear
+                </button>
+                <button type="button" onClick={() => setConfirmingClear(false)}
+                  style={{ flex: 1, padding: '8px 0', background: '#e0e0e0', color: '#212121', border: 'none', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <button type="button" onClick={() => setConfirmingClear(true)}
-            style={{ width: '100%', padding: '12px 0', background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}>
-            Clear All Progress
-          </button>
-        )}
-      </div>
+          ) : (
+            <button type="button" onClick={() => setConfirmingClear(true)}
+              style={{ width: '100%', padding: '12px 0', background: '#ffebee', color: '#c62828', border: '1px solid #ef9a9a', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}>
+              Clear All Progress
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

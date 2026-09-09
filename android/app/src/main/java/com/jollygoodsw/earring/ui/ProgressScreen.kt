@@ -26,7 +26,8 @@ import com.jollygoodsw.earring.TestRecord
 @Composable
 fun ProgressScreen(
     viewModel: ProgressViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onStartExercise: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -69,10 +70,11 @@ fun ProgressScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // Streak
+        // Streak — plain Card, same treatment as the recorded-tests card below (issue
+        // #30: a tinted primaryContainer here next to that card's plain surface made
+        // this one look "highlighted" and the other "disabled" by comparison).
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            modifier = Modifier.fillMaxWidth()
         ) {
             Row(
                 modifier = Modifier.padding(16.dp),
@@ -84,13 +86,12 @@ fun ProgressScreen(
                     Text(
                         "${state.streak}",
                         fontSize = 36.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
                         "Streak (≥80% sessions in a row)",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -147,39 +148,49 @@ fun ProgressScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = onStartExercise,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("▶ Start your first exercise", fontSize = 17.sp)
+            }
         } else {
             state.sessions.forEach { s ->
                 SessionCard(s, onClick = { selectedSession = s })
                 Spacer(Modifier.height(8.dp))
             }
-        }
 
-        Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
 
-        var showClearConfirm by remember { mutableStateOf(false) }
-        if (showClearConfirm) {
-            AlertDialog(
-                onDismissRequest = { showClearConfirm = false },
-                title = { Text("Clear All Progress?") },
-                text = { Text("This will permanently delete all session history and test records. This cannot be undone.") },
-                confirmButton = {
-                    TextButton(onClick = { viewModel.clearAllProgress(); showClearConfirm = false }) {
-                        Text("Clear", color = MaterialTheme.colorScheme.error)
+            var showClearConfirm by remember { mutableStateOf(false) }
+            if (showClearConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showClearConfirm = false },
+                    title = { Text("Clear All Progress?") },
+                    text = { Text("This will permanently delete all session history and test records. This cannot be undone.") },
+                    confirmButton = {
+                        TextButton(onClick = { viewModel.clearAllProgress(); showClearConfirm = false }) {
+                            Text("Clear", color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showClearConfirm = false }) { Text("Cancel") }
                     }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showClearConfirm = false }) { Text("Cancel") }
-                }
-            )
-        }
-        Button(
-            onClick = { showClearConfirm = true },
-            modifier = Modifier.fillMaxWidth(),
-            // .error/.onError — see ExerciseScreen.kt's Stop Testing button for why not
-            // the errorContainer/onErrorContainer pair (issue #30).
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-        ) {
-            Text("Clear All Progress", color = MaterialTheme.colorScheme.onError)
+                )
+            }
+            // Only shown once there's actually something to clear (issue #30: this was
+            // previously always visible — the most prominent control on the screen for
+            // a brand-new user with nothing to clear).
+            Button(
+                onClick = { showClearConfirm = true },
+                modifier = Modifier.fillMaxWidth(),
+                // .error/.onError — see ExerciseScreen.kt's Stop Testing button for why not
+                // the errorContainer/onErrorContainer pair (issue #30).
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text("Clear All Progress", color = MaterialTheme.colorScheme.onError)
+            }
         }
 
         Spacer(Modifier.height(16.dp))

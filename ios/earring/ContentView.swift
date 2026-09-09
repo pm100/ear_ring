@@ -56,7 +56,7 @@ struct ContentView: View {
             NavigationStack { SetupView().hideNavigationBar() }
                 .tabItem { Label(tabItems[1].label, systemImage: tabItems[1].icon) }
                 .tag(1)
-            NavigationStack { ProgressScreen().hideNavigationBar() }
+            NavigationStack { ProgressScreen(selectedTab: $selectedTab).hideNavigationBar() }
                 .tabItem { Label(tabItems[2].label, systemImage: tabItems[2].icon) }
                 .tag(2)
             NavigationStack { SettingsView().hideNavigationBar() }
@@ -99,7 +99,7 @@ struct ContentView: View {
         switch selectedTab {
         case 0: HomeTabView()
         case 1: NavigationStack { SetupView().hideNavigationBar() }
-        case 2: NavigationStack { ProgressScreen().hideNavigationBar() }
+        case 2: NavigationStack { ProgressScreen(selectedTab: $selectedTab).hideNavigationBar() }
         case 3: NavigationStack { SettingsView().hideNavigationBar() }
         case 4: NavigationStack { HelpView().hideNavigationBar() }
         default: HomeTabView()

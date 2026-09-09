@@ -4,6 +4,7 @@ import SwiftUI
 struct ProgressScreen: View {
     @EnvironmentObject var progressModel: ProgressModel
     @Environment(\.dismiss) private var dismiss
+    @Binding var selectedTab: Int
     @State private var showClearConfirm = false
     // Drill-down: tapping a session shows just that session's individual test records
     // instead of a separate always-visible "Recent Tests" list.
@@ -79,6 +80,12 @@ struct ProgressScreen: View {
                         .frame(maxWidth: .infinity)
                         .padding(.top, 40)
                         .multilineTextAlignment(.center)
+
+                    Spacer().frame(height: 16)
+                    Button("▶ Start your first exercise") {
+                        selectedTab = 0
+                    }
+                    .buttonStyle(PrimaryButtonStyle(height: 52, fontSize: 17))
                 } else {
                     Text("Session History")
                         .font(.title3.weight(.semibold))
@@ -116,20 +123,25 @@ struct ProgressScreen: View {
                     }
                 }
 
-                Spacer().frame(height: 24)
+                // Only shown once there's actually something to clear (issue #30: this
+                // was previously always visible — the most prominent control on the
+                // screen for a brand-new user with nothing to clear).
+                if !progressModel.history.isEmpty {
+                    Spacer().frame(height: 24)
 
-                Button(action: { showClearConfirm = true }) {
-                    Text("Clear All Progress")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                }
-                .buttonStyle(.bordered)
-                .tint(.red)
-                .alert("Clear All Progress?", isPresented: $showClearConfirm) {
-                    Button("Clear", role: .destructive) { progressModel.clearAllProgress() }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("This will permanently delete all session history and test records. This cannot be undone.")
+                    Button(action: { showClearConfirm = true }) {
+                        Text("Clear All Progress")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                    .alert("Clear All Progress?", isPresented: $showClearConfirm) {
+                        Button("Clear", role: .destructive) { progressModel.clearAllProgress() }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("This will permanently delete all session history and test records. This cannot be undone.")
+                    }
                 }
 
                 Spacer().frame(height: 16)

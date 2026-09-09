@@ -185,7 +185,14 @@ fun EarRingApp() {
             composable(Routes.PROGRESS) {
                 ProgressScreen(
                     viewModel = progressViewModel,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onStartExercise = {
+                        navController.navigate(Routes.HOME) {
+                            popUpTo(Routes.HOME) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
                 )
             }
             composable(Routes.SETTINGS) {

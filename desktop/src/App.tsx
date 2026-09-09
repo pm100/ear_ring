@@ -237,7 +237,11 @@ export default function App() {
         />
       )}
       {screen === 'progress' && (
-        <ProgressScreen onBack={() => setScreen('home')} onClearProgress={clearProgress} />
+        <ProgressScreen
+          onBack={() => setScreen('home')}
+          onClearProgress={clearProgress}
+          onStartExercise={() => setScreen('home')}
+        />
       )}
       {screen === 'settings' && (
         <SettingsScreen
