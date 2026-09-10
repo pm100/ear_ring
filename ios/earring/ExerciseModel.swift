@@ -221,7 +221,6 @@ class ExerciseModel: ObservableObject {
     }
 
     func playTestNote(midi: Int) async {
-        audioPlayback.resetCancellation()
         await audioPlayback.playNote(midi: midi)
     }
 
@@ -363,15 +362,13 @@ class ExerciseModel: ObservableObject {
     }
 
     private func playPrompt() async {
-        // A previous session's delayed continuation (completeTest's/commitNote's Task) can still
-        // be mid-flight when a new session starts — isSessionRunning alone can't tell them apart
-        // since it just checks status != .stopped, which is true again as soon as the new session
-        // begins. Capture the session identity now and re-check it at every resume point below so
-        // a stale call from an old session can never play audio or flip state for the new one.
+        // A previous session's delayed continuation can still be mid-flight when a new
+        // session starts. Capture the session identity now and re-check it at every
+        // resume point below so a stale call can never play audio or flip state for the
+        // new session (AudioPlayback has its own equivalent guard for issue #17).
         let mySession = sessionId
         guard !sequence.isEmpty else { return }
         status = .playing
-        audioPlayback.resetCancellation()
         // Issue #8: what plays before the test sequence is configurable — a single root
         // note, a block chord (default, unchanged), the chord arpeggiated, the full scale
         // ascending, or nothing at all. All but "chord" reuse playSequence (one note after

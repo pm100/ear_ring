@@ -21,7 +21,9 @@ class AudioPlayback {
     private let engine = AVAudioEngine()
     // (playerNode, timePitchUnit) pairs for all currently sounding notes.
     private var activeNodes: [(AVAudioPlayerNode, AVAudioUnitTimePitch)] = []
-    private var isCancelled = false
+    // Bumped by cancelPlayback(); each play call captures its own generation and
+    // checks it at every resume point, so a cancelled call can never resume (issue #17).
+    private var generation = 0
 
     // The Salamander piano samples play back at whatever level they were recorded/
     // normalized at, with no headroom applied — reported as too quiet by testers.
@@ -64,7 +66,7 @@ class AudioPlayback {
     }
 
     func cancelPlayback() {
-        isCancelled = true
+        generation += 1
         stopAllPlayers()
     }
 
@@ -100,10 +102,6 @@ class AudioPlayback {
         if engine.isRunning {
             engine.stop()
         }
-    }
-
-    func resetCancellation() {
-        isCancelled = false
     }
 
     // MARK: - Private helpers
@@ -195,12 +193,13 @@ class AudioPlayback {
     // MARK: - Public API
 
     func playNote(midi: Int, holdNanoseconds: UInt64 = 600_000_000) async {
-        guard !isCancelled else { return }
+        let myGen = generation
+        guard myGen == generation else { return }
         let sample = nearestSample(for: midi)
         let pitchCents = Float((midi - sample.midi) * 100)
         do {
             let url = try await downloadIfNeeded(name: sample.name)
-            guard !isCancelled else { return }
+            guard myGen == generation else { return }
             _ = try startNode(url: url, pitchCents: pitchCents)
             // Wait for the step duration (for sequencing pacing) but don't stop the note —
             // let it ring with natural piano decay. stopAllPlayers() silences everything
@@ -212,8 +211,9 @@ class AudioPlayback {
     }
 
     func playSequence(notes: [Int], bpm: Int = 100, durations: [Float]? = nil, onNoteStart: @escaping (Int) -> Void) async {
+        let myGen = generation
         for (i, midi) in notes.enumerated() {
-            guard !isCancelled else { return }
+            guard myGen == generation else { return }
             onNoteStart(midi)
             let beatDuration = durations?.indices.contains(i) == true ? durations![i] : 1.0
             let stepNanoseconds = UInt64(max(150.0, 60_000.0 / Double(max(1, bpm)) * Double(beatDuration))) * 1_000_000
@@ -225,7 +225,8 @@ class AudioPlayback {
     /// Downloads all samples first (usually cached), then fires all player nodes
     /// in a tight synchronous loop for near-simultaneous onset.
     func playChord(notes: [Int], holdMs: UInt64 = 600) async {
-        guard !isCancelled else { return }
+        let myGen = generation
+        guard myGen == generation else { return }
         // Download all samples in parallel so chord onset isn't delayed by sequential fetches.
         var results: [Int: (URL, Float)] = [:]
         await withTaskGroup(of: (Int, URL, Float)?.self) { group in
@@ -242,7 +243,7 @@ class AudioPlayback {
                 if let (i, url, cents) = result { results[i] = (url, cents) }
             }
         }
-        guard !isCancelled else { return }
+        guard myGen == generation else { return }
         // Start all notes with no awaits between them → simultaneous onset.
         for i in notes.indices {
             guard let (url, pitchCents) = results[i] else { continue }
