@@ -1,25 +1,5 @@
 import SwiftUI
 
-private struct SectionContainer: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .padding(.leading, 12)
-            .overlay(alignment: .leading) {
-                Rectangle().fill(Color.erMuted.opacity(0.4)).frame(width: 2)
-            }
-            .padding(.leading, 12)
-            .padding(.bottom, 4)
-    }
-}
-
-extension View {
-    /// Indents and left-rules a DisclosureGroup's expanded content so it reads as
-    /// visually contained under its header, matching Android's ExpandableSection.
-    func sectionContained() -> some View {
-        modifier(SectionContainer())
-    }
-}
-
 struct SettingsView: View {
     @EnvironmentObject var model: ExerciseModel
     private let bpmOptions = [60, 80, 100, 120, 140]
@@ -46,144 +26,144 @@ struct SettingsView: View {
     @State private var expandExerciseTiming = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Settings")
-                    .font(.title2.bold())
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.bottom, 8)
+        VStack(spacing: 0) {
+            Text("Settings")
+                .font(.title2.bold())
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 12)
 
-                DisclosureGroup(isExpanded: $expandInstrumentPlayback) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        sectionLabel("Instrument").padding(.top, 8)
-                        Picker("Instrument", selection: $model.instrumentIndex) {
-                            ForEach(instruments) { inst in
-                                Text(inst.name).tag(inst.id)
+            // A real List/Form (not ScrollView+VStack) so Toggle renders as a true
+            // native UISwitch — outside a List, SwiftUI falls back to a simplified
+            // custom-drawn switch whose knob touches the track with no margin,
+            // unlike every native toggle elsewhere in iOS (issue found during the
+            // UI review, issue #30: "the round slider is an oval... clipped on the
+            // right" — that was this exact fallback rendering, not a design choice).
+            List {
+                Section {
+                    DisclosureGroup(isExpanded: $expandInstrumentPlayback) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            // No separate sectionLabel here — the Picker's own
+                            // "Instrument" label already names the row (shown as
+                            // "Instrument   Piano ⌄"), so a label above it just
+                            // repeated the word.
+                            Picker("Instrument", selection: $model.instrumentIndex) {
+                                ForEach(instruments) { inst in
+                                    Text(inst.name).tag(inst.id)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            sectionLabel("Tempo (BPM)")
+                            chipGrid(options: bpmOptions.map { "\($0)" },
+                                     selected: bpmOptions.firstIndex(of: model.tempoBpm) ?? 0,
+                                     count: bpmOptions.count) { idx in
+                                model.tempoBpm = bpmOptions[idx]
                             }
                         }
-                        .pickerStyle(.menu)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.bottom, 4)
+                        .padding(.vertical, 6)
+                    } label: { sectionHeader("Instrument & Playback") }
+                }
 
-                        sectionLabel("Tempo (BPM)").padding(.top, 8)
-                        chipGrid(options: bpmOptions.map { "\($0)" },
-                                 selected: bpmOptions.firstIndex(of: model.tempoBpm) ?? 0,
-                                 count: bpmOptions.count) { idx in
-                            model.tempoBpm = bpmOptions[idx]
+                Section {
+                    DisclosureGroup(isExpanded: $expandSoundDisplay) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Toggle(isOn: Binding(
+                                get: { model.playPassFailSounds },
+                                set: { model.playPassFailSounds = $0 }
+                            )) {
+                                Text("Play Pass/Fail Sounds")
+                            }
+                            Toggle(isOn: Binding(
+                                get: { model.showTestNotes },
+                                set: { model.showTestNotes = $0 }
+                            )) {
+                                Text("Display Test Notes")
+                            }
+                            Toggle(isOn: Binding(
+                                get: { model.keySignatureMode == 1 },
+                                set: { model.keySignatureMode = $0 ? 1 : 0 }
+                            )) {
+                                Text("Use Key Signature")
+                            }
+
+                            Picker("Intro Sound", selection: $model.introSoundMode) {
+                                ForEach(introSoundOptions.indices, id: \.self) { idx in
+                                    Text(introSoundOptions[idx]).tag(idx)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                    }
-                    .sectionContained()
-                } label: { sectionHeader("Instrument & Playback") }
-                Divider()
+                        .padding(.vertical, 6)
+                    } label: { sectionHeader("Sound & Display") }
+                }
 
-                DisclosureGroup(isExpanded: $expandSoundDisplay) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Toggle(isOn: Binding(
-                            get: { model.playPassFailSounds },
-                            set: { model.playPassFailSounds = $0 }
-                        )) {
-                            Text("Play Pass/Fail Sounds")
-                        }
-                        Text("A chime when a test is passed, a different tone when it fails")
-                            .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
+                Section {
+                    DisclosureGroup(isExpanded: $expandExerciseTiming) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            sectionLabel("Max Retries")
+                            Text("Attempts per test before moving on")
+                                .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading)
+                            chipGrid(options: retryOptions.map { "\($0)" },
+                                     selected: retryOptions.firstIndex(of: model.maxRetries) ?? 0,
+                                     count: retryOptions.count) { idx in
+                                model.maxRetries = retryOptions[idx]
+                            }
 
-                        sectionLabel("Intro Sound").padding(.top, 8)
-                        Text("What plays before each test")
-                            .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
-                        Picker("Intro Sound", selection: $model.introSoundMode) {
-                            ForEach(introSoundOptions.indices, id: \.self) { idx in
-                                Text(introSoundOptions[idx]).tag(idx)
+                            sectionLabel("Retry Same Note")
+                            Text("Tries allowed on a wrong note before the whole test restarts — each retry costs a few points (0 = off)")
+                                .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading)
+                            chipGrid(options: noteRetryOptions.map { "\($0)" },
+                                     selected: noteRetryOptions.firstIndex(of: model.noteRetries) ?? 0,
+                                     count: noteRetryOptions.count) { idx in
+                                model.noteRetries = noteRetryOptions[idx]
+                            }
+
+                            sectionLabel("Pause Before Playing")
+                            Text("Gap between chord and test sequence: \(model.postChordGapNanoseconds / 1_000_000)ms")
+                                .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading)
+                            Slider(value: Binding(
+                                get: { Double(model.postChordGapNanoseconds / 1_000_000) },
+                                set: { model.postChordGapNanoseconds = UInt64($0) * 1_000_000 }
+                            ), in: 400...2000, step: 100)
+
+                            sectionLabel("Wrong Note Pause")
+                            Text("How long to display a wrong note before replaying")
+                                .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading)
+                            chipGrid(options: wrongPauseOptions.map { $0.1 },
+                                     selected: wrongPauseOptions.firstIndex(where: { $0.0 == model.wrongNotePauseNanoseconds }) ?? 0,
+                                     count: wrongPauseOptions.count) { idx in
+                                model.wrongNotePauseNanoseconds = wrongPauseOptions[idx].0
                             }
                         }
-                        .pickerStyle(.menu)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.bottom, 4)
-
-                        Toggle(isOn: Binding(
-                            get: { model.showTestNotes },
-                            set: { model.showTestNotes = $0 }
-                        )) {
-                            Text("Display Test Notes")
-                        }
-                        .padding(.top, 8)
-                        Toggle(isOn: Binding(
-                            get: { model.keySignatureMode == 1 },
-                            set: { model.keySignatureMode = $0 ? 1 : 0 }
-                        )) {
-                            Text("Use Key Signature")
-                        }
-                    }
-                    .sectionContained()
-                } label: { sectionHeader("Sound & Display") }
-                Divider()
-
-                DisclosureGroup(isExpanded: $expandExerciseTiming) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        sectionLabel("Max Retries").padding(.top, 8)
-                        Text("Attempts per test before moving on")
-                            .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
-                        chipGrid(options: retryOptions.map { "\($0)" },
-                                 selected: retryOptions.firstIndex(of: model.maxRetries) ?? 0,
-                                 count: retryOptions.count) { idx in
-                            model.maxRetries = retryOptions[idx]
-                        }
-
-                        sectionLabel("Retry Same Note").padding(.top, 8)
-                        Text("Tries allowed on a wrong note before the whole test restarts — each retry costs a few points (0 = off)")
-                            .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
-                        chipGrid(options: noteRetryOptions.map { "\($0)" },
-                                 selected: noteRetryOptions.firstIndex(of: model.noteRetries) ?? 0,
-                                 count: noteRetryOptions.count) { idx in
-                            model.noteRetries = noteRetryOptions[idx]
-                        }
-
-                        sectionLabel("Pause Before Playing").padding(.top, 8)
-                        Text("Gap between chord and test sequence: \(model.postChordGapNanoseconds / 1_000_000)ms")
-                            .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 4)
-                        Slider(value: Binding(
-                            get: { Double(model.postChordGapNanoseconds / 1_000_000) },
-                            set: { model.postChordGapNanoseconds = UInt64($0) * 1_000_000 }
-                        ), in: 400...2000, step: 100)
-
-                        sectionLabel("Wrong Note Pause").padding(.top, 8)
-                        Text("How long to display a wrong note before replaying")
-                            .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 6)
-                        chipGrid(options: wrongPauseOptions.map { $0.1 },
-                                 selected: wrongPauseOptions.firstIndex(where: { $0.0 == model.wrongNotePauseNanoseconds }) ?? 0,
-                                 count: wrongPauseOptions.count) { idx in
-                            model.wrongNotePauseNanoseconds = wrongPauseOptions[idx].0
-                        }
-                    }
-                    .sectionContained()
-                } label: { sectionHeader("Exercise & Timing") }
-                Divider()
-
-                Spacer(minLength: 32)
-
-                Button(action: { showResetConfirm = true }) {
-                    Text("Reset to Defaults")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                }
-                .buttonStyle(.bordered)
-                .tint(.red)
-                .alert("Reset Settings?", isPresented: $showResetConfirm) {
-                    Button("Reset", role: .destructive) { model.resetSettings() }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("All settings will be restored to their defaults. Your progress history will not be affected.")
+                        .padding(.vertical, 6)
+                    } label: { sectionHeader("Exercise & Timing") }
                 }
 
-                Text("Build \(EarRingCore.gitHash())")
-                    .font(.caption2)
-                    .foregroundColor(.erMuted)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, 16)
+                Section {
+                    Button(action: { showResetConfirm = true }) {
+                        Text("Reset to Defaults")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .foregroundColor(.erError)
+                    .alert("Reset Settings?", isPresented: $showResetConfirm) {
+                        Button("Reset", role: .destructive) { model.resetSettings() }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("All settings will be restored to their defaults. Your progress history will not be affected.")
+                    }
+                }
 
-                Spacer(minLength: 24)
+                Section {
+                    Text("Build \(EarRingCore.gitHash())")
+                        .font(.caption2)
+                        .foregroundColor(.erMuted)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+                .listRowBackground(Color.clear)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
+            .listStyle(.insetGrouped)
         }
         .background(Color(.systemBackground))
         .hideNavigationBar()
@@ -211,7 +191,6 @@ struct SettingsView: View {
         Text(title.uppercased())
             .font(.caption.weight(.bold))
             .foregroundColor(.erPrimary)
-            .padding(.vertical, 8)
     }
 
     @ViewBuilder
@@ -226,7 +205,6 @@ struct SettingsView: View {
             .font(.subheadline.weight(.semibold))
             .foregroundColor(.erCaption)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, 6)
     }
 
     private func chipGrid(options: [String], selected: Int, count: Int, onSelect: @escaping (Int) -> Void) -> some View {
