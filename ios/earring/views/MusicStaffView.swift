@@ -72,7 +72,13 @@ struct MusicStaffView: View {
         for name in ["flat", "flat_correct", "flat_wrong", "flat_active",
                      "sharp", "sharp_correct", "sharp_wrong", "sharp_active",
                      "natural", "natural_correct", "natural_wrong", "natural_active"] {
-            if let img = UIImage(named: name) { d[name] = img }
+            if let img = UIImage(named: name) {
+                d[name] = img
+            } else {
+                // issue #33: this silently failed for months because a missing asset
+                // just meant nothing drew where the glyph should be — no crash, no log.
+                print("[MusicStaffView] missing image asset: \(name)")
+            }
         }
         return d
     }()

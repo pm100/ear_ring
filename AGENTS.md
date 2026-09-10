@@ -631,7 +631,7 @@ The NotoMusic-Regular.ttf file lives in icon/ (do not delete it; the generator n
 Distributed to:
   - desktop/public/treble_clef.png              (Tauri — SVG <image href>)
   - android/.../res/drawable/treble_clef.png    (Android — BitmapFactory.decodeResource)
-  - ios/.../Assets.xcassets/treble_clef.imageset (iOS — Canvas Image asset)
+  - ios/.../Images.xcassets/treble_clef.imageset (iOS — Canvas Image asset)
 
 Regenerate all three with: cd icon && node gen_desktop_clef.js
 (script renders, trims, and copies to all platforms automatically)
@@ -741,7 +741,9 @@ Regenerate PNGs after any font/size change:
 ```
 cd icon && node gen_accidental_symbols.js
 ```
-Files are written to `desktop/public/`, `android/.../res/drawable/`, and `ios/.../Assets.xcassets/`.
+Files are written to `desktop/public/`, `android/.../res/drawable/`, and `ios/.../Images.xcassets/`
+(NOT `Assets.xcassets` — that catalog exists but was never wired into the Xcode project's
+Resources build phase, so anything placed there silently never renders on iOS; see issue #33).
 - Do not draw note-name text beneath the staff notes
 
 **Note colours**:

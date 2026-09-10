@@ -50,7 +50,10 @@ sharp(rawPng)
     const androidDest = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res', 'drawable', 'treble_clef.png');
     fs.copyFileSync(outFile, androidDest);
 
-    const iosDir = path.join(__dirname, '..', 'ios', 'earring', 'Assets.xcassets', 'treble_clef.imageset');
+    // Images.xcassets, NOT Assets.xcassets — the latter is a stray folder that was
+    // never wired into the Xcode project's Resources build phase, so anything
+    // written there silently never renders on-device (issue #33).
+    const iosDir = path.join(__dirname, '..', 'ios', 'earring', 'Images.xcassets', 'treble_clef.imageset');
     if (!fs.existsSync(iosDir)) fs.mkdirSync(iosDir, { recursive: true });
     fs.copyFileSync(outFile, path.join(iosDir, 'treble_clef.png'));
     const contents = JSON.stringify({

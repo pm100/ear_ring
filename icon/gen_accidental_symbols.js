@@ -23,7 +23,7 @@
  * Outputs (24 files total, 8 per symbol):
  *   desktop/public/{flat,sharp,natural}{,_correct,_wrong,_active}.png
  *   android/.../res/drawable/{flat,sharp,natural}{,_correct,_wrong,_active}.png
- *   ios/.../Assets.xcassets/{flat,sharp,natural}{,_correct,_wrong,_active}.imageset/
+ *   ios/.../Images.xcassets/{flat,sharp,natural}{,_correct,_wrong,_active}.imageset/
  */
 
 const { execSync } = require('child_process');
@@ -62,7 +62,10 @@ function copyTo(src, dest) {
 }
 
 function writeIosImageset(src, name) {
-  const dir = path.join(ROOT, `ios/earring/Assets.xcassets/${name}.imageset`);
+  // Images.xcassets, NOT Assets.xcassets — the latter is a stray folder that was
+  // never wired into the Xcode project's Resources build phase, so anything
+  // written there silently never renders on-device (issue #33).
+  const dir = path.join(ROOT, `ios/earring/Images.xcassets/${name}.imageset`);
   ensureDir(dir);
   fs.copyFileSync(src, path.join(dir, `${name}.png`));
   const contents = {
