@@ -23,6 +23,11 @@ import com.jollygoodsw.earring.R
 
 enum class NoteState { EXPECTED, CORRECT, INCORRECT, ACTIVE }
 
+// Issue #22: key-signature mode has THREE possible accidentals, not two — a note
+// out-of-key relative to the signature can need a natural (♮) to cancel the
+// signature's implied sharp/flat, not just a sharp or flat of its own.
+private enum class Accidental { SHARP, FLAT, NATURAL }
+
 data class StaffNote(
     val midi: Int,
     val state: NoteState,
@@ -70,6 +75,10 @@ fun MusicStaff(
             "sharp_correct" to BitmapFactory.decodeResource(context.resources, R.drawable.sharp_correct),
             "sharp_wrong"   to BitmapFactory.decodeResource(context.resources, R.drawable.sharp_wrong),
             "sharp_active"  to BitmapFactory.decodeResource(context.resources, R.drawable.sharp_active),
+            "natural"         to BitmapFactory.decodeResource(context.resources, R.drawable.natural),
+            "natural_correct" to BitmapFactory.decodeResource(context.resources, R.drawable.natural_correct),
+            "natural_wrong"   to BitmapFactory.decodeResource(context.resources, R.drawable.natural_wrong),
+            "natural_active"  to BitmapFactory.decodeResource(context.resources, R.drawable.natural_active),
         )
     }
 
@@ -87,12 +96,23 @@ fun MusicStaff(
         val stemLength = lineSpacing * 3.2f
 
         // Display heights for accidental PNGs — same multiplier on all platforms.
-        val flatDisplayH  = lineSpacing * 3.0f
-        val sharpDisplayH = lineSpacing * 2.0f
+        val flatDisplayH    = lineSpacing * 3.0f
+        val sharpDisplayH   = lineSpacing * 2.0f
+        val naturalDisplayH = lineSpacing * 2.0f
+
+        fun displayHFor(accidental: Accidental): Float = when (accidental) {
+            Accidental.FLAT -> flatDisplayH
+            Accidental.SHARP -> sharpDisplayH
+            Accidental.NATURAL -> naturalDisplayH
+        }
 
         // Returns the correctly-coloured bitmap for a given symbol and note state.
-        fun accBmp(isSharp: Boolean, state: NoteState = NoteState.EXPECTED): android.graphics.Bitmap? {
-            val prefix = if (isSharp) "sharp" else "flat"
+        fun accBmp(accidental: Accidental, state: NoteState = NoteState.EXPECTED): android.graphics.Bitmap? {
+            val prefix = when (accidental) {
+                Accidental.SHARP -> "sharp"
+                Accidental.FLAT -> "flat"
+                Accidental.NATURAL -> "natural"
+            }
             val suffix = when (state) {
                 NoteState.CORRECT   -> "_correct"
                 NoteState.INCORRECT -> "_wrong"
@@ -135,8 +155,9 @@ fun MusicStaff(
 
         // ── Key signature (PNG bitmaps) ──────────────────────────────────────
         val keySigIsSharp = EarRingCore.isSharpKey(rootChroma)
-        val keySigDisplayH = if (keySigIsSharp) sharpDisplayH else flatDisplayH
-        val keySigBmp = accBmp(keySigIsSharp)
+        val keySigAccidental = if (keySigIsSharp) Accidental.SHARP else Accidental.FLAT
+        val keySigDisplayH = displayHFor(keySigAccidental)
+        val keySigBmp = accBmp(keySigAccidental)
         val keySigStep = keySigBmp?.let { keySigDisplayH * it.width / it.height.toFloat() }
             ?: (lineSpacing * 1.2f)
 
@@ -171,18 +192,23 @@ fun MusicStaff(
                 NoteState.ACTIVE    -> Color(0xFF3F51B5)
             }
 
-            // Determine accidental type for this note (true=sharp, false=flat, null=none).
-            val accIsSharp: Boolean? = if (keySignatureMode == 1) {
+            // Determine accidental for this note. Key-signature mode has three
+            // possibilities — a note out-of-key can need a natural sign to cancel the
+            // signature's implied sharp/flat, not just a sharp or flat of its own
+            // (issue #22: this used to collapse to a Boolean, silently dropping the
+            // natural case into "no accidental").
+            val accidental: Accidental? = if (keySignatureMode == 1) {
                 when (EarRingCore.accidentalInKey(staffNote.midi, rootChroma)) {
-                    1 -> true   // ♯
-                    2 -> false  // ♭
+                    1 -> Accidental.SHARP
+                    2 -> Accidental.FLAT
+                    3 -> Accidental.NATURAL
                     else -> null
                 }
             } else {
                 val label = EarRingCore.preferredMidiLabel(staffNote.midi, rootChroma)
                 when {
-                    label.contains("#") -> true
-                    label.contains("b") || label.contains("\u266d") -> false
+                    label.contains("#") -> Accidental.SHARP
+                    label.contains("b") || label.contains("\u266d") -> Accidental.FLAT
                     else -> null
                 }
             }
@@ -237,10 +263,10 @@ fun MusicStaff(
                 }
                 nc.restore()
 
-                accIsSharp?.let { isSharp ->
-                    val bmp = accBmp(isSharp, staffNote.state)
+                accidental?.let { acc ->
+                    val bmp = accBmp(acc, staffNote.state)
                     bmp?.let {
-                        val dh = if (isSharp) sharpDisplayH else flatDisplayH
+                        val dh = displayHFor(acc)
                         val dw = dh * it.width / it.height.toFloat()
                         nc.drawAcc(it, noteX - noteHeadWidth * 1.25f - dw / 2f, noteY, dh)
                     }

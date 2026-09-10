@@ -4,16 +4,25 @@ import { preferredMidiLabel, accidentalInKey, keySigPositions, staffPositionForM
 
 // Flat PNG: 141×435px, belly (anchor) at exactly 50% height.
 // Sharp PNG: 179×305px, bar-centre (anchor) at exactly 50% height.
+// Natural PNG: 117×305px, bar-centre (anchor) at exactly 50% height.
 // Position formula on every platform: top = targetY - displayH / 2
-const FLAT_W  = 141;
-const FLAT_H  = 435;
-const SHARP_W = 179;
-const SHARP_H = 305;
+const FLAT_W    = 141;
+const FLAT_H    = 435;
+const SHARP_W   = 179;
+const SHARP_H   = 305;
+const NATURAL_W = 117;
+const NATURAL_H = 305;
 
 // Display height multipliers (same on all platforms).
 // Width is derived from aspect ratio so images are never distorted.
-const FLAT_H_MULT  = 3.0;
-const SHARP_H_MULT = 2.0;
+const FLAT_H_MULT    = 3.0;
+const SHARP_H_MULT   = 2.0;
+const NATURAL_H_MULT = 2.0;
+
+// Issue #22: key-signature mode has THREE possible accidentals, not two — a note
+// out-of-key relative to the signature can need a natural sign to cancel the
+// signature's implied sharp/flat, not just a sharp or flat of its own.
+type Accidental = 'sharp' | 'flat' | 'natural';
 
 interface Props {
   notes: StaffDisplayNote[];
@@ -48,10 +57,17 @@ export default function MusicStaff({ notes, fixedSpacing, rootChroma = 0, keySig
   const clefImgY = staffTop - lineSpacing * 2;
 
   // Accidental display sizes
-  const flatDisplayH  = lineSpacing * FLAT_H_MULT;
-  const sharpDisplayH = lineSpacing * SHARP_H_MULT;
-  const flatDisplayW  = flatDisplayH  * (FLAT_W  / FLAT_H);
-  const sharpDisplayW = sharpDisplayH * (SHARP_W / SHARP_H);
+  const flatDisplayH    = lineSpacing * FLAT_H_MULT;
+  const sharpDisplayH   = lineSpacing * SHARP_H_MULT;
+  const naturalDisplayH = lineSpacing * NATURAL_H_MULT;
+  const flatDisplayW    = flatDisplayH    * (FLAT_W    / FLAT_H);
+  const sharpDisplayW   = sharpDisplayH   * (SHARP_W   / SHARP_H);
+  const naturalDisplayW = naturalDisplayH * (NATURAL_W / NATURAL_H);
+
+  const displayHFor = (acc: Accidental) =>
+    acc === 'flat' ? flatDisplayH : acc === 'sharp' ? sharpDisplayH : naturalDisplayH;
+  const displayWFor = (acc: Accidental) =>
+    acc === 'flat' ? flatDisplayW : acc === 'sharp' ? sharpDisplayW : naturalDisplayW;
 
   // Key signature layout
   const keySigStartX = 2 + clefW + 6;
@@ -70,17 +86,21 @@ export default function MusicStaff({ notes, fixedSpacing, rootChroma = 0, keySig
   const noteHeadRy = noteRadius * 0.85;
   const stemLength = lineSpacing * 3.2;
 
-  // Returns true=sharp, false=flat, null=none
-  const accidentalIsSharp = (midi: number): boolean | null => {
+  // Determine accidental for a note. Key-signature mode has three possibilities \u2014
+  // a note out-of-key can need a natural sign to cancel the signature's implied
+  // sharp/flat, not just a sharp or flat of its own (issue #22: this used to
+  // collapse to a boolean, silently dropping the natural case into "no accidental").
+  const accidentalFor = (midi: number): Accidental | null => {
     if (keySignatureMode === 1) {
       const acc = accidentalInKey(midi, rootChroma);
-      if (acc === 1) return true;
-      if (acc === 2) return false;
+      if (acc === 1) return 'sharp';
+      if (acc === 2) return 'flat';
+      if (acc === 3) return 'natural';
       return null;
     }
     const label = preferredMidiLabel(midi, rootChroma);
-    if (label.includes('#')) return true;
-    if (label.includes('b') || label.includes('\u266d')) return false;
+    if (label.includes('#')) return 'sharp';
+    if (label.includes('b') || label.includes('\u266d')) return 'flat';
     return null;
   };
 
@@ -169,7 +189,7 @@ export default function MusicStaff({ notes, fixedSpacing, rootChroma = 0, keySig
         const stemUp = sp < 6;
         const stemX = stemUp ? cx + noteHeadRx * 0.9 : cx - noteHeadRx * 0.9;
         const stemY2 = stemUp ? cy - stemLength : cy + stemLength;
-        const isSharpAcc = accidentalIsSharp(note.midi);
+        const acc = accidentalFor(note.midi);
         const suffix = accSuffix(note.state);
 
         const durType = classifyDuration(note.duration);
@@ -194,10 +214,10 @@ export default function MusicStaff({ notes, fixedSpacing, rootChroma = 0, keySig
           <g key={`${note.midi}-${i}`}>
             {ledgers}
             {/* Per-note accidental PNG — anchor@50% → top = noteY - displayH/2 */}
-            {isSharpAcc !== null && (() => {
-              const dh = isSharpAcc ? sharpDisplayH : flatDisplayH;
-              const dw = isSharpAcc ? sharpDisplayW : flatDisplayW;
-              const href = isSharpAcc ? `/sharp${suffix}.png` : `/flat${suffix}.png`;
+            {acc !== null && (() => {
+              const dh = displayHFor(acc);
+              const dw = displayWFor(acc);
+              const href = `/${acc}${suffix}.png`;
               return (
                 <image
                   href={href}

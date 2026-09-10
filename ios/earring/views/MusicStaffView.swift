@@ -33,14 +33,22 @@ private func classifyDuration(_ beats: Float?) -> DurationType {
 }
 
 // Accidental PNG dimensions (matching gen_accidental_symbols.js output).
-// Anchor (belly for ♭, bar-centre for ♯) is at exactly 50% of the image height.
+// Anchor (belly for ♭, bar-centre for ♯/♮) is at exactly 50% of the image height.
 // Position formula: top = targetY - displayH / 2  (same on all platforms).
-private let FLAT_PNG_W:  CGFloat = 141
-private let FLAT_PNG_H:  CGFloat = 435
-private let SHARP_PNG_W: CGFloat = 179
-private let SHARP_PNG_H: CGFloat = 305
-private let FLAT_H_MULT:  CGFloat = 3.0
-private let SHARP_H_MULT: CGFloat = 2.0
+private let FLAT_PNG_W:    CGFloat = 141
+private let FLAT_PNG_H:    CGFloat = 435
+private let SHARP_PNG_W:   CGFloat = 179
+private let SHARP_PNG_H:   CGFloat = 305
+private let NATURAL_PNG_W: CGFloat = 117
+private let NATURAL_PNG_H: CGFloat = 305
+private let FLAT_H_MULT:    CGFloat = 3.0
+private let SHARP_H_MULT:   CGFloat = 2.0
+private let NATURAL_H_MULT: CGFloat = 2.0
+
+// Issue #22: key-signature mode has THREE possible accidentals, not two — a note
+// out-of-key relative to the signature can need a natural (♮) to cancel the
+// signature's implied sharp/flat, not just a sharp or flat of its own.
+private enum Accidental { case sharp, flat, natural }
 
 // Map note state → colour-variant suffix used in image asset names.
 private func accSuffix(_ state: StaffNoteState) -> String {
@@ -62,7 +70,8 @@ struct MusicStaffView: View {
     private static let accImages: [String: UIImage] = {
         var d: [String: UIImage] = [:]
         for name in ["flat", "flat_correct", "flat_wrong", "flat_active",
-                     "sharp", "sharp_correct", "sharp_wrong", "sharp_active"] {
+                     "sharp", "sharp_correct", "sharp_wrong", "sharp_active",
+                     "natural", "natural_correct", "natural_wrong", "natural_active"] {
             if let img = UIImage(named: name) { d[name] = img }
         }
         return d
@@ -81,10 +90,34 @@ struct MusicStaffView: View {
             let noteHeadHeight: CGFloat = noteRadius * 1.7
             let stemLength: CGFloat = lineSpacing * 3.2
 
-            let flatDisplayH:  CGFloat = lineSpacing * FLAT_H_MULT
-            let sharpDisplayH: CGFloat = lineSpacing * SHARP_H_MULT
-            let flatDisplayW:  CGFloat = flatDisplayH  * (FLAT_PNG_W  / FLAT_PNG_H)
-            let sharpDisplayW: CGFloat = sharpDisplayH * (SHARP_PNG_W / SHARP_PNG_H)
+            let flatDisplayH:    CGFloat = lineSpacing * FLAT_H_MULT
+            let sharpDisplayH:   CGFloat = lineSpacing * SHARP_H_MULT
+            let naturalDisplayH: CGFloat = lineSpacing * NATURAL_H_MULT
+            let flatDisplayW:    CGFloat = flatDisplayH    * (FLAT_PNG_W    / FLAT_PNG_H)
+            let sharpDisplayW:   CGFloat = sharpDisplayH   * (SHARP_PNG_W   / SHARP_PNG_H)
+            let naturalDisplayW: CGFloat = naturalDisplayH * (NATURAL_PNG_W / NATURAL_PNG_H)
+
+            func accName(_ acc: Accidental) -> String {
+                switch acc {
+                case .sharp: return "sharp"
+                case .flat: return "flat"
+                case .natural: return "natural"
+                }
+            }
+            func displayH(_ acc: Accidental) -> CGFloat {
+                switch acc {
+                case .sharp: return sharpDisplayH
+                case .flat: return flatDisplayH
+                case .natural: return naturalDisplayH
+                }
+            }
+            func displayW(_ acc: Accidental) -> CGFloat {
+                switch acc {
+                case .sharp: return sharpDisplayW
+                case .flat: return flatDisplayW
+                case .natural: return naturalDisplayW
+                }
+            }
 
             func noteY(_ staffPos: Int) -> CGFloat {
                 staffCenter - CGFloat(staffPos - 6) * (lineSpacing / 2)
@@ -156,19 +189,24 @@ struct MusicStaffView: View {
                     }
                 }()
 
-                // Determine accidental (true=sharp, false=flat, nil=none)
-                let accIsSharp: Bool? = {
+                // Determine accidental for this note. Key-signature mode has three
+                // possibilities — a note out-of-key can need a natural sign to cancel
+                // the signature's implied sharp/flat, not just a sharp or flat of its
+                // own (issue #22: this used to collapse to a Bool, silently dropping
+                // the natural case into "no accidental").
+                let accidental: Accidental? = {
                     if keySignatureMode == 1 {
                         let acc = EarRingCore.accidentalInKey(midi: displayNote.midi, rootChroma: rootChroma)
                         switch acc {
-                        case 1: return true
-                        case 2: return false
+                        case 1: return .sharp
+                        case 2: return .flat
+                        case 3: return .natural
                         default: return nil
                         }
                     } else {
                         let label = EarRingCore.preferredNoteLabel(midi: displayNote.midi, rootChroma: rootChroma)
-                        if label.contains("#") { return true }
-                        if label.contains("b") { return false }
+                        if label.contains("#") { return .sharp }
+                        if label.contains("b") { return .flat }
                         return nil
                     }
                 }()
@@ -251,11 +289,11 @@ struct MusicStaffView: View {
                 }
 
                 // Per-note accidental PNG
-                if let isSharp = accIsSharp {
+                if let acc = accidental {
                     let suffix = accSuffix(displayNote.state)
-                    let imgName = (isSharp ? "sharp" : "flat") + suffix
-                    let dh = isSharp ? sharpDisplayH : flatDisplayH
-                    let dw = isSharp ? sharpDisplayW : flatDisplayW
+                    let imgName = accName(acc) + suffix
+                    let dh = displayH(acc)
+                    let dw = displayW(acc)
                     // Centre the accidental just left of the notehead
                     let leftX = x - noteHeadWidth * 1.25 - dw / 2
                     drawAcc(imgName, leftX: leftX, targetY: y, displayH: dh, displayW: dw)

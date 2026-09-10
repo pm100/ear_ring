@@ -1,10 +1,10 @@
 /**
  * gen_accidental_symbols.js
  *
- * Generates sharp.png and flat.png (plus _correct / _wrong / _active colour
- * variants) for use across Android, iOS, and Tauri.
+ * Generates sharp.png, flat.png, and natural.png (plus _correct / _wrong /
+ * _active colour variants) for use across Android, iOS, and Tauri.
  *
- * Each PNG has its visual anchor (belly for ♭, bar-centre for ♯) at EXACTLY
+ * Each PNG has its visual anchor (belly for ♭, bar-centre for ♯/♮) at EXACTLY
  * 50% of the image height.  All platforms position with:
  *
  *   y = targetStaffLineY - displayHeight / 2
@@ -12,6 +12,7 @@
  * Display height multipliers (same on every platform):
  *   ♭  →  lineSpacing * 3.0
  *   ♯  →  lineSpacing * 2.0
+ *   ♮  →  lineSpacing * 2.0   (same family/shape as ♯ — two vertical strokes)
  *
  * Colour variants (suffix → note state):
  *   (none)    → EXPECTED / key-signature  (#333333)
@@ -19,10 +20,10 @@
  *   _wrong    → INCORRECT                (#F44336)
  *   _active   → ACTIVE                   (#3F51B5)
  *
- * Outputs (16 files total, 8 per symbol):
- *   desktop/public/{flat,sharp}{,_correct,_wrong,_active}.png
- *   android/.../res/drawable/{flat,sharp}{,_correct,_wrong,_active}.png
- *   ios/.../Assets.xcassets/{flat,sharp}{,_correct,_wrong,_active}.imageset/
+ * Outputs (24 files total, 8 per symbol):
+ *   desktop/public/{flat,sharp,natural}{,_correct,_wrong,_active}.png
+ *   android/.../res/drawable/{flat,sharp,natural}{,_correct,_wrong,_active}.png
+ *   ios/.../Assets.xcassets/{flat,sharp,natural}{,_correct,_wrong,_active}.imageset/
  */
 
 const { execSync } = require('child_process');
@@ -35,8 +36,9 @@ const ROOT = path.resolve(__dirname, '..');
 const FONT_SIZE = 400;
 
 // Fraction of the trimmed glyph where the visual anchor sits.
-const FLAT_ANCHOR_FRAC  = 0.731;  // belly ~73% from top of trimmed ♭ (Segoe UI Symbol)
-const SHARP_ANCHOR_FRAC = 0.50;   // bars centred in ♯
+const FLAT_ANCHOR_FRAC    = 0.731;  // belly ~73% from top of trimmed ♭ (Segoe UI Symbol)
+const SHARP_ANCHOR_FRAC   = 0.50;   // bars centred in ♯
+const NATURAL_ANCHOR_FRAC = 0.50;   // bars centred in ♮, same shape family as ♯
 
 const MARGIN = 12;
 
@@ -171,14 +173,15 @@ $bmp.Save('${tmpRaw.replace(/\\/g, '\\\\')}')
 async function main() {
   console.log('\n=== Generating accidental symbol PNGs ===\n');
 
-  const flatVariants  = await generateSymbol({ codepoint: '266D', name: 'flat',  anchorFrac: FLAT_ANCHOR_FRAC  });
-  const sharpVariants = await generateSymbol({ codepoint: '266F', name: 'sharp', anchorFrac: SHARP_ANCHOR_FRAC });
+  const flatVariants    = await generateSymbol({ codepoint: '266D', name: 'flat',    anchorFrac: FLAT_ANCHOR_FRAC    });
+  const sharpVariants   = await generateSymbol({ codepoint: '266F', name: 'sharp',   anchorFrac: SHARP_ANCHOR_FRAC   });
+  const naturalVariants = await generateSymbol({ codepoint: '266E', name: 'natural', anchorFrac: NATURAL_ANCHOR_FRAC });
 
   console.log('\n=== Distributing to platforms ===\n');
 
   const androidDrawable = path.join(ROOT, 'android/app/src/main/res/drawable');
 
-  for (const { suffix, outFile } of [...flatVariants, ...sharpVariants]) {
+  for (const { suffix, outFile } of [...flatVariants, ...sharpVariants, ...naturalVariants]) {
     const baseName = path.basename(outFile, '.png');
     const pngName  = `${baseName}.png`;
 
