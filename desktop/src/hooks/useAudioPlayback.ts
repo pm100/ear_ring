@@ -1,4 +1,5 @@
 import { useRef, useCallback } from 'react';
+import { getCachedSample, putCachedSample } from '../sampleCache';
 
 const SAMPLE_MIDIS = [21,24,27,30,33,36,39,42,45,48,51,54,57,60,63,66,69,72,75,78,81,84,87,90,93,96,99,102,105,108];
 const SAMPLE_NAMES: Record<number, string> = {
@@ -58,11 +59,24 @@ export function useAudioPlayback() {
       return bufferCache.current.get(sampleMidi)!;
     }
     const name = SAMPLE_NAMES[sampleMidi];
-    const url = `https://tonejs.github.io/audio/salamander/${name}.mp3`;
     try {
+      const ctx = getContext();
+
+      // Persistent cache (IndexedDB) survives app restarts, unlike the in-memory
+      // Map above which only survives this session (issue #29).
+      const cached = await getCachedSample(name);
+      if (cached) {
+        const audioBuffer = await ctx.decodeAudioData(cached);
+        bufferCache.current.set(sampleMidi, audioBuffer);
+        return audioBuffer;
+      }
+
+      const url = `https://tonejs.github.io/audio/salamander/${name}.mp3`;
       const response = await fetch(url);
       const arrayBuffer = await response.arrayBuffer();
-      const ctx = getContext();
+      // Persist before decoding — decodeAudioData transfers/detaches the buffer
+      // it's given, so the cache write must happen on the still-intact bytes.
+      await putCachedSample(name, arrayBuffer.slice(0));
       const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
       bufferCache.current.set(sampleMidi, audioBuffer);
       return audioBuffer;
