@@ -48,11 +48,16 @@ class AudioPlayback {
 
     /// Pre-configure the audio session so playback can start instantly.
     /// Only sets up the session — does not start the engine (which needs nodes attached first).
-    /// Preserves the current mode to avoid disrupting .measurement if AudioCapture set it.
+    /// If the category isn't set up yet, initializes it straight into .measurement — the
+    /// same mode AudioCapture uses — rather than .default (issue #28): the Exercise screen's
+    /// invariant is .measurement throughout, and initializing into .default here just means
+    /// AudioCapture.start() has to switch it moments later, which is the exact mode-switch
+    /// its own stop() comment says produces transient noise. If the category is already
+    /// .playAndRecord (AudioCapture ran already), leave the mode as-is.
     func prepareForPlayback() {
         let session = AVAudioSession.sharedInstance()
         if session.category != .playAndRecord {
-            try? session.setCategory(.playAndRecord, mode: .default,
+            try? session.setCategory(.playAndRecord, mode: .measurement,
                                      options: [.defaultToSpeaker, .allowBluetooth])
         }
         try? session.setActive(true)
@@ -125,13 +130,16 @@ class AudioPlayback {
     }
 
     /// Ensure the audio session and engine are in a state ready for playback.
-    /// Keeps the existing session mode (.measurement or .default) — switching to
-    /// .default is unnecessary because AVAudioUnitTimePitch works in any mode.
+    /// Keeps the existing session mode if one's already set (AVAudioUnitTimePitch works
+    /// in any mode); if the category isn't set up yet, initializes straight into
+    /// .measurement rather than .default, for the same reason as prepareForPlayback()
+    /// above (issue #28) — this is the path a bare playNote()/playChord() call (e.g. the
+    /// Repeat button) takes when it runs before prepareForPlayback() or AudioCapture ever has.
     private func ensureEngineRunning() throws {
         let session = AVAudioSession.sharedInstance()
         // Only configure if the category isn't already .playAndRecord.
         if session.category != .playAndRecord {
-            try session.setCategory(.playAndRecord, mode: .default,
+            try session.setCategory(.playAndRecord, mode: .measurement,
                                     options: [.defaultToSpeaker, .allowBluetooth])
         }
         if !session.isOtherAudioPlaying {
