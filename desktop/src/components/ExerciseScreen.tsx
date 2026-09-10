@@ -63,7 +63,6 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   const [sequence, setSequence] = useState<number[]>(exercise.sequence);
   const [detected, setDetected] = useState<DetectedNote[]>([]);
   const [displayedNotes, setDisplayedNotes] = useState<DetectedNote[]>([]);
-  const [sessionSaved, setSessionSaved] = useState(false);
   const [melodyDurations, setMelodyDurations] = useState<number[]>([]);
   const [melodyTitle, setMelodyTitle] = useState('');
   // Issue #9 "note correction": consecutive wrong tries at the current note position —
@@ -82,6 +81,21 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   // noteRetryCountRef, which resets on every restart via playPromptForSequence).
   const totalNoteRetriesRef = useRef(0);
   const sequenceRef = useRef<number[]>(exercise.sequence);
+  // Issue #25: completeTest() finishes async (two invoke() calls) after the note that
+  // ends a test is confirmed, so testsCompleted/cumulativeScorePercent state can still be
+  // stale if Stop is clicked in that window. These refs are the source of truth for
+  // "how many tests actually completed" — updated the instant the async work resolves,
+  // whether or not the session is still running by then — so stopSession() and the
+  // completion callback always agree, however they're interleaved.
+  const testsCompletedRef = useRef(0);
+  const cumulativeScorePercentRef = useRef(0);
+  // Counts completeTest() calls whose two invoke()s haven't resolved yet. stopSession()
+  // must not decide the session summary while this is nonzero — the in-flight
+  // completion(s) will update testsCompletedRef first — otherwise a Stop that lands
+  // between the note-confirmed and invoke-resolved moments would save a summary that's
+  // missing the test currently completing (not just the very first test — any test).
+  const pendingCompletionsRef = useRef(0);
+  const sessionSavedRef = useRef(false);
   const sessionRunningRef = useRef(true);
   const timersRef = useRef<number[]>([]);
   const handleFrameRef = useRef<(frame: TrackerFrame) => void>(() => {});
@@ -332,11 +346,26 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     void retryCurrentTest(currentAttemptRef.current);
   }, [status, stopCapture, retryCurrentTest]);
 
+  // Issue #25: the single place a session summary gets written, whether triggered by
+  // Stop or by a completeTest() completion that resolves after Stop already ran. Reads
+  // the refs (always current) rather than testsCompleted/cumulativeScorePercent state
+  // (which can still be one test behind while completeTest's async work is in flight),
+  // and sessionSavedRef guards it from running twice however the two call sites race.
+  const maybeSaveSession = useCallback(() => {
+    if (sessionSavedRef.current || testsCompletedRef.current === 0) return;
+    appendSessionRecord(
+      { ...exercise, testsCompleted: testsCompletedRef.current, cumulativeScorePercent: cumulativeScorePercentRef.current } as ExerciseState,
+      averageScore(cumulativeScorePercentRef.current, testsCompletedRef.current)
+    );
+    sessionSavedRef.current = true;
+  }, [exercise]);
+
   const completeTest = useCallback((passed: boolean, attemptNotes: DetectedNote[], attemptsUsed: number) => {
     const myGen = startFreshGenRef.current;
     if (exercise.playPassFailSounds) {
       if (passed) playPassSound(); else playFailSound();
     }
+    pendingCompletionsRef.current += 1;
     // Issue #9 "note correction": note-level retries don't consume a test attempt, but
     // they still cost points — deduct a penalty scaled so burning the whole per-note
     // budget on one note costs about as much as one full attempt would.
@@ -366,8 +395,22 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         detectedNotes: attemptNotes.map(note => midiToLabel(note.midi)),
         sessionId: exercise.sessionId,
       });
-      setTestsCompleted(prev => prev + 1);
-      setCumulativeScorePercent(prev => prev + testScore);
+      // Update the refs (source of truth) unconditionally — this test really did
+      // complete — but only push it into rendered state, and only schedule the next
+      // test, if the session is still running (issue #25: Stop may have already run
+      // and unmounted this screen by the time this async work resolves).
+      testsCompletedRef.current += 1;
+      cumulativeScorePercentRef.current += testScore;
+      pendingCompletionsRef.current -= 1;
+      if (!sessionRunningRef.current) {
+        // Stop already ran. If it saw a pending completion (this one) it deliberately
+        // deferred the save to avoid missing this test's result — do it now that the
+        // refs are current, but only once every such completion has landed.
+        if (pendingCompletionsRef.current === 0) maybeSaveSession();
+        return;
+      }
+      setTestsCompleted(testsCompletedRef.current);
+      setCumulativeScorePercent(cumulativeScorePercentRef.current);
       setStatus('retry_delay');
       schedule(() => {
         if (sessionRunningRef.current && startFreshGenRef.current === myGen) {
@@ -375,7 +418,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         }
       }, exercise.wrongNotePauseMs);
     });
-  }, [exercise.scaleId, exercise.rootNote, exercise.sequenceLength, exercise.maxRetries, exercise.noteRetries, exercise.wrongNotePauseMs, exercise.sessionId, exercise.playPassFailSounds, playPassSound, playFailSound, schedule, startFreshTest]);
+  }, [exercise.scaleId, exercise.rootNote, exercise.sequenceLength, exercise.maxRetries, exercise.noteRetries, exercise.wrongNotePauseMs, exercise.sessionId, exercise.playPassFailSounds, playPassSound, playFailSound, schedule, startFreshTest, maybeSaveSession]);
 
   // The audio frame handler — confirmed MIDI comes from the Rust tracker.
   handleFrameRef.current = async (frame: TrackerFrame) => {
@@ -456,12 +499,13 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   };
 
   const stopSession = useCallback(() => {
-    if (!sessionSaved && testsCompleted > 0) {
-      appendSessionRecord(
-        { ...exercise, testsCompleted, cumulativeScorePercent } as ExerciseState,
-        averageScore(cumulativeScorePercent, testsCompleted)
-      );
-      setSessionSaved(true);
+    // Issue #25: if a completeTest() is still mid-flight (its two invoke() calls
+    // haven't resolved), testsCompletedRef doesn't yet include that test either — saving
+    // now would produce a summary that's missing it. Leave it to that completion's own
+    // resolution (guarded by the sessionRunningRef check added there) instead of saving
+    // a stale summary here.
+    if (pendingCompletionsRef.current === 0) {
+      maybeSaveSession();
     }
     sessionRunningRef.current = false;
     clearTimers();
@@ -469,7 +513,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     cancelPlayback();
     void invoke('cmd_tracker_reset');
     onStop();
-  }, [cancelPlayback, clearTimers, cumulativeScorePercent, destroyCapture, exercise, onStop, sessionSaved, testsCompleted]);
+  }, [cancelPlayback, clearTimers, destroyCapture, onStop, maybeSaveSession]);
 
   useEffect(() => {
     void invoke('cmd_tracker_set_params', {
