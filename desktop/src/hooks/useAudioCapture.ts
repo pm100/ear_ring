@@ -14,6 +14,11 @@ export function useAudioCapture() {
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const callbackRef = useRef<((frame: TrackerFrame) => void) | null>(null);
   const activeRef = useRef(false);
+  // Issue #18: getUserMedia() below can stay pending for as long as the OS
+  // permission dialog is on screen. If destroy() runs (component unmounted) while
+  // that's in flight, bumping this invalidates the continuation — it releases
+  // the stream it just got instead of wiring up a pipeline with no mounted owner.
+  const generationRef = useRef(0);
   const detectInFlightRef = useRef(false);
   // Queue the latest buffer when detection is in-flight instead of dropping it.
   // This prevents missed notes under CPU load.
@@ -50,6 +55,7 @@ export function useAudioCapture() {
       return;
     }
 
+    const myGen = generationRef.current;
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         noiseSuppression: false,
@@ -59,6 +65,12 @@ export function useAudioCapture() {
         channelCount: 1,
       }
     });
+    if (myGen !== generationRef.current) {
+      // destroy() ran while the permission dialog was still open (issue #18) —
+      // release this stream immediately; there's no mounted owner left for it.
+      stream.getTracks().forEach(t => t.stop());
+      return;
+    }
     streamRef.current = stream;
 
     const context = new AudioContext({ sampleRate: 44100 });
@@ -93,10 +105,15 @@ export function useAudioCapture() {
   };
 
   const start = useCallback(async (onFrame: (frame: TrackerFrame) => void) => {
+    const myGen = generationRef.current;
     try {
       callbackRef.current = onFrame;
       detectInFlightRef.current = false;
       await ensureAudioPipeline();
+      // Issue #18: destroy() may have run while ensureAudioPipeline() was awaiting
+      // getUserMedia() — it already bailed out and released the stream above, but
+      // don't also flip activeRef back on for a pipeline that no longer exists.
+      if (myGen !== generationRef.current) return;
       activeRef.current = true;
     } catch (e) {
       console.error('useAudioCapture start error', e);
@@ -114,6 +131,7 @@ export function useAudioCapture() {
 
   // Fully release all audio resources. Call on component unmount.
   const destroy = useCallback(() => {
+    generationRef.current += 1;
     activeRef.current = false;
     detectInFlightRef.current = false;
     if (processorRef.current) {
