@@ -154,21 +154,23 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
         }
 
         ExpandableSection("Sound & Display") {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
-                    checked = state.playPassFailSounds,
-                    onCheckedChange = { viewModel.setPlayPassFailSounds(it) }
-                )
-                Text("Play Pass/Fail Sounds", style = MaterialTheme.typography.bodyLarge)
+            // Switch, not Checkbox — a checkbox reads as "select from a list," a
+            // switch as "toggle a setting," and Switch is what every other on/off
+            // preference on the platform (including this app's own OS settings)
+            // uses. Grouped together rather than split around the Intro Sound
+            // dropdown, and without a caption restating each control's own label.
+            SettingSwitchRow("Play Pass/Fail Sounds", state.playPassFailSounds) {
+                viewModel.setPlayPassFailSounds(it)
             }
-            Text("A chime when a test is passed, a different tone when it fails",
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SettingSwitchRow("Display Test Notes", state.showTestNotes) {
+                viewModel.setShowTestNotes(it)
+            }
+            SettingSwitchRow("Use Key Signature", state.keySignatureMode == 1) {
+                viewModel.setKeySignatureMode(if (it) 1 else 0)
+            }
 
             Spacer(Modifier.height(12.dp))
             SectionLabel("Intro Sound")
-            Text("What plays before each test",
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 6.dp))
             var introSoundExpanded by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(
                 expanded = introSoundExpanded,
@@ -193,22 +195,6 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
                         )
                     }
                 }
-            }
-
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
-                    checked = state.showTestNotes,
-                    onCheckedChange = { viewModel.setShowTestNotes(it) }
-                )
-                Text("Display Test Notes", style = MaterialTheme.typography.bodyLarge)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
-                    checked = state.keySignatureMode == 1,
-                    onCheckedChange = { viewModel.setKeySignatureMode(if (it) 1 else 0) }
-                )
-                Text("Use Key Signature", style = MaterialTheme.typography.bodyLarge)
             }
         }
 

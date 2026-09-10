@@ -340,6 +340,22 @@ internal fun SectionLabel(text: String) {
     )
 }
 
+/** A label + Switch row for a boolean setting. Switch, not Checkbox — a checkbox
+ *  reads as "select from a list," a switch as "toggle a setting," matching every
+ *  other on/off preference on the platform. */
+@Composable
+internal fun SettingSwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
 @Composable
 internal fun ChipRow(
     items: List<String>,
