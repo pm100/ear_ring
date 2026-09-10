@@ -33,6 +33,15 @@ Key things you will find here:
 
 ---
 
+## Code Comment Style
+
+Keep in-code comments short. Put the detailed bug narrative in the commit message and the
+tracking issue — that's the append-only history a reader can follow. A code comment should
+either point to the issue number (e.g. `// issue #17`) or explain something non-obvious about
+the code itself, not re-tell the whole bug story.
+
+---
+
 ## Shared Logic Rule
 
 **Keep cross-platform app logic in the shared Rust core whenever practical.**
