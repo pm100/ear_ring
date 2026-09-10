@@ -31,6 +31,11 @@ struct SetupView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            Text("Mic Setup")
+                .font(.title2.bold())
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
 
             // ── Instruction text ──────────────────────────────────────────
             Spacer().frame(height: 12)

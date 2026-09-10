@@ -32,6 +32,11 @@ struct ProgressScreen: View {
     private var sessionList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                Text("Progress")
+                    .font(.title2.bold())
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
 
                 // ── Streak card ───────────────────────────────────────────
                 Spacer().frame(height: 16)
