@@ -89,7 +89,7 @@ fun ProgressScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "Streak (≥80% sessions in a row)",
+                        "Consecutive days with a session",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
