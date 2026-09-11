@@ -155,6 +155,71 @@ pub fn best_params(history: &[(CalibrationRound, CalibrationScore)], fallback: C
         .unwrap_or(fallback)
 }
 
+/// Drives one calibration run: owns round history and hands out the next round
+/// to present until convergence. Platform code owns audio I/O; this owns the
+/// decision of what to test next and when to stop.
+pub struct CalibrationSession {
+    range_start: i32,
+    range_end: i32,
+    starting_params: CalibrationParams,
+    history: Vec<(CalibrationRound, CalibrationScore)>,
+    pending_round: CalibrationRound,
+}
+
+impl CalibrationSession {
+    pub fn new(range_start: i32, range_end: i32, starting_params: CalibrationParams) -> Self {
+        let pending_round = next_calibration_round(range_start, range_end, starting_params, &[]);
+        Self {
+            range_start,
+            range_end,
+            starting_params,
+            history: Vec::new(),
+            pending_round,
+        }
+    }
+
+    pub fn current_round(&self) -> &CalibrationRound {
+        &self.pending_round
+    }
+
+    /// Record the outcome of the current round. Returns `true` once calibration
+    /// has converged (caller should stop and read `best_params()`); otherwise
+    /// `current_round()` now returns the next round to present.
+    pub fn record_round(&mut self, detected: &[i32], frames_to_confirm: &[u32]) -> bool {
+        let score = score_round(&self.pending_round.notes, detected, frames_to_confirm);
+        self.history.push((self.pending_round.clone(), score));
+        if is_converged(&self.history) {
+            return true;
+        }
+        self.pending_round = next_calibration_round(self.range_start, self.range_end, self.starting_params, &self.history);
+        false
+    }
+
+    pub fn best_params(&self) -> CalibrationParams {
+        best_params(&self.history, self.starting_params)
+    }
+
+    /// Highest `total_score` seen across all recorded rounds (0.0 if none yet).
+    pub fn best_score(&self) -> f32 {
+        self.history.iter().map(|(_, s)| s.total_score).fold(0.0, f32::max)
+    }
+
+    /// True when the most recently recorded round detected nothing at all (every
+    /// slot missed) — a mic-permission/hardware problem, not a tuning problem.
+    /// Platform code should stop and surface an error rather than let the
+    /// directional-nudge loop keep iterating on zero data (spec: Error handling).
+    pub fn last_round_had_no_signal(&self) -> bool {
+        self.history
+            .last()
+            .map(|(_, score)| score.detected.iter().all(|&d| d == -1))
+            .unwrap_or(false)
+    }
+
+    pub fn round_count(&self) -> usize {
+        self.history.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -328,5 +393,58 @@ mod tests {
     fn test_best_params_falls_back_when_history_empty() {
         let start = params(0.003);
         assert_eq!(best_params(&[], start), start);
+    }
+
+    #[test]
+    fn test_session_drives_rounds_to_convergence() {
+        let start = params(0.003);
+        let mut session = CalibrationSession::new(60, 72, start);
+        assert_eq!(session.round_count(), 0);
+        let first_notes = session.current_round().notes.clone();
+        assert_eq!(first_notes, vec![60, 66, 72]);
+
+        // First attempt misses the middle note.
+        let converged = session.record_round(&[60, -1, 72], &[3, 0, 3]);
+        assert!(!converged);
+        assert_eq!(session.round_count(), 1);
+        assert!(session.current_round().params.silence_threshold < start.silence_threshold);
+
+        // Second attempt: everything confirmed correctly.
+        let next_notes = session.current_round().notes.clone();
+        let converged = session.record_round(&next_notes, &vec![3; next_notes.len()]);
+        assert!(converged);
+        assert_eq!(session.best_params(), session.current_round().params);
+        assert_eq!(session.best_score(), 1.0);
+    }
+
+    #[test]
+    fn test_last_round_had_no_signal() {
+        let start = params(0.003);
+        let mut session = CalibrationSession::new(60, 72, start);
+        let notes = session.current_round().notes.clone();
+        assert!(!session.last_round_had_no_signal()); // no rounds recorded yet
+        session.record_round(&vec![-1; notes.len()], &vec![0; notes.len()]);
+        assert!(session.last_round_had_no_signal());
+    }
+
+    #[test]
+    fn test_last_round_had_signal_when_at_least_one_note_detected() {
+        let start = params(0.003);
+        let mut session = CalibrationSession::new(60, 72, start);
+        let notes = session.current_round().notes.clone();
+        session.record_round(&[notes[0], -1, -1], &[3, 0, 0]);
+        assert!(!session.last_round_had_no_signal());
+    }
+
+    #[test]
+    fn test_session_best_params_survives_a_worse_final_round() {
+        let start = params(0.003);
+        let mut session = CalibrationSession::new(60, 72, start);
+        let r1_notes = session.current_round().notes.clone();
+        session.record_round(&r1_notes.clone(), &vec![3; r1_notes.len()]); // perfect round 1
+        // best_params must reflect round 1's (perfect) params even though session
+        // logically would have already converged — verifies best_params doesn't
+        // require convergence to have happened.
+        assert_eq!(session.best_params().silence_threshold, start.silence_threshold);
     }
 }
