@@ -70,3 +70,6 @@ screen_keydrop.png
 
 # graphify knowledge-graph output
 graphify-out/
+
+# Scratch workspace for superpowers subagent-driven-development runs (git-ignored, per-plan)
+.superpowers/
