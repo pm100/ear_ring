@@ -1154,13 +1154,30 @@ Add a new callback, separate from the existing `handleFrame` (which stays exactl
 
 - [ ] **Step 3: Wire `handleCalibrationFrame` into capture when in Auto mode**
 
-Replace the existing single `useEffect` that calls `start(handleFrame)` with one that picks the active callback based on `mode`:
+**Do not put `handleFrame`/`handleCalibrationFrame` directly in this effect's dependency array.** `handleCalibrationFrame`'s own deps include `roundNotes`, which is reassigned every round (`setRoundNotes`) — so its identity changes every round, and an effect depending on it directly would tear down and rebuild every round, not just on an actual mode switch. Since the cleanup below fires `finishCalibration(null)` whenever `capturingRef.current` is still true, that cascade would end every run after (or even during) round 1: `capturingRef.current` is set `true` once at the start of a run and only cleared inside `finishCalibration`, so it's still `true` at every mid-run round transition, and the mis-triggered cleanup would read that as "the user navigated away" every time.
+
+Instead, use the standard "latest ref" pattern to decouple "which callback receives frames" from "when the capture pipeline itself needs torn down and rebuilt." Add two refs, updated on every render (ordinary React idiom — the assignment happens in the component body, not inside an effect), right before the effect:
+```ts
+  const handleFrameRef = useRef(handleFrame);
+  const handleCalibrationFrameRef = useRef(handleCalibrationFrame);
+  handleFrameRef.current = handleFrame;
+  handleCalibrationFrameRef.current = handleCalibrationFrame;
+```
+
+Replace the existing single `useEffect` that calls `start(handleFrame)` with one that builds a stable `dispatch` wrapper reading from those refs, so the effect's own deps never include the handlers themselves:
 ```ts
   useEffect(() => {
     void invoke('cmd_tracker_set_params', { silenceThreshold, requiredFrames: framesToConfirm });
     void invoke('cmd_tracker_set_advanced_params', { graceFrames, octaveCorrection, yinThreshold });
     void invoke('cmd_tracker_reset_with_warmup', { warmupFrames });
-    start(mode === 'auto' ? handleCalibrationFrame : handleFrame);
+    const dispatch = (frame: TrackerFrame) => {
+      if (mode === 'auto') {
+        void handleCalibrationFrameRef.current(frame);
+      } else {
+        void handleFrameRef.current(frame);
+      }
+    };
+    start(dispatch);
     return () => {
       // Spec (Error handling): navigating away or switching back to Manual
       // mid-run must not silently discard progress — keep whatever was the
@@ -1174,9 +1191,9 @@ Replace the existing single `useEffect` that calls `start(handleFrame)` with one
       void invoke('cmd_tracker_reset');
       destroy();
     };
-  }, [start, stop, destroy, handleFrame, handleCalibrationFrame, finishCalibration, mode]);
+  }, [start, stop, destroy, finishCalibration, mode]);
 ```
-(Note: switching `mode` re-runs this effect, which tears down and restarts capture with the right callback — matching the existing cleanup-on-unmount pattern, just re-triggered on mode change too.)
+Now this effect only tears down and rebuilds on an actual `mode` switch or unmount — not on every round — since none of `start`/`stop`/`destroy`/`finishCalibration`/`mode` change mid-run (`finishCalibration`'s own deps, `[instrumentIndex, onUpdateSettings]`, don't change mid-run either). The cleanup's `capturingRef.current` check now fires only on a genuine navigate-away or mode switch, which is what it was always meant to detect.
 
 - [ ] **Step 4: Add the Auto-Calibrate tab's UI**
 

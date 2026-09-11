@@ -206,6 +206,16 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
       .catch(() => {});
   }, [instrumentIndex]);
 
+  // Latest-ref pattern: dispatch always calls whichever handler is current
+  // without the mode-effect itself depending on handleFrame/handleCalibrationFrame
+  // (both of which get new identities every round via handleCalibrationFrame's
+  // roundNotes dependency) — otherwise the effect would tear down and re-run
+  // mid-round, not just on an actual mode switch or unmount.
+  const handleFrameRef = useRef(handleFrame);
+  const handleCalibrationFrameRef = useRef(handleCalibrationFrame);
+  handleFrameRef.current = handleFrame;
+  handleCalibrationFrameRef.current = handleCalibrationFrame;
+
   // Configure tracker on entry, then auto-start with the callback for the active
   // mode.  Full cleanup on unmount, and also re-runs on mode switch (tearing down
   // and restarting capture with the right callback).
@@ -213,7 +223,14 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
     void invoke('cmd_tracker_set_params', { silenceThreshold, requiredFrames: framesToConfirm });
     void invoke('cmd_tracker_set_advanced_params', { graceFrames, octaveCorrection, yinThreshold });
     void invoke('cmd_tracker_reset_with_warmup', { warmupFrames });
-    start(mode === 'auto' ? handleCalibrationFrame : handleFrame);
+    const dispatch = (frame: TrackerFrame) => {
+      if (mode === 'auto') {
+        void handleCalibrationFrameRef.current(frame);
+      } else {
+        void handleFrameRef.current(frame);
+      }
+    };
+    start(dispatch);
     return () => {
       // Spec (Error handling): navigating away or switching back to Manual
       // mid-run must not silently discard progress — keep whatever was the
@@ -227,7 +244,7 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
       void invoke('cmd_tracker_reset');
       destroy();
     };
-  }, [start, stop, destroy, handleFrame, handleCalibrationFrame, finishCalibration, mode]);
+  }, [start, stop, destroy, finishCalibration, mode]);
 
   const transpMidi = (midi: number) => Math.max(0, Math.min(127, midi + transpSemitones));
   // Staff notation shows written pitch, like a transposing instrument's part.
