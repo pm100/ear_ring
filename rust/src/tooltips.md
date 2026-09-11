@@ -69,3 +69,15 @@ How many consistent pitch readings in a row are needed before a note is confirme
 ## mic_warmup_frames
 
 How many initial readings are discarded right after the mic starts listening, to let it settle before detection begins.
+
+## grace_frames
+
+How many shaky readings after a confirmed note are tolerated before the tracker gives up on it and starts confirming a new one.
+
+## octave_correction
+
+Snap detected pitches that are an octave off to the nearest note in your exercise's range — helps with instruments prone to octave errors.
+
+## yin_threshold
+
+How strict the pitch detector is about a note being clearly periodic. Lower catches quieter or noisier notes; higher rejects more false positives.
