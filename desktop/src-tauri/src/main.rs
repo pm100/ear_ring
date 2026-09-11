@@ -91,25 +91,41 @@ fn params_tuple(p: ear_ring_core::CalibrationParams) -> (f32, u32, u32, u32, boo
     (p.silence_threshold, p.required_frames, p.warmup_frames, p.grace_frames, p.octave_correction, p.yin_threshold)
 }
 
+const NOT_STARTED: &str = "calibration not started";
+
+// These three return Result rather than `.expect()`ing on a missing session: a
+// panicking Tauri command never sends an IPC response at all, so the caller's
+// `await invoke(...)` hangs forever instead of rejecting. Reachable whenever the
+// screen tears down a run that hasn't finished starting.
+
 #[tauri::command]
-fn cmd_calibration_current_params(state: State<CalibrationState>) -> (f32, u32, u32, u32, bool, f32) {
+fn cmd_calibration_current_params(state: State<CalibrationState>) -> Result<(f32, u32, u32, u32, bool, f32), String> {
     let guard = state.0.lock().unwrap();
-    params_tuple(guard.as_ref().expect("calibration not started").current_round().params)
+    let session = guard.as_ref().ok_or_else(|| NOT_STARTED.to_string())?;
+    Ok(params_tuple(session.current_round().params))
 }
 
 #[tauri::command]
-fn cmd_calibration_record_round(state: State<CalibrationState>, detected: Vec<i32>, frames_to_confirm: Vec<u32>) -> (bool, Vec<i32>) {
+fn cmd_calibration_record_round(state: State<CalibrationState>, detected: Vec<i32>, frames_to_confirm: Vec<u32>) -> Result<(bool, Vec<i32>), String> {
     let mut guard = state.0.lock().unwrap();
-    let session = guard.as_mut().expect("calibration not started");
+    let session = guard.as_mut().ok_or_else(|| NOT_STARTED.to_string())?;
     let converged = session.record_round(&detected, &frames_to_confirm);
     let next_notes = if converged { Vec::new() } else { session.current_round().notes.clone() };
-    (converged, next_notes)
+    Ok((converged, next_notes))
 }
 
 #[tauri::command]
-fn cmd_calibration_best_params(state: State<CalibrationState>) -> (f32, u32, u32, u32, bool, f32) {
+fn cmd_calibration_best_params(state: State<CalibrationState>) -> Result<(f32, u32, u32, u32, bool, f32), String> {
     let guard = state.0.lock().unwrap();
-    params_tuple(guard.as_ref().expect("calibration not started").best_params())
+    let session = guard.as_ref().ok_or_else(|| NOT_STARTED.to_string())?;
+    Ok(params_tuple(session.best_params()))
+}
+
+/// Maximum rounds a run can take — lets the UI show "Round 2 of 8" rather than
+/// an open-ended round number.
+#[tauri::command]
+fn cmd_calibration_round_cap() -> usize {
+    ear_ring_core::ROUND_CAP
 }
 
 #[tauri::command]
@@ -387,6 +403,7 @@ fn main() {
             cmd_calibration_best_score,
             cmd_calibration_last_round_no_signal,
             cmd_calibration_round_count,
+            cmd_calibration_round_cap,
             cmd_detect_pitch,
             cmd_freq_to_midi,
             cmd_freq_to_cents,
