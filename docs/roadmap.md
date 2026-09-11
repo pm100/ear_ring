@@ -257,13 +257,36 @@ generating a new sequence. See the issue for the design questions to settle
 ## Detection & Exercise-Mode R&D (not premium-specific)
 
 ### Mic setup auto-calibration
-On the Setup/mic-permission screen, prompt the user to play a simple known arpeggio
-(e.g. a triad up and down) instead of just confirming mic access. Compare what was
-actually detected against the expected sequence and use the deltas to adapt
-`silenceThreshold`, `framesToConfirm`, `warmupFrames` (and instrument-specific defaults)
-per-device instead of relying on fixed global defaults. This is squarely pitch-detection
-tuning logic, so the calibration math belongs in the Rust core (`tracker.rs` /
-`pitch_detection.rs`) with platform code only driving the prompt UI and mic capture.
+Fully designed — see
+`docs/superpowers/specs/2026-09-10-mic-auto-calibration-design.md`. Adds an
+Auto-Calibrate mode to Mic Setup (alongside Manual): prompts short (max
+3-note) known sequences, shown as both text and staff notation, compares
+detected vs. expected, and directionally nudges toward the best-scoring
+settings across *all* detection params — not just the 3 user sliders, but
+also the previously-hidden `grace_frames`/`octave_correction`
+(per-instrument) and the global `YIN_THRESHOLD` — all of which also become
+user-editable (behind an "Advanced" disclosure) once this ships.
+
+### Check-at-the-end Exercise dynamic (deferred, brainstormed 2026-09-10)
+A second, related idea from the same session, intentionally **not** part of
+the auto-calibration spec above and not yet its own design: let the user
+play a full test sequence with no gaps between notes (or minimal decay)
+instead of the current real-time per-note check, then grade the whole
+sequence once played. Decisions already settled for whenever this gets its
+own spec:
+- An **orthogonal setting** ("check as you go" vs "check at the end"),
+  applicable within any existing Test Type — not a new Test Type itself.
+- **Retry stays whole-sequence** on any wrong note — reuses today's
+  `wrong_note_outcome` restart path as-is, no new partial-retry mechanic.
+- **End-of-sequence detection is just note-count-based**: capture stops
+  once the expected number of notes (N, already known from the generated
+  sequence) have been confirmed — no silence-timeout or manual "Done"
+  button.
+- The tracker (`tracker.rs`) already resets/reconfirms on a pitch change
+  alone, no silence required (`test_adjacent_notes_dont_merge` proves
+  this) — so the segmentation groundwork already exists; the actual work
+  is deferring *when* attempt-resolution runs, not building new
+  onset-detection logic.
 
 ### Dyad/triad test mode (chord recognition, not just single notes)
 A new Test Type where the prompt and expected answer are a dyad (2 notes) or triad
