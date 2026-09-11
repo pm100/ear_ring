@@ -66,6 +66,8 @@ fn cmd_calibration_start(
     state: State<CalibrationState>,
     range_start: i32,
     range_end: i32,
+    root_chroma: u8,
+    scale_id: u8,
     silence_threshold: f32,
     required_frames: u32,
     warmup_frames: u32,
@@ -73,6 +75,7 @@ fn cmd_calibration_start(
     octave_correction: bool,
     yin_threshold: f32,
 ) -> Vec<i32> {
+    let scale = ear_ring_core::scale_type_from_id(scale_id).unwrap_or(ear_ring_core::ScaleType::Major);
     let starting = CalibrationParams {
         silence_threshold,
         required_frames,
@@ -81,7 +84,7 @@ fn cmd_calibration_start(
         octave_correction,
         yin_threshold,
     };
-    let session = CalibrationSession::new(range_start, range_end, starting);
+    let session = CalibrationSession::new(range_start, range_end, root_chroma, scale, starting);
     let notes = session.current_round().notes.clone();
     *state.0.lock().unwrap() = Some(session);
     notes
