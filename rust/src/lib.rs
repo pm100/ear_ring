@@ -969,7 +969,7 @@ mod android_jni {
         if env.get_float_array_region(&arr, 0, &mut buf).is_err() {
             return -1.0;
         }
-        match detect_pitch(&buf, sample_rate as u32) {
+        match detect_pitch(&buf, sample_rate as u32, pitch_detection::DEFAULT_YIN_THRESHOLD) {
             Some(hz) => hz,
             None => -1.0,
         }
