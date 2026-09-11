@@ -351,13 +351,13 @@ mod tests {
     fn test_does_not_converge_while_improving() {
         let start = params(0.003);
         let round = next_calibration_round(60, 72, start, &[]);
-        let worse = score_round(&round.notes, &[-1, -1, -1], &[0, 0, 0]);
-        let better = score_round(&round.notes, &round.notes.clone(), &[3, 3, 3]);
-        // Only 2 rounds so far and score improved from worse to (not-perfect-but-not-worse) —
-        // use a partial-improvement pair that isn't itself perfect to exercise the plateau path.
-        let mid = score_round(&round.notes, &[round.notes[0], -1, round.notes[2]], &[3, 0, 3]);
-        assert!(!is_converged(&[(round.clone(), worse), (round, mid.clone())]));
-        let _ = better; // silence unused warning if not referenced further
+        // Round 1: nothing detected (score 0.0). Round 2: 2 of 3 correct (score
+        // ~0.667) — an improvement, and not itself perfect. With PLATEAU_ROUNDS=2
+        // this pair must NOT read as a plateau (0.667 > 0.0), so calibration
+        // should keep going rather than stop.
+        let round1_score = score_round(&round.notes, &[-1, -1, -1], &[0, 0, 0]);
+        let round2_score = score_round(&round.notes, &[round.notes[0], -1, round.notes[2]], &[3, 0, 3]);
+        assert!(!is_converged(&[(round.clone(), round1_score), (round, round2_score)]));
     }
 
     #[test]
