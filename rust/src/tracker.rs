@@ -9,7 +9,7 @@
 /// This is the single source of truth for all detection rules. Platform code
 /// only needs to feed audio buffers and react to `FrameResult::confirmed_midi`.
 use crate::music_theory::{freq_to_note, INSTRUMENTS};
-use crate::pitch_detection::detect_pitch;
+use crate::pitch_detection::{detect_pitch, DEFAULT_YIN_THRESHOLD};
 
 pub struct PitchTracker {
     pub silence_threshold: f32,
@@ -20,6 +20,9 @@ pub struct PitchTracker {
     /// When true, a detection that is exactly ±12 semitones from the current stable note is
     /// absorbed rather than resetting stability. Prevents octave-harmonic glitches on guitar.
     pub octave_correction: bool,
+    /// YIN algorithm confidence threshold. Defaults to `pitch_detection::DEFAULT_YIN_THRESHOLD`;
+    /// overridden by Auto-Calibrate per instrument/device.
+    pub yin_threshold: f32,
     warmup_remaining: u32,
     stable_midi: i32,   // -1 = no stable note yet
     stable_count: u32,
@@ -45,6 +48,7 @@ impl PitchTracker {
             required_frames,
             grace_frames: 1,
             octave_correction: false,
+            yin_threshold: DEFAULT_YIN_THRESHOLD,
             warmup_remaining: 0,
             stable_midi: -1,
             stable_count: 0,
@@ -103,7 +107,7 @@ impl PitchTracker {
         }
 
         // YIN pitch detection (includes DC offset removal internally)
-        let Some(hz) = detect_pitch(samples, sample_rate) else {
+        let Some(hz) = detect_pitch(samples, sample_rate, self.yin_threshold) else {
             return self.handle_no_detection();
         };
 

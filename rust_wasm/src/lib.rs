@@ -1,6 +1,6 @@
 use ear_ring_core::{
     detect_pitch, freq_to_note, generate_sequence, intro_chord, is_correct_note, scale_type_from_id,
-    staff_position, test_score, Note, ScaleType,
+    staff_position, test_score, Note, ScaleType, DEFAULT_YIN_THRESHOLD,
 };
 use wasm_bindgen::prelude::*;
 
@@ -8,7 +8,7 @@ use wasm_bindgen::prelude::*;
 /// Returns the detected frequency in Hz, or -1.0 if not detected.
 #[wasm_bindgen]
 pub fn wasm_detect_pitch(samples: &[f32], sample_rate: u32) -> f32 {
-    detect_pitch(samples, sample_rate).unwrap_or(-1.0)
+    detect_pitch(samples, sample_rate, DEFAULT_YIN_THRESHOLD).unwrap_or(-1.0)
 }
 
 /// Convert frequency (Hz) to MIDI note number.

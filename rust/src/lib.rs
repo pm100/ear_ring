@@ -14,7 +14,7 @@ pub use music_theory::{
     MelodyNote, MelodySnippet, Note, NoteName, ScaleType, FLAT_ORDER,
     FLAT_STAFF_POSITIONS, SHARP_ORDER, SHARP_STAFF_POSITIONS,
 };
-pub use pitch_detection::detect_pitch;
+pub use pitch_detection::{detect_pitch, DEFAULT_YIN_THRESHOLD};
 pub use tracker::{FrameResult, PitchTracker};
 
 // ── Help content ──────────────────────────────────────────────────────────────
@@ -228,7 +228,7 @@ pub extern "C" fn ear_ring_detect_pitch(
         return 0;
     }
     let slice = unsafe { std::slice::from_raw_parts(samples, num_samples as usize) };
-    match detect_pitch(slice, sample_rate) {
+    match detect_pitch(slice, sample_rate, pitch_detection::DEFAULT_YIN_THRESHOLD) {
         Some(hz) => {
             unsafe { *out_hz = hz };
             1

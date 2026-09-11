@@ -6,15 +6,17 @@
 /// Input: mono f32 PCM samples at `sample_rate` Hz.
 /// Output: fundamental frequency in Hz, or `None` if not detected / low confidence.
 
-const YIN_THRESHOLD: f32 = 0.15;
+/// Default YIN confidence threshold, used wherever no calibrated value exists yet.
+pub const DEFAULT_YIN_THRESHOLD: f32 = 0.15;
 
 /// Detect the fundamental frequency of a monophonic signal.
 ///
 /// * `samples`     – slice of f32 PCM samples in the range [-1.0, 1.0]
 /// * `sample_rate` – recording sample rate in Hz (e.g. 44100)
+/// * `yin_threshold` – confidence threshold for YIN algorithm (typically 0.1–0.2)
 ///
 /// Returns `Some(hz)` when a confident pitch is found, `None` otherwise.
-pub fn detect_pitch(samples: &[f32], sample_rate: u32) -> Option<f32> {
+pub fn detect_pitch(samples: &[f32], sample_rate: u32, yin_threshold: f32) -> Option<f32> {
     let n = samples.len();
     if n < 2 {
         return None;
@@ -68,7 +70,7 @@ pub fn detect_pitch(samples: &[f32], sample_rate: u32) -> Option<f32> {
     let mut tau_opt: Option<usize> = None;
     let mut tau = min_lag;
     while tau <= max_lag {
-        if cmndf[tau] < YIN_THRESHOLD {
+        if cmndf[tau] < yin_threshold {
             // Find the local minimum within this dip.
             while tau + 1 <= max_lag && cmndf[tau + 1] < cmndf[tau] {
                 tau += 1;
@@ -126,7 +128,7 @@ mod tests {
     #[test]
     fn test_detect_a4() {
         let samples = sine_wave(440.0, 44100, 4096);
-        let hz = detect_pitch(&samples, 44100).expect("Should detect A4");
+        let hz = detect_pitch(&samples, 44100, DEFAULT_YIN_THRESHOLD).expect("Should detect A4");
         assert!(
             (hz - 440.0).abs() < 5.0,
             "Expected ~440 Hz, got {hz:.1} Hz"
@@ -136,48 +138,48 @@ mod tests {
     #[test]
     fn test_detect_c4() {
         let samples = sine_wave(261.63, 44100, 4096);
-        let hz = detect_pitch(&samples, 44100).expect("Should detect C4");
+        let hz = detect_pitch(&samples, 44100, DEFAULT_YIN_THRESHOLD).expect("Should detect C4");
         assert!((hz - 261.63).abs() < 5.0, "Expected ~261.6 Hz, got {hz:.1} Hz");
     }
 
     #[test]
     fn test_silence_returns_none() {
         let samples = vec![0.0f32; 4096];
-        assert!(detect_pitch(&samples, 44100).is_none());
+        assert!(detect_pitch(&samples, 44100, DEFAULT_YIN_THRESHOLD).is_none());
     }
 
     #[test]
     fn test_detect_e4() {
         let samples = sine_wave(329.63, 44100, 4096);
-        let hz = detect_pitch(&samples, 44100).expect("Should detect E4");
+        let hz = detect_pitch(&samples, 44100, DEFAULT_YIN_THRESHOLD).expect("Should detect E4");
         assert!((hz - 329.63).abs() < 5.0, "Expected ~329.6 Hz, got {hz:.1} Hz");
     }
 
     #[test]
     fn test_detect_g4() {
         let samples = sine_wave(392.00, 44100, 4096);
-        let hz = detect_pitch(&samples, 44100).expect("Should detect G4");
+        let hz = detect_pitch(&samples, 44100, DEFAULT_YIN_THRESHOLD).expect("Should detect G4");
         assert!((hz - 392.0).abs() < 5.0, "Expected ~392.0 Hz, got {hz:.1} Hz");
     }
 
     #[test]
     fn test_detect_c5() {
         let samples = sine_wave(523.25, 44100, 4096);
-        let hz = detect_pitch(&samples, 44100).expect("Should detect C5");
+        let hz = detect_pitch(&samples, 44100, DEFAULT_YIN_THRESHOLD).expect("Should detect C5");
         assert!((hz - 523.25).abs() < 5.0, "Expected ~523.3 Hz, got {hz:.1} Hz");
     }
 
     #[test]
     fn test_detect_low_c3() {
         let samples = sine_wave(130.81, 44100, 4096);
-        let hz = detect_pitch(&samples, 44100).expect("Should detect C3");
+        let hz = detect_pitch(&samples, 44100, DEFAULT_YIN_THRESHOLD).expect("Should detect C3");
         assert!((hz - 130.81).abs() < 5.0, "Expected ~130.8 Hz, got {hz:.1} Hz");
     }
 
     #[test]
     fn test_detect_high_c6() {
         let samples = sine_wave(1046.50, 44100, 4096);
-        let hz = detect_pitch(&samples, 44100).expect("Should detect C6");
+        let hz = detect_pitch(&samples, 44100, DEFAULT_YIN_THRESHOLD).expect("Should detect C6");
         assert!((hz - 1046.5).abs() < 10.0, "Expected ~1046.5 Hz, got {hz:.1} Hz");
     }
 
@@ -187,7 +189,7 @@ mod tests {
         let samples: Vec<f32> = (0..4096)
             .map(|i| 0.05 * (2.0 * PI * 440.0 * i as f32 / 44100.0).sin())
             .collect();
-        let hz = detect_pitch(&samples, 44100).expect("Should detect quiet A4");
+        let hz = detect_pitch(&samples, 44100, DEFAULT_YIN_THRESHOLD).expect("Should detect quiet A4");
         assert!((hz - 440.0).abs() < 5.0, "Expected ~440 Hz, got {hz:.1} Hz");
     }
 
@@ -198,7 +200,7 @@ mod tests {
             .map(|i| 0.0001 * (2.0 * PI * 440.0 * i as f32 / 44100.0).sin())
             .collect();
         // YIN may or may not detect this; the point is it doesn't crash
-        let _ = detect_pitch(&samples, 44100);
+        let _ = detect_pitch(&samples, 44100, DEFAULT_YIN_THRESHOLD);
     }
 
     /// Simulate a sequence of notes (as separate buffers) and verify each is detected.
@@ -208,12 +210,20 @@ mod tests {
         let notes = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5
         for &freq in &notes {
             let samples = sine_wave(freq, 44100, 4096);
-            let hz = detect_pitch(&samples, 44100)
+            let hz = detect_pitch(&samples, 44100, DEFAULT_YIN_THRESHOLD)
                 .unwrap_or_else(|| panic!("Should detect {freq:.1} Hz"));
             assert!(
                 (hz - freq).abs() < 5.0,
                 "Expected ~{freq:.1} Hz, got {hz:.1} Hz"
             );
         }
+    }
+
+    #[test]
+    fn test_custom_yin_threshold_still_detects_clean_tone() {
+        let a4 = sine_wave(440.0, 44100, 4096);
+        // A stricter (lower) threshold on a clean, noise-free tone must still detect it.
+        let hz = detect_pitch(&a4, 44100, 0.05).unwrap();
+        assert!((hz - 440.0).abs() < 1.0);
     }
 }
