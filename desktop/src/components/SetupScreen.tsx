@@ -3,16 +3,17 @@ import { invoke } from '@tauri-apps/api/tauri';
 import PitchMeter from './PitchMeter';
 import MusicStaff from './MusicStaff';
 import { useAudioCapture, TrackerFrame } from '../hooks/useAudioCapture';
-import { useAudioPlayback } from '../hooks/useAudioPlayback';
 import { ExerciseSettings, StaffNoteState } from '../types';
 import { TooltipIcon } from './Tooltip';
 
 const STABILITY_OPTIONS = [2, 3, 4, 5];
 const WARMUP_OPTIONS = [0, 1, 2, 3, 4, 5, 6];
-// Quiet gap between the end of a round's reference playback and the start of
-// listening, so the tail/room decay of our own notes can't be captured as the
-// user's answer. Same value ExerciseScreen uses after its prompt.
-const CAPTURE_SETTLE_MS = 700;
+// Auto-Calibrate capture timing (wall-clock, not frame-counted): no audio is
+// played and there's no rush to start — the user begins whenever they're
+// ready. These bound how long we're willing to wait for that to happen.
+const ONSET_TIMEOUT_MS = 25000;   // max time to wait for the user to start playing a note at all
+const CONFIRM_TIMEOUT_MS = 15000; // max additional time, after onset, to reach a stable confirmed note
+const TRAILING_QUIET_MS = 1000;   // fixed pause after a note confirms, before moving on
 
 interface InstrumentInfo { id: number; name: string; semitones: number; graceFrames: number; octaveCorrection: boolean; }
 // Global default for yin_threshold: DEFAULT_YIN_THRESHOLD in rust/src/pitch_detection.rs.
@@ -88,7 +89,6 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
   const { start, stop, destroy } = useAudioCapture();
-  const { playSequence, cancelPlayback } = useAudioPlayback();
 
   const [roundNotes, setRoundNotes] = useState<number[]>([]);
   const [roundIndex, setRoundIndex] = useState(0);      // which note within the round we're listening for
@@ -102,9 +102,25 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
   const roundDetectedRef = useRef<number[]>([]);
   const roundFramesRef = useRef<number[]>([]);
   const noteFrameCountRef = useRef(0);
-  // True only while a round's listening window is genuinely open — false for the
-  // whole prompt/settle window, so handleCalibrationFrame can't score our own
-  // reference playback (the mic is opened with echoCancellation: false).
+  // Per-note capture wait phase. A ref for the frame callback's synchronous
+  // logic (mirrored into state below purely so the UI text can react to it).
+  type WaitPhase = 'waiting_onset' | 'waiting_confirm' | 'waiting_quiet';
+  const waitPhaseRef = useRef<WaitPhase | null>(null);
+  const [waitPhase, setWaitPhase] = useState<WaitPhase | null>(null);
+  // Wall-clock timestamps (Date.now()) for the current note's two timeouts:
+  // noteStartTimeRef marks when we started waiting for onset (also the basis
+  // for the elapsed-time indicator), onsetTimeRef marks when onset happened.
+  const noteStartTimeRef = useRef(0);
+  const onsetTimeRef = useRef(0);
+  const [waitElapsedSec, setWaitElapsedSec] = useState(0);
+  const waitElapsedSecRef = useRef(0);
+  // Handle for the trailing-quiet setTimeout that finalizes a just-confirmed
+  // note, so Stop/unmount/mode-switch can cancel a still-pending one.
+  const quietTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // True only while the current note's listening window is genuinely open —
+  // false while a round is being scored and during the trailing-quiet pause
+  // after a note confirms, so handleCalibrationFrame ignores frames outside
+  // the window it's actually deciding for.
   const capturingRef = useRef(false);
   // True from the moment a round's last note lands until the next round's
   // listening window opens, so the long IPC chain that scores a round can't be
@@ -115,7 +131,8 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
   // to end the run; capturingRef is too narrow to detect that.
   const runActiveRef = useRef(false);
   // Bumped whenever a run starts or ends — invalidates in-flight async work
-  // (playback callbacks, the settle timer) belonging to a run that's over.
+  // (the onset/confirm timeout checks and the trailing-quiet timer) belonging
+  // to a run that's over.
   const runGenRef = useRef(0);
   // Latest-ref for the saved-calibration map so the instrument effect below can
   // read it without re-running every time an unrelated setting changes.
@@ -150,9 +167,14 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
     runGenRef.current += 1;
     capturingRef.current = false;
     roundCompletingRef.current = false;
-    // Stopping mid-prompt should silence the prompt too, not let the rest of the
-    // round's reference notes keep playing out.
-    cancelPlayback();
+    // A pending trailing-quiet timer must not fire after the run has ended —
+    // it would finalize a note into a session that no longer exists.
+    if (quietTimerRef.current !== null) {
+      clearTimeout(quietTimerRef.current);
+      quietTimerRef.current = null;
+    }
+    waitPhaseRef.current = null;
+    setWaitPhase(null);
     setCalibrating(false);
     try {
       const best = await invoke<[number, number, number, number, boolean, number]>('cmd_calibration_best_params');
@@ -177,17 +199,33 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
       capturingRef.current = false;
       roundCompletingRef.current = false;
     }
-  }, [instrumentIndex, onUpdateSettings, cancelPlayback]);
+  }, [instrumentIndex, onUpdateSettings]);
+
+  // Opens the listening window for one note within the current round: resets
+  // this note's per-note bookkeeping (frame count, wait phase, timeout clocks,
+  // elapsed-time display) and starts the onset wait. Guarded by myGen so a
+  // round transition or Stop that raced ahead of us can't reopen a window for
+  // a run that's already over.
+  const beginNoteWait = useCallback((myGen: number) => {
+    if (runGenRef.current !== myGen) return;
+    noteFrameCountRef.current = 0;
+    noteStartTimeRef.current = Date.now();
+    onsetTimeRef.current = 0;
+    waitPhaseRef.current = 'waiting_onset';
+    setWaitPhase('waiting_onset');
+    waitElapsedSecRef.current = 0;
+    setWaitElapsedSec(0);
+    capturingRef.current = true;
+  }, []);
 
   const beginRound = useCallback(async (notes: number[]) => {
     const myGen = runGenRef.current;
-    // Nothing is captured until this round's own reference playback has finished
-    // and settled — set synchronously, before any await.
+    // Nothing is captured until this round's params are pushed to the tracker
+    // and it's been reset — set synchronously, before any await.
     capturingRef.current = false;
     roundCompletingRef.current = false;
     roundDetectedRef.current = [];
     roundFramesRef.current = [];
-    noteFrameCountRef.current = 0;
     setRoundIndex(0);
     setCalibrating(true);
 
@@ -204,97 +242,48 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
     await invoke('cmd_tracker_set_advanced_params', { graceFrames: gf, octaveCorrection: oc, yinThreshold: yt });
     if (runGenRef.current !== myGen) return;
 
-    // playSequence resolves as soon as the FIRST note has been scheduled — the rest
-    // are fired from setTimeout — so awaiting it would open the listening window
-    // while our own notes are still sounding. onDone is the only signal that the
-    // whole sequence has actually played (same pattern as ExerciseScreen's prompt).
-    await playSequence(notes, () => {}, () => {
-      if (runGenRef.current !== myGen) return;
-      window.setTimeout(() => {
-        if (runGenRef.current !== myGen) return;
-        cancelPlayback();
-        void (async () => {
-          await invoke('cmd_tracker_reset_with_warmup', { warmupFrames: wf });
-          if (runGenRef.current !== myGen) return;
-          noteFrameCountRef.current = 0;
-          capturingRef.current = true;
-        })();
-      }, CAPTURE_SETTLE_MS);
-    }, 100);
-  }, [playSequence, cancelPlayback, finishCalibration]);
+    // No reference audio is played (Auto-Calibrate shows the target note(s)
+    // as text + on the staff only) — go straight to warming up the tracker and
+    // opening the onset wait for the round's first note.
+    await invoke('cmd_tracker_reset_with_warmup', { warmupFrames: wf });
+    if (runGenRef.current !== myGen) return;
+    beginNoteWait(myGen);
+  }, [finishCalibration, beginNoteWait]);
 
-  const startCalibrationRun = useCallback(async () => {
-    setCalibrationDone(null);
-    setCalibrationError(null);
-    setBestScoreSoFar(null);
-    setRoundNumber(1);
-    let notes: number[];
-    try {
-      notes = await invoke<number[]>('cmd_calibration_start', {
-        rangeStart, rangeEnd,
-        silenceThreshold, requiredFrames: framesToConfirm, warmupFrames,
-        graceFrames, octaveCorrection, yinThreshold,
-      });
-    } catch (e) {
-      // Nothing to clean up: no session exists, and capturing was never enabled.
-      setCalibrating(false);
-      setCalibrationError(`Could not start calibration: ${String(e)}`);
-      return;
-    }
-    // Only now is there a session for the teardown paths to read from.
-    runGenRef.current += 1;
-    runActiveRef.current = true;
-    setRoundNotes(notes);
-    await beginRound(notes);
-  }, [rangeStart, rangeEnd, silenceThreshold, framesToConfirm, warmupFrames, graceFrames, octaveCorrection, yinThreshold, beginRound]);
-
-  // Resolve each round's MIDI notes to display labels (e.g. "C4") for the text
-  // prompt, the same written/transposed label the rest of the app uses.
-  useEffect(() => {
-    if (roundNotes.length === 0) { setRoundNoteLabels([]); return; }
-    let cancelled = false;
-    Promise.all(roundNotes.map(m => invoke<string>('cmd_written_midi_label', { concertMidi: m, instrumentIndex })))
-      .then(labels => { if (!cancelled) setRoundNoteLabels(labels); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [roundNotes, instrumentIndex]);
-
-  // Spec: "Round 2 of 8" — ROUND_CAP lives in the Rust core.
-  useEffect(() => {
-    invoke<number>('cmd_calibration_round_cap').then(setRoundCap).catch(() => {});
-  }, []);
-
-  const handleCalibrationFrame = useCallback(async (frame: TrackerFrame) => {
-    if (!capturingRef.current || roundCompletingRef.current) return;
-    noteFrameCountRef.current += 1;
-    let detected = -1;
-    let frames = 0;
-    if (frame.confirmedMidi >= 0) {
-      detected = frame.confirmedMidi;
-      frames = noteFrameCountRef.current;
-    } else if (noteFrameCountRef.current >= 55 /* PER_NOTE_TIMEOUT_FRAMES */) {
-      detected = -1;
-      frames = 0;
-    } else {
-      return; // still listening for this note
+  // Shared by every path that ends a single note's capture: the onset timeout,
+  // the confirm timeout, and the trailing-quiet timer after a note confirms.
+  // Appends to the round's detected-notes accumulator, resets the tracker, and
+  // either advances to the next note within the round or scores the whole
+  // round. `myGen` must be the runGenRef value captured when the note's wait
+  // began (or when the caller's timer was scheduled) — a run that has since
+  // ended (Stop/unmount/mode-switch) must not finalize into it.
+  const finalizeNote = useCallback(async (myGen: number, detected: number, frames: number) => {
+    if (runGenRef.current !== myGen) return;
+    // Close this note's window and cancel any pending trailing-quiet timer
+    // before any await, so a stray frame or a second timer firing can't
+    // finalize the same note twice.
+    capturingRef.current = false;
+    waitPhaseRef.current = null;
+    setWaitPhase(null);
+    if (quietTimerRef.current !== null) {
+      clearTimeout(quietTimerRef.current);
+      quietTimerRef.current = null;
     }
 
     roundDetectedRef.current = [...roundDetectedRef.current, detected];
     roundFramesRef.current = [...roundFramesRef.current, frames];
     const roundComplete = roundDetectedRef.current.length >= roundNotes.length;
     if (roundComplete) {
-      // Close the listening window before the first await. Scoring a round spans
-      // several IPC round-trips — many frame intervals — and a user still holding
-      // the final note would otherwise get it re-confirmed after the reset below
-      // and appended a second time, letting this branch run twice for one round.
+      // Close the round's listening window before the first await, same
+      // reasoning as before: scoring a round spans several IPC round-trips.
       roundCompletingRef.current = true;
-      capturingRef.current = false;
     }
     await invoke('cmd_tracker_reset');
-    noteFrameCountRef.current = 0;
+    if (runGenRef.current !== myGen) return;
 
     if (!roundComplete) {
       setRoundIndex(i => i + 1);
+      beginNoteWait(myGen);
       return;
     }
 
@@ -322,7 +311,122 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
     } catch (e) {
       await finishCalibration(`Calibration stopped: ${String(e)}`);
     }
-  }, [roundNotes, beginRound, finishCalibration]);
+  }, [roundNotes, beginRound, beginNoteWait, finishCalibration]);
+
+  const startCalibrationRun = useCallback(async () => {
+    setCalibrationDone(null);
+    setCalibrationError(null);
+    setBestScoreSoFar(null);
+    setRoundNumber(1);
+    let notes: number[];
+    try {
+      notes = await invoke<number[]>('cmd_calibration_start', {
+        rangeStart, rangeEnd, rootChroma, scaleId,
+        silenceThreshold, requiredFrames: framesToConfirm, warmupFrames,
+        graceFrames, octaveCorrection, yinThreshold,
+      });
+    } catch (e) {
+      // Nothing to clean up: no session exists, and capturing was never enabled.
+      setCalibrating(false);
+      setCalibrationError(`Could not start calibration: ${String(e)}`);
+      return;
+    }
+    // Only now is there a session for the teardown paths to read from.
+    runGenRef.current += 1;
+    runActiveRef.current = true;
+    setRoundNotes(notes);
+    await beginRound(notes);
+  }, [rangeStart, rangeEnd, rootChroma, scaleId, silenceThreshold, framesToConfirm, warmupFrames, graceFrames, octaveCorrection, yinThreshold, beginRound]);
+
+  // Resolve each round's MIDI notes to dual-label display strings, "{written}
+  // ({concert})" — e.g. "D (C4)" for tenor sax, "C (C4)" for piano — combining
+  // the bare written note name (no octave; transposed for the instrument) with
+  // the key-aware concert-pitch label (with octave, respecting the selected
+  // key's sharp/flat spelling).
+  useEffect(() => {
+    if (roundNotes.length === 0) { setRoundNoteLabels([]); return; }
+    let cancelled = false;
+    Promise.all(roundNotes.map(async m => {
+      const [written, concert] = await Promise.all([
+        invoke<string>('cmd_written_note_name', { concertChroma: m % 12, instrumentIndex }),
+        invoke<string>('cmd_preferred_midi_label', { midi: m, rootChroma }),
+      ]);
+      return `${written} (${concert})`;
+    }))
+      .then(labels => { if (!cancelled) setRoundNoteLabels(labels); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [roundNotes, instrumentIndex, rootChroma]);
+
+  // Spec: "Round 2 of 8" — ROUND_CAP lives in the Rust core.
+  useEffect(() => {
+    invoke<number>('cmd_calibration_round_cap').then(setRoundCap).catch(() => {});
+  }, []);
+
+  // Auto-Calibrate's per-frame handler: no audio timeout here beyond the two
+  // wall-clock safety timers below — the user sets the pace. `capturingRef`
+  // gates whether the current note's window is open at all (false during the
+  // trailing-quiet pause and while a round is being scored), and `waitPhaseRef`
+  // tracks which of the two waits (onset / confirm) we're in for this note.
+  const handleCalibrationFrame = useCallback((frame: TrackerFrame) => {
+    if (!capturingRef.current || roundCompletingRef.current) return;
+    noteFrameCountRef.current += 1;
+    const myGen = runGenRef.current;
+    const phase = waitPhaseRef.current;
+    const now = Date.now();
+
+    if (phase === 'waiting_onset' || phase === 'waiting_confirm') {
+      const elapsedSec = Math.floor((now - noteStartTimeRef.current) / 1000);
+      if (elapsedSec !== waitElapsedSecRef.current) {
+        waitElapsedSecRef.current = elapsedSec;
+        setWaitElapsedSec(elapsedSec);
+      }
+    }
+
+    if (phase === 'waiting_onset') {
+      // Onset = the moment ANY live pitch reading shows up for this note, even
+      // before it's stability-confirmed — that's the user starting to play.
+      if (frame.liveMidi >= 0) {
+        onsetTimeRef.current = now;
+        waitPhaseRef.current = 'waiting_confirm';
+        setWaitPhase('waiting_confirm');
+        return;
+      }
+      if (now - noteStartTimeRef.current >= ONSET_TIMEOUT_MS) {
+        // Nobody ever started playing this note — give up and move on.
+        capturingRef.current = false;
+        void finalizeNote(myGen, -1, 0);
+      }
+      return;
+    }
+
+    if (phase === 'waiting_confirm') {
+      // Stability confirmation itself is unchanged (the Rust tracker's
+      // required_frames logic) — this only bounds how long we'll wait for it.
+      if (frame.confirmedMidi >= 0) {
+        const detected = frame.confirmedMidi;
+        const frames = noteFrameCountRef.current;
+        capturingRef.current = false;
+        waitPhaseRef.current = 'waiting_quiet';
+        setWaitPhase('waiting_quiet');
+        // Don't rush to the next note: a fixed trailing-quiet pause, not a
+        // continuous-silence monitor — the note is already correctly captured.
+        quietTimerRef.current = setTimeout(() => {
+          if (runGenRef.current !== myGen) return;
+          void finalizeNote(myGen, detected, frames);
+        }, TRAILING_QUIET_MS);
+        return;
+      }
+      if (now - onsetTimeRef.current >= CONFIRM_TIMEOUT_MS) {
+        // Onset happened but the pitch never stabilized — treat as missed.
+        capturingRef.current = false;
+        void finalizeNote(myGen, -1, 0);
+      }
+      return;
+    }
+    // 'waiting_quiet' (or idle): nothing to do per-frame; the scheduled
+    // trailing-quiet timeout above handles finalization.
+  }, [finalizeNote]);
 
   const stopCalibration = useCallback(async () => {
     await finishCalibration(null);
@@ -485,7 +589,7 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
       <p className="setup-instruction">
         {mode === 'manual'
           ? 'Play a note to test your microphone.'
-          : 'Auto-Calibrate plays a few notes — play each one back on your instrument.'}
+          : 'Auto-Calibrate shows a few notes — play each one on your instrument, at your own pace.'}
       </p>
 
       {mode === 'manual' && (
@@ -593,6 +697,13 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
                 Round {roundNumber}{roundCap > 0 ? ` of ${roundCap}` : ''} — Play: {roundNoteLabels.length === roundNotes.length ? roundNoteLabels.join(' → ') : '…'}
               </p>
               <p className="setup-instruction" style={{ fontSize: 13, opacity: 0.7 }}>Note {roundIndex + 1} of {roundNotes.length}</p>
+              {/* Visible feedback that the app IS listening (no audio plays, and
+                  there's no rush to start) rather than frozen. */}
+              <p className="setup-instruction" style={{ fontSize: 13, opacity: 0.7 }}>
+                {waitPhase === 'waiting_onset' && `Waiting for you to start… ${waitElapsedSec}s`}
+                {waitPhase === 'waiting_confirm' && `Listening… ${waitElapsedSec}s`}
+                {waitPhase === 'waiting_quiet' && 'Got it!'}
+              </p>
               {bestScoreSoFar !== null && (
                 <p className="setup-instruction" style={{ fontSize: 13, opacity: 0.7 }}>Best so far: {Math.round(bestScoreSoFar * 100)}%</p>
               )}
