@@ -1,6 +1,7 @@
 pub mod music_theory;
 pub mod pitch_detection;
 pub mod tracker;
+pub mod calibration;
 
 pub use music_theory::{
     accidental_in_key, diatonic_chord_label, effective_key_chroma, effective_intro_root_midi, enforce_min_range_span, freq_to_note, generate_diatonic_chord, generate_sequence, intro_chord,
