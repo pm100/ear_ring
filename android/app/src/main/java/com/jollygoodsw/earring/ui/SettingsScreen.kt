@@ -118,7 +118,7 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
         Spacer(Modifier.height(16.dp))
 
         ExpandableSection("Instrument & Playback") {
-            SectionLabel("Instrument")
+            SectionLabel("Instrument", tooltipKey = "instrument")
             ExposedDropdownMenuBox(
                 expanded = instrumentExpanded,
                 onExpandedChange = { instrumentExpanded = !instrumentExpanded }
@@ -145,7 +145,7 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             }
 
             Spacer(Modifier.height(12.dp))
-            SectionLabel("Tempo (BPM)")
+            SectionLabel("Tempo (BPM)", tooltipKey = "tempo")
             ChipRow(
                 items = bpmOptions,
                 selected = bpmOptions.indexOf(state.tempoBpm.toString()).coerceAtLeast(0),
@@ -159,18 +159,18 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             // preference on the platform (including this app's own OS settings)
             // uses. Grouped together rather than split around the Intro Sound
             // dropdown, and without a caption restating each control's own label.
-            SettingSwitchRow("Play Pass/Fail Sounds", state.playPassFailSounds) {
+            SettingSwitchRow("Play Pass/Fail Sounds", state.playPassFailSounds, tooltipKey = "play_pass_fail_sounds") {
                 viewModel.setPlayPassFailSounds(it)
             }
-            SettingSwitchRow("Display Test Notes", state.showTestNotes) {
+            SettingSwitchRow("Display Test Notes", state.showTestNotes, tooltipKey = "display_test_notes") {
                 viewModel.setShowTestNotes(it)
             }
-            SettingSwitchRow("Use Key Signature", state.keySignatureMode == 1) {
+            SettingSwitchRow("Use Key Signature", state.keySignatureMode == 1, tooltipKey = "use_key_signature") {
                 viewModel.setKeySignatureMode(if (it) 1 else 0)
             }
 
             Spacer(Modifier.height(12.dp))
-            SectionLabel("Intro Sound")
+            SectionLabel("Intro Sound", tooltipKey = "intro_sound")
             var introSoundExpanded by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(
                 expanded = introSoundExpanded,
@@ -199,9 +199,10 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
         }
 
         ExpandableSection("Exercise & Timing") {
-            SectionLabel("Max Retries")
-            Text("Attempts per test before moving on", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 6.dp))
+            // Explanatory captions removed under each label here — redundant now that
+            // every label has a tooltip icon (issue #11). Pause Before Playing keeps its
+            // live ms readout since the Slider itself shows no value of its own.
+            SectionLabel("Max Retries", tooltipKey = "max_retries")
             ChipRow(
                 items = retryOptions.map { it.toString() },
                 selected = retryOptions.indexOf(state.maxRetries).coerceAtLeast(0),
@@ -209,10 +210,7 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             )
 
             Spacer(Modifier.height(12.dp))
-            SectionLabel("Retry Same Note")
-            Text("Tries allowed on a wrong note before the whole test restarts — each retry costs a few points (0 = off)",
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 6.dp))
+            SectionLabel("Retry Same Note", tooltipKey = "retry_same_note")
             ChipRow(
                 items = noteRetryOptions.map { it.toString() },
                 selected = noteRetryOptions.indexOf(state.noteRetries).coerceAtLeast(0),
@@ -220,9 +218,8 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             )
 
             Spacer(Modifier.height(12.dp))
-            SectionLabel("Pause Before Playing")
-            Text("Gap between chord and test sequence (${state.postChordGapMs}ms)",
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            SectionLabel("Pause Before Playing", tooltipKey = "pause_before_playing")
+            Text("${state.postChordGapMs}ms", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 4.dp))
             Slider(
                 value = state.postChordGapMs.toFloat(),
@@ -233,10 +230,7 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             )
 
             Spacer(Modifier.height(12.dp))
-            SectionLabel("Wrong Note Pause")
-            Text("How long to display a wrong note before replaying",
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 6.dp))
+            SectionLabel("Wrong Note Pause", tooltipKey = "wrong_note_pause")
             ChipRow(
                 items = wrongPauseOptions.map { it.second },
                 selected = wrongPauseOptions.indexOfFirst { it.first == state.wrongNotePauseMs }.coerceAtLeast(0),

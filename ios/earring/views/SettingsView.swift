@@ -46,15 +46,18 @@ struct SettingsView: View {
                             // "Instrument" label already names the row (shown as
                             // "Instrument   Piano ⌄"), so a label above it just
                             // repeated the word.
-                            Picker("Instrument", selection: $model.instrumentIndex) {
-                                ForEach(instruments) { inst in
-                                    Text(inst.name).tag(inst.id)
+                            HStack(spacing: 4) {
+                                Picker("Instrument", selection: $model.instrumentIndex) {
+                                    ForEach(instruments) { inst in
+                                        Text(inst.name).tag(inst.id)
+                                    }
                                 }
+                                .pickerStyle(.menu)
+                                TooltipIcon(key: "instrument")
+                                Spacer()
                             }
-                            .pickerStyle(.menu)
-                            .frame(maxWidth: .infinity, alignment: .leading)
 
-                            sectionLabel("Tempo (BPM)")
+                            sectionLabel("Tempo (BPM)", tooltipKey: "tempo")
                             chipGrid(options: bpmOptions.map { "\($0)" },
                                      selected: bpmOptions.firstIndex(of: model.tempoBpm) ?? 0,
                                      count: bpmOptions.count) { idx in
@@ -72,28 +75,40 @@ struct SettingsView: View {
                                 get: { model.playPassFailSounds },
                                 set: { model.playPassFailSounds = $0 }
                             )) {
-                                Text("Play Pass/Fail Sounds")
+                                HStack(spacing: 4) {
+                                    Text("Play Pass/Fail Sounds")
+                                    TooltipIcon(key: "play_pass_fail_sounds")
+                                }
                             }
                             Toggle(isOn: Binding(
                                 get: { model.showTestNotes },
                                 set: { model.showTestNotes = $0 }
                             )) {
-                                Text("Display Test Notes")
+                                HStack(spacing: 4) {
+                                    Text("Display Test Notes")
+                                    TooltipIcon(key: "display_test_notes")
+                                }
                             }
                             Toggle(isOn: Binding(
                                 get: { model.keySignatureMode == 1 },
                                 set: { model.keySignatureMode = $0 ? 1 : 0 }
                             )) {
-                                Text("Use Key Signature")
-                            }
-
-                            Picker("Intro Sound", selection: $model.introSoundMode) {
-                                ForEach(introSoundOptions.indices, id: \.self) { idx in
-                                    Text(introSoundOptions[idx]).tag(idx)
+                                HStack(spacing: 4) {
+                                    Text("Use Key Signature")
+                                    TooltipIcon(key: "use_key_signature")
                                 }
                             }
-                            .pickerStyle(.menu)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            HStack(spacing: 4) {
+                                Picker("Intro Sound", selection: $model.introSoundMode) {
+                                    ForEach(introSoundOptions.indices, id: \.self) { idx in
+                                        Text(introSoundOptions[idx]).tag(idx)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                TooltipIcon(key: "intro_sound")
+                                Spacer()
+                            }
                         }
                         .padding(.vertical, 6)
                     } label: { sectionHeader("Sound & Display") }
@@ -101,36 +116,34 @@ struct SettingsView: View {
 
                 Section {
                     DisclosureGroup(isExpanded: $expandExerciseTiming) {
+                        // Explanatory captions removed under each label here — redundant
+                        // now that every label has a tooltip icon (issue #11). Pause
+                        // Before Playing keeps its live ms readout since the Slider
+                        // itself shows no value of its own.
                         VStack(alignment: .leading, spacing: 16) {
-                            sectionLabel("Max Retries")
-                            Text("Attempts per test before moving on")
-                                .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading)
+                            sectionLabel("Max Retries", tooltipKey: "max_retries")
                             chipGrid(options: retryOptions.map { "\($0)" },
                                      selected: retryOptions.firstIndex(of: model.maxRetries) ?? 0,
                                      count: retryOptions.count) { idx in
                                 model.maxRetries = retryOptions[idx]
                             }
 
-                            sectionLabel("Retry Same Note")
-                            Text("Tries allowed on a wrong note before the whole test restarts — each retry costs a few points (0 = off)")
-                                .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading)
+                            sectionLabel("Retry Same Note", tooltipKey: "retry_same_note")
                             chipGrid(options: noteRetryOptions.map { "\($0)" },
                                      selected: noteRetryOptions.firstIndex(of: model.noteRetries) ?? 0,
                                      count: noteRetryOptions.count) { idx in
                                 model.noteRetries = noteRetryOptions[idx]
                             }
 
-                            sectionLabel("Pause Before Playing")
-                            Text("Gap between chord and test sequence: \(model.postChordGapNanoseconds / 1_000_000)ms")
+                            sectionLabel("Pause Before Playing", tooltipKey: "pause_before_playing")
+                            Text("\(model.postChordGapNanoseconds / 1_000_000)ms")
                                 .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading)
                             Slider(value: Binding(
                                 get: { Double(model.postChordGapNanoseconds / 1_000_000) },
                                 set: { model.postChordGapNanoseconds = UInt64($0) * 1_000_000 }
                             ), in: 400...2000, step: 100)
 
-                            sectionLabel("Wrong Note Pause")
-                            Text("How long to display a wrong note before replaying")
-                                .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading)
+                            sectionLabel("Wrong Note Pause", tooltipKey: "wrong_note_pause")
                             chipGrid(options: wrongPauseOptions.map { $0.1 },
                                      selected: wrongPauseOptions.firstIndex(where: { $0.0 == model.wrongNotePauseNanoseconds }) ?? 0,
                                      count: wrongPauseOptions.count) { idx in
@@ -194,17 +207,22 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func sectionLabel(_ text: String) -> some View {
+    private func sectionLabel(_ text: String, tooltipKey: String? = nil) -> some View {
         // Distinctly larger than the .caption explanatory text below each control
         // (matches Android's SectionLabel, which uses labelLarge vs a 12sp caption —
         // same-size text differing only by weight reads as near-identical at a glance).
         // .erCaption, not .erMuted — erMuted (#BDBDBD) is too pale for prompt text
         // that's meant to be read, not just glanced at; erCaption is a literal match
         // for Android's onSurfaceVariant, which is a dark, legible gray.
-        Text(text)
-            .font(.subheadline.weight(.semibold))
-            .foregroundColor(.erCaption)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        HStack(spacing: 4) {
+            Text(text)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.erCaption)
+            if let tooltipKey {
+                TooltipIcon(key: tooltipKey)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func chipGrid(options: [String], selected: Int, count: Int, onSelect: @escaping (Int) -> Void) -> some View {

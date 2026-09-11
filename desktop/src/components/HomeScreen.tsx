@@ -1,6 +1,7 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { ExerciseSettings } from '../types';
+import { TooltipIcon } from './Tooltip';
 
 interface Props {
   settings: ExerciseSettings;
@@ -261,36 +262,28 @@ function RangeTextInputs({ rangeStart, rangeEnd, onChange, disabled }: {
     }
   };
   const inputStyle: React.CSSProperties = { width: 70, padding: '6px 8px', fontSize: 14, borderRadius: 6, border: '1px solid #ccc', textAlign: 'center' };
-  const captionStyle: React.CSSProperties = { fontSize: 11, color: '#757575', marginBottom: 2 };
 
-  // A small caption above each field is the only visible cue that these are
-  // editable text entry (not a static display) — a plain bordered <input> alone
-  // reads as static, and there's no built-in floating-label affordance in HTML.
+  // "Start"/"End" labels removed — the "to" between the two fields already makes
+  // which is which implicit.
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <span style={captionStyle}>Start</span>
-        <input
-          value={startText}
-          disabled={disabled}
-          onChange={e => setStartText(e.target.value)}
-          onBlur={commitStart}
-          onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-          style={inputStyle}
-        />
-      </div>
-      <span style={{ color: '#757575', paddingBottom: 6 }}>to</span>
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <span style={captionStyle}>End</span>
-        <input
-          value={endText}
-          disabled={disabled}
-          onChange={e => setEndText(e.target.value)}
-          onBlur={commitEnd}
-          onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-          style={inputStyle}
-        />
-      </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <input
+        value={startText}
+        disabled={disabled}
+        onChange={e => setStartText(e.target.value)}
+        onBlur={commitStart}
+        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+        style={inputStyle}
+      />
+      <span style={{ color: '#757575' }}>to</span>
+      <input
+        value={endText}
+        disabled={disabled}
+        onChange={e => setEndText(e.target.value)}
+        onBlur={commitEnd}
+        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+        style={inputStyle}
+      />
     </div>
   );
 }
@@ -378,7 +371,7 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
       </div>
       <p className="app-subtitle">Ear Training</p>
 
-      <span className="section-label">Test Type</span>
+      <span className="section-label">Test Type<TooltipIcon tooltipKey="test_type" /></span>
       <select
         value={settings.testType}
         onChange={e => handleTestTypeChange(Number(e.target.value))}
@@ -391,7 +384,7 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
 
       <div style={{ display: 'flex', gap: 8 }}>
         <div style={{ flex: 1 }}>
-          <span className="section-label">Key</span>
+          <span className="section-label">Key<TooltipIcon tooltipKey="key" /></span>
           <select
             value={settings.rootNote}
             onChange={e => {
@@ -411,7 +404,7 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
           </select>
         </div>
         <div style={{ flex: 1, opacity: isMelodyMode ? 0.38 : 1 }}>
-          <span className="section-label">Scale</span>
+          <span className="section-label">Scale<TooltipIcon tooltipKey="scale" /></span>
           <select
             value={settings.scaleId}
             disabled={isMelodyMode}
@@ -425,11 +418,8 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
         </div>
       </div>
 
-      <span className="section-label">Range</span>
-      {/* flex-end, not center — RangeTextInputs now has a small caption above each
-          field, so the piano button needs to align with the actual text-entry row,
-          not the row's overall top. */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 4 }}>
+      <span className="section-label">Range<TooltipIcon tooltipKey="range" /></span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
         <RangeTextInputs
           rangeStart={settings.rangeStart}
           rangeEnd={settings.rangeEnd}
@@ -457,7 +447,7 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
       )}
 
       <div>
-        <span className="section-label">Sequence Length</span>
+        <span className="section-label">Sequence Length<TooltipIcon tooltipKey="sequence_length" /></span>
         <div className="chip-row">
           {[1, 2, 3, 4, 5, 6, 7, 8].map(len => {
             // Fully locked at 3 in diatonic mode (4-note/7th-chord arpeggios are

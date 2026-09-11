@@ -206,7 +206,7 @@ struct HomeView: View {
                 .padding(.top, 24)
 
                 // ── Test Type ─────────────────────────────────────────────
-                sectionLabel("Test Type").padding(.top, 28)
+                sectionLabel("Test Type", tooltipKey: "test_type").padding(.top, 28)
                 OutlinedDropdown(
                     selectedLabel: model.testType == 2 ? "Diatonic Arpeggios" : "Random Notes",
                     options: [DropdownOption(value: 0, label: "Random Notes"), DropdownOption(value: 2, label: "Diatonic Arpeggios")],
@@ -223,7 +223,7 @@ struct HomeView: View {
                 // ── Key + Scale (side by side) ────────────────────────────
                 HStack(alignment: .top, spacing: 8) {
                     VStack(alignment: .leading, spacing: 0) {
-                        sectionLabel("Key").padding(.top, 28)
+                        sectionLabel("Key", tooltipKey: "key").padding(.top, 28)
                         OutlinedDropdown(
                             selectedLabel: {
                                 let writtenRoot = (model.rootNote + instrKeyTranspose) % 12
@@ -246,7 +246,7 @@ struct HomeView: View {
                     .frame(maxWidth: .infinity)
 
                     VStack(alignment: .leading, spacing: 0) {
-                        sectionLabel("Scale").padding(.top, 28)
+                        sectionLabel("Scale", tooltipKey: "scale").padding(.top, 28)
                         OutlinedDropdown(
                             selectedLabel: EarRingCore.writtenScaleLabel(concertRootChroma: model.rootNote, scaleId: model.scaleId, instrumentIndex: model.instrumentIndex),
                             options: MusicTheory.SELECTABLE_SCALE_IDS.map { i in
@@ -263,11 +263,8 @@ struct HomeView: View {
                 // ── Range: typed start/end fields, plus a button opening the piano
                 // keyboard full-screen (it needs all the room it can get to stay tappable —
                 // see PianoRangePickerFullScreen below for why this isn't a small sheet). ──
-                sectionLabel("Range").padding(.top, 16)
-                // .bottom, not the default .center — RangeTextInputs now has a small
-                // caption above each field (see below), so the piano button needs to
-                // align with the actual text-entry row, not the row's overall top.
-                HStack(alignment: .bottom, spacing: 10) {
+                sectionLabel("Range", tooltipKey: "range").padding(.top, 16)
+                HStack(alignment: .center, spacing: 10) {
                     RangeTextInputs(
                         rangeStart: model.rangeStart,
                         rangeEnd: model.rangeEnd,
@@ -298,7 +295,7 @@ struct HomeView: View {
                 }
 
                 // ── Sequence Length ───────────────────────────────────────
-                sectionLabel("Sequence Length").padding(.top, 16)
+                sectionLabel("Sequence Length", tooltipKey: "sequence_length").padding(.top, 16)
                 LazyVGrid(
                     columns: Array(repeating: GridItem(.flexible()), count: 8),
                     spacing: 6
@@ -348,12 +345,17 @@ struct HomeView: View {
     }
 
     @ViewBuilder
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.caption)
-            .foregroundColor(.erCaption)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, 6)
+    private func sectionLabel(_ text: String, tooltipKey: String? = nil) -> some View {
+        HStack(spacing: 4) {
+            Text(text)
+                .font(.caption)
+                .foregroundColor(.erCaption)
+            if let tooltipKey {
+                TooltipIcon(key: tooltipKey)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, 6)
     }
 
     private func loadInstrTranspose() {
@@ -381,40 +383,27 @@ private struct RangeTextInputs: View {
     @FocusState private var endFocused: Bool
 
     var body: some View {
-        // A small caption above each field is the only visible cue that these are
-        // editable text entry (not a static display) — SwiftUI's plain roundedBorder
-        // TextField has no built-in floating label like Android's OutlinedTextField,
-        // and the field's own text is never empty, so a placeholder would never show.
-        HStack(alignment: .bottom, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Start")
-                    .font(.caption2)
-                    .foregroundColor(.erCaption)
-                TextField("", text: $startText)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 70)
-                    .multilineTextAlignment(.center)
-                    .disabled(!enabled)
-                    .focused($startFocused)
-                    .onSubmit { commitStart() }
-                    .onChange(of: startFocused) { focused in if !focused { commitStart() } }
-            }
+        // "Start"/"End" labels removed — the "to" between the two fields already
+        // makes which is which implicit.
+        HStack(alignment: .center, spacing: 10) {
+            TextField("", text: $startText)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 70)
+                .multilineTextAlignment(.center)
+                .disabled(!enabled)
+                .focused($startFocused)
+                .onSubmit { commitStart() }
+                .onChange(of: startFocused) { focused in if !focused { commitStart() } }
             Text("to")
                 .fixedSize()
-                .padding(.bottom, 6)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("End")
-                    .font(.caption2)
-                    .foregroundColor(.erCaption)
-                TextField("", text: $endText)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 70)
-                    .multilineTextAlignment(.center)
-                    .disabled(!enabled)
-                    .focused($endFocused)
-                    .onSubmit { commitEnd() }
-                    .onChange(of: endFocused) { focused in if !focused { commitEnd() } }
-            }
+            TextField("", text: $endText)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 70)
+                .multilineTextAlignment(.center)
+                .disabled(!enabled)
+                .focused($endFocused)
+                .onSubmit { commitEnd() }
+                .onChange(of: endFocused) { focused in if !focused { commitEnd() } }
         }
         .onAppear {
             startText = MusicTheory.midiToLabel(rangeStart)

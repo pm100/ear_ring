@@ -181,6 +181,12 @@ struct EarRingCore {
         return String(cString: ptr)
     }
 
+    /// Returns a JSON string: `[{"key":"...","text":"..."},...]` (issue #11).
+    static func tooltipContent() -> String {
+        guard let ptr = ear_ring_tooltip_content() else { return "[]" }
+        return String(cString: ptr)
+    }
+
     /// Returns a JSON string: `[{"id":0,"name":"Piano","semitones":0},...]`
     static func instrumentList() -> String {
         guard let ptr = ear_ring_instrument_list() else { return "[]" }

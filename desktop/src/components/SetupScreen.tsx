@@ -4,6 +4,7 @@ import PitchMeter from './PitchMeter';
 import MusicStaff from './MusicStaff';
 import { useAudioCapture, TrackerFrame } from '../hooks/useAudioCapture';
 import { ExerciseSettings } from '../types';
+import { TooltipIcon } from './Tooltip';
 
 const STABILITY_OPTIONS = [2, 3, 4, 5];
 const WARMUP_OPTIONS = [0, 1, 2, 3, 4, 5, 6];
@@ -122,7 +123,7 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
       </div>
 
       <div style={{ marginTop: 16 }}>
-        <span className="section-label" style={{ marginTop: 0 }}>Mic Sensitivity</span>
+        <span className="section-label" style={{ marginTop: 0 }}>Mic Sensitivity<TooltipIcon tooltipKey="mic_sensitivity" /></span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <input type="range" min={1} max={10} step={1}
             value={Math.round((0.011 - silenceThreshold) / 0.001)}
@@ -131,7 +132,7 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
           <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{Math.round((0.011 - silenceThreshold) / 0.001)} / 10</span>
         </div>
 
-        <span className="section-label">Note Stability (frames to confirm)</span>
+        <span className="section-label">Note Stability (frames to confirm)<TooltipIcon tooltipKey="note_stability" /></span>
         <div className="chip-row">
           {STABILITY_OPTIONS.map(n => (
             <button key={n} type="button"
@@ -140,7 +141,7 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
           ))}
         </div>
 
-        <span className="section-label">Mic Warmup Frames</span>
+        <span className="section-label">Mic Warmup Frames<TooltipIcon tooltipKey="mic_warmup_frames" /></span>
         <div className="chip-row">
           {WARMUP_OPTIONS.map(n => (
             <button key={n} type="button"

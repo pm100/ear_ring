@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use ear_ring_core::{
-    accidental_in_key, detect_pitch, diatonic_chord_label, effective_intro_root_midi, enforce_min_range_span, freq_to_note, generate_diatonic_chord, generate_sequence, help_sections_json,
+    accidental_in_key, detect_pitch, diatonic_chord_label, effective_intro_root_midi, enforce_min_range_span, freq_to_note, generate_diatonic_chord, generate_sequence, help_sections_json, tooltips_json,
     intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions, label_to_midi,
     melody_count, melody_range_midi, melody_title, melody_to_midi_by_index, note_timing, preferred_midi_label,
     scale_notes, scale_type_from_id, shuffle_melody_indices, staff_position, test_score, note_retry_penalty, wrong_note_outcome, written_diatonic_chord_label, written_note_name, written_midi_label, written_scale_label,
@@ -211,6 +211,11 @@ fn cmd_help_content() -> String {
 }
 
 #[tauri::command]
+fn cmd_tooltip_content() -> String {
+    tooltips_json()
+}
+
+#[tauri::command]
 fn cmd_instrument_list() -> String {
     ear_ring_core::instrument_list_json()
 }
@@ -311,6 +316,7 @@ fn main() {
             cmd_accidental_in_key,
             cmd_key_sig_positions,
             cmd_help_content,
+            cmd_tooltip_content,
             cmd_instrument_list,
             cmd_git_hash,
             cmd_transpose_display_midi,

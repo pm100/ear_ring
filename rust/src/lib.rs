@@ -72,6 +72,46 @@ fn json_string(s: &str) -> String {
     out
 }
 
+// ── Tooltip content ──────────────────────────────────────────────────────────
+
+const TOOLTIPS_MD: &str = include_str!("tooltips.md");
+
+/// Parse the embedded tooltips.md into a JSON array: `[{"key":"...","text":"..."},...]`.
+/// Same `## key` / body convention as help_sections_json — each platform parses this
+/// once and looks entries up by key locally (issue #11).
+pub fn tooltips_json() -> String {
+    let mut entries: Vec<(String, String)> = Vec::new();
+    let mut current_key: Option<String> = None;
+    let mut current_body: Vec<&str> = Vec::new();
+
+    for line in TOOLTIPS_MD.lines() {
+        if let Some(key) = line.strip_prefix("## ") {
+            if let Some(k) = current_key.take() {
+                entries.push((k, current_body.join("\n").trim().to_string()));
+                current_body.clear();
+            }
+            current_key = Some(key.trim().to_string());
+        } else if current_key.is_some() {
+            current_body.push(line);
+        }
+    }
+    if let Some(k) = current_key {
+        entries.push((k, current_body.join("\n").trim().to_string()));
+    }
+
+    let mut json = String::from("[");
+    for (i, (key, text)) in entries.iter().enumerate() {
+        if i > 0 { json.push(','); }
+        json.push_str(&format!(
+            "{{\"key\":{},\"text\":{}}}",
+            json_string(key),
+            json_string(text)
+        ));
+    }
+    json.push(']');
+    json
+}
+
 // ── Instrument list ──────────────────────────────────────────────────────────
 
 pub fn instrument_list_json() -> String {
@@ -116,6 +156,19 @@ pub extern "C" fn ear_ring_help_content() -> *const std::os::raw::c_char {
     static CACHE: OnceLock<CString> = OnceLock::new();
     CACHE.get_or_init(|| {
         CString::new(help_sections_json()).unwrap_or_else(|_| CString::new("[]").unwrap())
+    }).as_ptr()
+}
+
+/// Returns a pointer to a null-terminated UTF-8 JSON string containing the
+/// tooltip entries: `[{"key":"...","text":"..."},...]`.
+/// The pointer is valid for the lifetime of the process (static storage).
+#[no_mangle]
+pub extern "C" fn ear_ring_tooltip_content() -> *const std::os::raw::c_char {
+    use std::ffi::CString;
+    use std::sync::OnceLock;
+    static CACHE: OnceLock<CString> = OnceLock::new();
+    CACHE.get_or_init(|| {
+        CString::new(tooltips_json()).unwrap_or_else(|_| CString::new("[]").unwrap())
     }).as_ptr()
 }
 
@@ -1347,6 +1400,17 @@ mod android_jni {
         _class: JClass,
     ) -> jstring {
         let json = super::help_sections_json();
+        env.new_string(json)
+            .map(|s| s.into_raw())
+            .unwrap_or(std::ptr::null_mut())
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeTooltipContent(
+        env: JNIEnv,
+        _class: JClass,
+    ) -> jstring {
+        let json = super::tooltips_json();
         env.new_string(json)
             .map(|s| s.into_raw())
             .unwrap_or(std::ptr::null_mut())

@@ -86,7 +86,7 @@ struct SetupView: View {
 
             // ── Pitch Detection settings ────────────────────────────────
             Spacer().frame(height: 12)
-            sectionLabel("Mic Sensitivity")
+            sectionLabel("Mic Sensitivity", tooltipKey: "mic_sensitivity")
             Text("\(sensitivity) / 10")
                 .font(.caption).foregroundColor(.erCaption).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 4)
             Slider(value: Binding(
@@ -95,7 +95,7 @@ struct SetupView: View {
             ), in: 1...10, step: 1)
 
             Spacer().frame(height: 6)
-            sectionLabel("Note Stability (frames to confirm)")
+            sectionLabel("Note Stability (frames to confirm)", tooltipKey: "note_stability")
             chipGrid(options: stabilityOptions.map { "\($0)" },
                      selected: stabilityOptions.firstIndex(of: model.framesToConfirm) ?? 0,
                      count: stabilityOptions.count) { idx in
@@ -103,7 +103,7 @@ struct SetupView: View {
             }
 
             Spacer().frame(height: 6)
-            sectionLabel("Mic Warmup Frames")
+            sectionLabel("Mic Warmup Frames", tooltipKey: "mic_warmup_frames")
             chipGrid(options: warmupOptions.map { "\($0)" },
                      selected: warmupOptions.firstIndex(of: model.warmupFrames) ?? 4,
                      count: warmupOptions.count) { idx in
@@ -155,15 +155,20 @@ struct SetupView: View {
     }
 
     @ViewBuilder
-    private func sectionLabel(_ text: String) -> some View {
+    private func sectionLabel(_ text: String, tooltipKey: String? = nil) -> some View {
         // .erCaption, not .erMuted — erMuted (#BDBDBD) is too pale for prompt text
         // that's meant to be read, not just glanced at; erCaption is a literal match
         // for Android's onSurfaceVariant, which is a dark, legible gray.
-        Text(text)
-            .font(.subheadline.weight(.semibold))
-            .foregroundColor(.erCaption)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, 6)
+        HStack(spacing: 4) {
+            Text(text)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.erCaption)
+            if let tooltipKey {
+                TooltipIcon(key: tooltipKey)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, 6)
     }
 
     private func chipGrid(options: [String], selected: Int, count: Int, onSelect: @escaping (Int) -> Void) -> some View {

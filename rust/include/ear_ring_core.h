@@ -235,6 +235,11 @@ int32_t ear_ring_staff_position_in_key(uint8_t midi, uint8_t root_chroma);
 /// The pointer is valid for the lifetime of the process. Do not free it.
 const char *ear_ring_help_content(void);
 
+/// Returns a pointer to a static null-terminated UTF-8 JSON string containing
+/// tooltip entries: `[{"key":"...","text":"..."},...]` (issue #11).
+/// The pointer is valid for the lifetime of the process. Do not free it.
+const char *ear_ring_tooltip_content(void);
+
 /// Returns a pointer to a static null-terminated UTF-8 JSON string listing
 /// available instruments: `[{"id":0,"name":"Piano","semitones":0},...]`.
 /// The pointer is valid for the lifetime of the process. Do not free it.

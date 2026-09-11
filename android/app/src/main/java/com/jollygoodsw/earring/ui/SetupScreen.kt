@@ -119,7 +119,7 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
         val stabilityOptions = listOf(2, 3, 4, 5)
         val warmupOptions = listOf(0, 1, 2, 3, 4, 5, 6)
 
-        SectionLabel("Mic Sensitivity")
+        SectionLabel("Mic Sensitivity", tooltipKey = "mic_sensitivity")
         val sensitivity = ((0.011f - silenceThreshold) / 0.001f).roundToInt().coerceIn(1, 10)
         Text("${sensitivity} / 10",
             fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -133,7 +133,7 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
         )
 
         Spacer(Modifier.height(8.dp))
-        SectionLabel("Note Stability (frames to confirm)")
+        SectionLabel("Note Stability (frames to confirm)", tooltipKey = "note_stability")
         ChipRow(
             items = stabilityOptions.map { it.toString() },
             selected = stabilityOptions.indexOf(framesToConfirm).coerceAtLeast(0),
@@ -141,7 +141,7 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
         )
 
         Spacer(Modifier.height(8.dp))
-        SectionLabel("Mic Warmup Frames")
+        SectionLabel("Mic Warmup Frames", tooltipKey = "mic_warmup_frames")
         ChipRow(
             items = warmupOptions.map { it.toString() },
             selected = warmupOptions.indexOf(warmupFrames).coerceAtLeast(0),

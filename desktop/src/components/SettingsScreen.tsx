@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { ExerciseSettings } from '../types';
+import { TooltipIcon } from './Tooltip';
 
 interface Props {
   settings: ExerciseSettings;
@@ -76,7 +77,7 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
       </div>
 
       <CollapsibleSection title="Instrument & Playback">
-        <span className="section-label" style={{ marginTop: 0 }}>Instrument</span>
+        <span className="section-label" style={{ marginTop: 0 }}>Instrument<TooltipIcon tooltipKey="instrument" /></span>
         <select
           value={settings.instrumentIndex}
           onChange={e => {
@@ -93,7 +94,7 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
             <option key={inst.id} value={inst.id}>{inst.name}</option>
           ))}
         </select>
-        <span className="section-label">Tempo (BPM)</span>
+        <span className="section-label">Tempo (BPM)<TooltipIcon tooltipKey="tempo" /></span>
         <div className="chip-row">
           {BPM_OPTIONS.map(bpm => (
             <button key={bpm} type="button"
@@ -104,18 +105,21 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
       </CollapsibleSection>
 
       <CollapsibleSection title="Sound & Display">
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginTop: 0 }}>
-          <input
-            type="checkbox"
-            checked={settings.playPassFailSounds}
-            onChange={e => set('playPassFailSounds', e.target.checked)}
-            style={{ width: 18, height: 18, cursor: 'pointer' }}
-          />
-          <span className="section-label" style={{ margin: 0 }}>Play Pass/Fail Sounds</span>
-        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 0 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={settings.playPassFailSounds}
+              onChange={e => set('playPassFailSounds', e.target.checked)}
+              style={{ width: 18, height: 18, cursor: 'pointer' }}
+            />
+            <span className="section-label" style={{ margin: 0 }}>Play Pass/Fail Sounds</span>
+          </label>
+          <TooltipIcon tooltipKey="play_pass_fail_sounds" />
+        </div>
         <p style={{ fontSize: 12, color: '#757575', marginTop: 4, marginBottom: 0 }}>A chime when a test is passed, a different tone when it fails</p>
 
-        <span className="section-label">Intro Sound</span>
+        <span className="section-label">Intro Sound<TooltipIcon tooltipKey="intro_sound" /></span>
         <p style={{ fontSize: 12, color: '#757575', marginBottom: 6 }}>What plays before each test</p>
         <select
           value={settings.introSoundMode}
@@ -127,30 +131,38 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
           ))}
         </select>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginTop: 12 }}>
-          <input
-            type="checkbox"
-            checked={settings.showTestNotes}
-            onChange={e => set('showTestNotes', e.target.checked)}
-            style={{ width: 18, height: 18, cursor: 'pointer' }}
-          />
-          <span className="section-label" style={{ margin: 0 }}>Display Test Notes</span>
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={settings.keySignatureMode === 1}
-            onChange={e => set('keySignatureMode', e.target.checked ? 1 : 0)}
-            style={{ width: 18, height: 18, cursor: 'pointer' }}
-          />
-          <span className="section-label" style={{ margin: 0 }}>Use Key Signature</span>
-        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={settings.showTestNotes}
+              onChange={e => set('showTestNotes', e.target.checked)}
+              style={{ width: 18, height: 18, cursor: 'pointer' }}
+            />
+            <span className="section-label" style={{ margin: 0 }}>Display Test Notes</span>
+          </label>
+          <TooltipIcon tooltipKey="display_test_notes" />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={settings.keySignatureMode === 1}
+              onChange={e => set('keySignatureMode', e.target.checked ? 1 : 0)}
+              style={{ width: 18, height: 18, cursor: 'pointer' }}
+            />
+            <span className="section-label" style={{ margin: 0 }}>Use Key Signature</span>
+          </label>
+          <TooltipIcon tooltipKey="use_key_signature" />
+        </div>
       </CollapsibleSection>
 
       <CollapsibleSection title="Exercise & Timing">
-        <span className="section-label" style={{ marginTop: 0 }}>Max Retries</span>
-        <p style={{ fontSize: 12, color: '#757575', marginBottom: 6 }}>Attempts per test before moving on</p>
-        <div className="chip-row">
+        {/* Explanatory captions removed under each label here — redundant now that
+            every label has a tooltip icon (issue #11). Pause Before Playing keeps its
+            live ms readout since the range input itself shows no value of its own. */}
+        <span className="section-label" style={{ marginTop: 0 }}>Max Retries<TooltipIcon tooltipKey="max_retries" /></span>
+        <div className="chip-row" style={{ marginTop: 6 }}>
           {RETRY_OPTIONS.map(n => (
             <button key={n} type="button"
               className={`chip ${settings.maxRetries === n ? 'chip-selected' : ''}`}
@@ -158,9 +170,8 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
           ))}
         </div>
 
-        <span className="section-label">Retry Same Note</span>
-        <p style={{ fontSize: 12, color: '#757575', marginBottom: 6 }}>Tries allowed on a wrong note before the whole test restarts — each retry costs a few points (0 = off)</p>
-        <div className="chip-row">
+        <span className="section-label">Retry Same Note<TooltipIcon tooltipKey="retry_same_note" /></span>
+        <div className="chip-row" style={{ marginTop: 6 }}>
           {NOTE_RETRY_OPTIONS.map(n => (
             <button key={n} type="button"
               className={`chip ${settings.noteRetries === n ? 'chip-selected' : ''}`}
@@ -168,9 +179,8 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
           ))}
         </div>
 
-        <span className="section-label">Pause Before Playing</span>
-        <p style={{ fontSize: 12, color: '#757575', marginBottom: 6 }}>Gap between chord and test sequence (ms)</p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span className="section-label">Pause Before Playing<TooltipIcon tooltipKey="pause_before_playing" /></span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
           <input type="range" min={400} max={2000} step={100}
             value={settings.postChordGapMs}
             onChange={e => set('postChordGapMs', parseInt(e.target.value))}
@@ -178,9 +188,8 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
           <span style={{ minWidth: 48, fontSize: 13, color: '#212121' }}>{settings.postChordGapMs}ms</span>
         </div>
 
-        <span className="section-label">Wrong Note Pause</span>
-        <p style={{ fontSize: 12, color: '#757575', marginBottom: 6 }}>How long to display a wrong note before replaying</p>
-        <div className="chip-row">
+        <span className="section-label">Wrong Note Pause<TooltipIcon tooltipKey="wrong_note_pause" /></span>
+        <div className="chip-row" style={{ marginTop: 6 }}>
           {WRONG_PAUSE_OPTIONS.map(opt => (
             <button key={opt.value} type="button"
               className={`chip ${settings.wrongNotePauseMs === opt.value ? 'chip-selected' : ''}`}

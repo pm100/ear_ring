@@ -94,7 +94,7 @@ fun HomeScreen(
         // Test Type dropdown — only Random Notes (0) and Diatonic Arpeggios (2) shown
         val testTypeOptions = listOf(0 to "Random Notes", 2 to "Diatonic Arpeggios")
         var testTypeExpanded by remember { mutableStateOf(false) }
-        SectionLabel("Test Type")
+        SectionLabel("Test Type", tooltipKey = "test_type")
         ExposedDropdownMenuBox(
             expanded = testTypeExpanded,
             onExpandedChange = { testTypeExpanded = it },
@@ -131,7 +131,7 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                SectionLabel("Key")
+                SectionLabel("Key", tooltipKey = "key")
                 var keyExpanded by remember { mutableStateOf(false) }
                 // Selected display: show written key name + "(concert X)" when transposing
                 val writtenRoot = (state.rootNote + instrKeyTranspose) % 12
@@ -173,7 +173,7 @@ fun HomeScreen(
                 }
             }
             Column(modifier = Modifier.weight(1f).alpha(if (state.testType == 1) 0.38f else 1f)) {
-                SectionLabel("Scale")
+                SectionLabel("Scale", tooltipKey = "scale")
                 var scaleExpanded by remember { mutableStateOf(false) }
                 ExposedDropdownMenuBox(
                     expanded = scaleExpanded,
@@ -211,7 +211,7 @@ fun HomeScreen(
         // Range selection — typed start/end fields, plus a button opening the piano
         // keyboard full-screen (it needs all the room it can get to stay tappable —
         // see PianoRangePickerScreen below for why this isn't a small dialog).
-        SectionLabel("Range")
+        SectionLabel("Range", tooltipKey = "range")
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -246,7 +246,7 @@ fun HomeScreen(
 
         // Sequence length — fully locked at 3 in diatonic mode (4-note/7th-chord
         // arpeggios are suppressed for now), not just narrowed to 3-4.
-        SectionLabel("Sequence Length")
+        SectionLabel("Sequence Length", tooltipKey = "sequence_length")
         ChipRow(
             items = (1..8).map { it.toString() },
             selected = state.sequenceLength - 1,
@@ -302,14 +302,13 @@ private fun RangeTextInputs(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        // "Start"/"End" labels removed — the "to" between the two fields already
+        // makes which is which implicit.
         OutlinedTextField(
             value = startText,
             onValueChange = { startText = it },
             enabled = enabled,
             singleLine = true,
-            // A floating label is the field's only visible cue that it's editable text
-            // entry (not a static display) — without one it reads as a plain box.
-            label = { Text("Start") },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { commitStart() }),
             modifier = Modifier.width(90.dp).onFocusChanged { if (!it.isFocused) commitStart() }
@@ -320,7 +319,6 @@ private fun RangeTextInputs(
             onValueChange = { endText = it },
             enabled = enabled,
             singleLine = true,
-            label = { Text("End") },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { commitEnd() }),
             modifier = Modifier.width(90.dp).onFocusChanged { if (!it.isFocused) commitEnd() }
@@ -328,23 +326,33 @@ private fun RangeTextInputs(
     }
 }
 
+/** tooltipKey, when given, adds a "?" icon after the label showing that tooltips.md
+ *  entry on tap (issue #11). */
 @Composable
-internal fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+internal fun SectionLabel(text: String, tooltipKey: String? = null) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 6.dp)
-    )
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (tooltipKey != null) {
+            Spacer(Modifier.width(4.dp))
+            TooltipIcon(tooltipKey)
+        }
+    }
 }
 
 /** A label + Switch row for a boolean setting. Switch, not Checkbox — a checkbox
  *  reads as "select from a list," a switch as "toggle a setting," matching every
  *  other on/off preference on the platform. */
 @Composable
-internal fun SettingSwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+internal fun SettingSwitchRow(label: String, checked: Boolean, tooltipKey: String? = null, onCheckedChange: (Boolean) -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -352,6 +360,10 @@ internal fun SettingSwitchRow(label: String, checked: Boolean, onCheckedChange: 
             .padding(vertical = 4.dp)
     ) {
         Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        if (tooltipKey != null) {
+            TooltipIcon(tooltipKey)
+            Spacer(Modifier.width(8.dp))
+        }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
