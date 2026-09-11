@@ -9,6 +9,13 @@ import SettingsScreen from './components/SettingsScreen';
 import HelpScreen from './components/HelpScreen';
 import Sidebar from './components/Sidebar';
 
+// Global default for yin_threshold: DEFAULT_YIN_THRESHOLD in rust/src/pitch_detection.rs.
+// cmd_tracker_apply_instrument never touches yin_threshold (it has no per-instrument
+// INSTRUMENTS-table entry, unlike grace_frames/octave_correction), so an uncalibrated
+// exercise falls back to this literal rather than a flat setting possibly left over
+// from a different instrument (or a different instrument's saved calibration).
+const DEFAULT_YIN_THRESHOLD = 0.15;
+
 const defaultSettings: ExerciseSettings = (() => {
   const rootNote = 0;
   let rangeStart = 60;
@@ -33,7 +40,7 @@ const defaultSettings: ExerciseSettings = (() => {
     warmupFrames: 4,
     graceFrames: 3,
     octaveCorrection: false,
-    yinThreshold: 0.15,
+    yinThreshold: DEFAULT_YIN_THRESHOLD,
     calibrationParamsByInstrument: {},
     postChordGapMs: 800,
     wrongNotePauseMs: 3000,
@@ -123,6 +130,26 @@ export default function App() {
     // settings fields — without this the exercise ran on whatever the sliders
     // and the instrument table happened to hold, and calibration was write-only.
     const calibrated = settings.calibrationParamsByInstrument?.[settings.instrumentIndex];
+    // Uncalibrated fallback: grace_frames/octave_correction are instrument-specific (the
+    // Rust INSTRUMENTS table, which cmd_tracker_apply_instrument applies in ExerciseScreen)
+    // rather than flat-settings-specific — settings.graceFrames/octaveCorrection can be
+    // stale leftovers from whichever instrument was previously selected or calibrated, so
+    // resolve them from the same table ExerciseScreen's apply_instrument call uses instead.
+    let fallbackGraceFrames = settings.graceFrames;
+    let fallbackOctaveCorrection = settings.octaveCorrection;
+    if (!calibrated) {
+      try {
+        const json = await invoke<string>('cmd_instrument_list');
+        const list = JSON.parse(json) as { graceFrames: number; octaveCorrection: boolean }[];
+        const info = list[settings.instrumentIndex];
+        if (info) {
+          fallbackGraceFrames = info.graceFrames;
+          fallbackOctaveCorrection = info.octaveCorrection;
+        }
+      } catch (e) {
+        console.error('cmd_instrument_list failed', e);
+      }
+    }
     const baseExercise = {
       rootNote,
       rangeStart,
@@ -139,9 +166,9 @@ export default function App() {
       silenceThreshold: calibrated?.silenceThreshold ?? settings.silenceThreshold,
       framesToConfirm: calibrated?.framesToConfirm ?? settings.framesToConfirm,
       warmupFrames: calibrated?.warmupFrames ?? settings.warmupFrames,
-      graceFrames: calibrated?.graceFrames ?? settings.graceFrames,
-      octaveCorrection: calibrated?.octaveCorrection ?? settings.octaveCorrection,
-      yinThreshold: calibrated?.yinThreshold ?? settings.yinThreshold,
+      graceFrames: calibrated?.graceFrames ?? fallbackGraceFrames,
+      octaveCorrection: calibrated?.octaveCorrection ?? fallbackOctaveCorrection,
+      yinThreshold: calibrated?.yinThreshold ?? DEFAULT_YIN_THRESHOLD,
       postChordGapMs: settings.postChordGapMs,
       wrongNotePauseMs: settings.wrongNotePauseMs,
       instrumentIndex: settings.instrumentIndex,
