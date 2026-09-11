@@ -30,7 +30,9 @@ pub struct CalibrationScore {
 
 pub const MAX_NOTES_PER_ROUND: usize = 3;
 pub const ROUND_CAP: usize = 8;
-pub const PLATEAU_ROUNDS: usize = 2;
+/// Consecutive non-improving rounds that count as a plateau. At 2 this fired
+/// after a single non-improving round, so runs almost never reached ROUND_CAP.
+pub const PLATEAU_ROUNDS: usize = 3;
 pub const PER_NOTE_TIMEOUT_FRAMES: u32 = 55;
 
 pub fn score_round(expected: &[i32], detected: &[i32], frames_to_confirm: &[u32]) -> CalibrationScore {
@@ -79,23 +81,45 @@ pub fn next_calibration_round(
     let mut new_params = last_round.params;
     let mut failing_notes: Vec<i32> = Vec::new();
 
+    // Classify every note first, then apply each nudge AT MOST ONCE for the
+    // round. Nudging inside the loop compounded per failing note (3 misses
+    // meant silence_threshold * 0.8^3 in one step), far past the "directional
+    // nudge" magnitude this design intends.
+    let mut any_missed = false;
+    let mut any_octave_error = false;
+    let mut any_wrong_pitch = false;
+
     for (i, &expected) in last_round.notes.iter().enumerate() {
         let detected = last_score.detected.get(i).copied().unwrap_or(-1);
         if detected == -1 {
-            // Nothing accepted at all: push both gates toward "accept more".
-            new_params.silence_threshold = (new_params.silence_threshold * 0.8).max(0.0005);
-            new_params.yin_threshold = (new_params.yin_threshold + 0.02).min(0.30);
+            any_missed = true;
             failing_notes.push(expected);
         } else if detected != expected {
             if (detected - expected).abs() == 12 {
-                new_params.octave_correction = true;
+                any_octave_error = true;
             } else {
-                // Something WAS confidently accepted, just the wrong thing —
-                // tighten rather than loosen (see doc comment above).
-                new_params.yin_threshold = (new_params.yin_threshold - 0.02).max(0.05);
+                any_wrong_pitch = true;
             }
             failing_notes.push(expected);
         }
+    }
+
+    if any_missed {
+        // Nothing accepted at all: push both gates toward "accept more".
+        new_params.silence_threshold = (new_params.silence_threshold * 0.8).max(0.0005);
+        new_params.yin_threshold = (new_params.yin_threshold + 0.02).min(0.30);
+    }
+    if any_octave_error {
+        // Sticky-on by design: once an octave error has been seen, correction
+        // stays enabled for the rest of the run rather than flipping back off
+        // on a later clean round — it's a cheap safety net, and letting it
+        // flip-flop would make consecutive rounds non-comparable.
+        new_params.octave_correction = true;
+    }
+    if any_wrong_pitch {
+        // Something WAS confidently accepted, just the wrong thing —
+        // tighten rather than loosen (see doc comment above).
+        new_params.yin_threshold = (new_params.yin_threshold - 0.02).max(0.05);
     }
 
     let confirmed_frames: Vec<u32> = last_score.frames_to_confirm.iter().copied().filter(|&f| f > 0).collect();
@@ -116,9 +140,30 @@ pub fn next_calibration_round(
     } else {
         let mut notes = failing_notes;
         notes.truncate(MAX_NOTES_PER_ROUND);
-        while notes.len() < MAX_NOTES_PER_ROUND {
-            let extra = (notes[0] + 1).clamp(range_start, range_end);
-            notes.push(extra);
+        if notes.len() < MAX_NOTES_PER_ROUND {
+            // Pad by walking outward from the first failing note (+1, -1, +2, -2, …)
+            // and skipping anything already in the round, so the extra probes are
+            // distinct notes rather than the same one repeated. Only a range too
+            // narrow to offer a fresh pitch falls back to duplicating.
+            let base = notes[0];
+            let span = (range_end - range_start).max(0);
+            for offset in 1..=(span + 1) {
+                for candidate in [base + offset, base - offset] {
+                    if notes.len() >= MAX_NOTES_PER_ROUND {
+                        break;
+                    }
+                    if candidate < range_start || candidate > range_end || notes.contains(&candidate) {
+                        continue;
+                    }
+                    notes.push(candidate);
+                }
+                if notes.len() >= MAX_NOTES_PER_ROUND {
+                    break;
+                }
+            }
+            while notes.len() < MAX_NOTES_PER_ROUND {
+                notes.push(base.clamp(range_start, range_end));
+            }
         }
         notes
     };
@@ -147,12 +192,29 @@ pub fn is_converged(history: &[(CalibrationRound, CalibrationScore)]) -> bool {
     false
 }
 
+/// Params of the highest-scoring recorded round, EARLIEST round winning a tie.
+///
+/// `max_by` would keep the last tied element, handing the run to the more-nudged
+/// later round even though nothing showed it was better — a non-converging run is
+/// meant to end up at least as good as where it started, not drift. So a later
+/// round only takes over on a strictly greater score. `partial_cmp` can't produce
+/// `None` for today's `total_score` (a hits/len ratio), but treat an unorderable
+/// comparison as a tie rather than panicking.
 pub fn best_params(history: &[(CalibrationRound, CalibrationScore)], fallback: CalibrationParams) -> CalibrationParams {
-    history
-        .iter()
-        .max_by(|a, b| a.1.total_score.partial_cmp(&b.1.total_score).unwrap())
-        .map(|(round, _)| round.params)
-        .unwrap_or(fallback)
+    let mut best: Option<&(CalibrationRound, CalibrationScore)> = None;
+    for entry in history {
+        let better = match best {
+            None => true,
+            Some(current) => matches!(
+                entry.1.total_score.partial_cmp(&current.1.total_score),
+                Some(std::cmp::Ordering::Greater)
+            ),
+        };
+        if better {
+            best = Some(entry);
+        }
+    }
+    best.map(|(round, _)| round.params).unwrap_or(fallback)
 }
 
 /// Drives one calibration run: owns round history and hands out the next round
@@ -370,12 +432,81 @@ mod tests {
         let start = params(0.003);
         let round = next_calibration_round(60, 72, start, &[]);
         // Round 1: nothing detected (score 0.0). Round 2: 2 of 3 correct (score
-        // ~0.667) — an improvement, and not itself perfect. With PLATEAU_ROUNDS=2
-        // this pair must NOT read as a plateau (0.667 > 0.0), so calibration
-        // should keep going rather than stop.
+        // ~0.667) — an improvement, and not itself perfect. Two rounds are also
+        // short of PLATEAU_ROUNDS (3), so on either count this must NOT read as a
+        // plateau: calibration should keep going rather than stop.
         let round1_score = score_round(&round.notes, &[-1, -1, -1], &[0, 0, 0]);
         let round2_score = score_round(&round.notes, &[round.notes[0], -1, round.notes[2]], &[3, 0, 3]);
         assert!(!is_converged(&[(round.clone(), round1_score), (round, round2_score)]));
+    }
+
+    #[test]
+    fn test_plateau_stop() {
+        let start = params(0.003);
+        let round = next_calibration_round(60, 72, start, &[]);
+        // PLATEAU_ROUNDS rounds all scoring the same 2/3 — not improving, not
+        // perfect, and well short of ROUND_CAP, so only the plateau branch can
+        // make this converge.
+        let flat_score = score_round(&round.notes, &[round.notes[0], -1, round.notes[2]], &[3, 0, 3]);
+        let history: Vec<_> = (0..PLATEAU_ROUNDS).map(|_| (round.clone(), flat_score.clone())).collect();
+        assert!(history.len() < ROUND_CAP, "must not be converging via the round cap");
+        assert!(flat_score.total_score < 1.0, "must not be converging via a perfect round");
+        assert!(is_converged(&history));
+        // One round short of the plateau window must still keep going.
+        assert!(!is_converged(&history[..PLATEAU_ROUNDS - 1]));
+    }
+
+    #[test]
+    fn test_all_notes_missed_nudges_silence_threshold_only_once() {
+        let start = params(0.003);
+        let round1 = next_calibration_round(60, 72, start, &[]);
+        // All three notes missed. The nudge is per ROUND, not per failing note,
+        // so this is one 0.8x step — not 0.8^3.
+        let score1 = score_round(&round1.notes, &[-1, -1, -1], &[0, 0, 0]);
+        let round2 = next_calibration_round(60, 72, start, &[(round1, score1)]);
+        assert!((round2.params.silence_threshold - start.silence_threshold * 0.8).abs() < 1e-9);
+        assert!((round2.params.yin_threshold - (start.yin_threshold + 0.02)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_padded_round_has_no_duplicate_notes() {
+        let start = params(0.003);
+        let round1 = next_calibration_round(60, 72, start, &[]);
+        // Only the middle note (66) fails, so the round is padded up to 3 notes.
+        let score1 = score_round(&round1.notes, &[60, -1, 72], &[3, 0, 3]);
+        let round2 = next_calibration_round(60, 72, start, &[(round1, score1)]);
+        assert_eq!(round2.notes.len(), MAX_NOTES_PER_ROUND);
+        let mut sorted = round2.notes.clone();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(sorted.len(), MAX_NOTES_PER_ROUND, "padding repeated a probe note: {:?}", round2.notes);
+        assert!(round2.notes.iter().all(|&n| (60..=72).contains(&n)));
+    }
+
+    #[test]
+    fn test_padding_duplicates_only_when_range_leaves_no_choice() {
+        let start = params(0.003);
+        // A one-note range has nothing else to probe, so duplication is the only
+        // option — this must still produce a full-length round rather than loop.
+        let round1 = next_calibration_round(60, 60, start, &[]);
+        let score1 = score_round(&round1.notes, &[-1, -1, -1], &[0, 0, 0]);
+        let round2 = next_calibration_round(60, 60, start, &[(round1, score1)]);
+        assert_eq!(round2.notes, vec![60, 60, 60]);
+    }
+
+    #[test]
+    fn test_best_params_keeps_earliest_round_on_tie() {
+        let start = params(0.003);
+        let round1 = next_calibration_round(60, 72, start, &[]);
+        // Both rounds score 1/3 — the later round's params are more nudged, but
+        // nothing demonstrated they're better, so the earlier round must win.
+        let score1 = score_round(&round1.notes, &[round1.notes[0], -1, -1], &[3, 0, 0]);
+        let round2 = next_calibration_round(60, 72, start, &[(round1.clone(), score1.clone())]);
+        let score2 = score_round(&round2.notes, &[round2.notes[0], -1, -1], &[3, 0, 0]);
+        assert!((score1.total_score - score2.total_score).abs() < 1e-6);
+        assert_ne!(round1.params, round2.params);
+        let best = best_params(&[(round1.clone(), score1), (round2, score2)], start);
+        assert_eq!(best, round1.params);
     }
 
     #[test]
