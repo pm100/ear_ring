@@ -5,12 +5,13 @@ use ear_ring_core::{
     intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions, label_to_midi,
     melody_count, melody_range_midi, melody_title, melody_to_midi_by_index, note_timing, preferred_midi_label,
     scale_notes, scale_type_from_id, shuffle_melody_indices, staff_position, test_score, note_retry_penalty, wrong_note_outcome, written_diatonic_chord_label, written_note_name, written_midi_label, written_scale_label,
-    Note, PitchTracker, ScaleType,
+    Note, PitchTracker, ScaleType, CalibrationSession, CalibrationParams,
 };
 use std::sync::Mutex;
 use tauri::State;
 
 struct TrackerState(Mutex<PitchTracker>);
+struct CalibrationState(Mutex<Option<CalibrationSession>>);
 
 // ── PitchTracker commands ────────────────────────────────────────────────────
 
@@ -39,12 +40,94 @@ fn cmd_tracker_apply_instrument(state: State<TrackerState>, instrument_index: us
     state.0.lock().unwrap().apply_instrument(instrument_index);
 }
 
+/// Directly set the previously-hidden per-instrument/global detection params
+/// (grace frames, octave correction, YIN threshold) — used by both manual
+/// Advanced-section edits and Auto-Calibrate applying a round's params.
+#[tauri::command]
+fn cmd_tracker_set_advanced_params(state: State<TrackerState>, grace_frames: u32, octave_correction: bool, yin_threshold: f32) {
+    let mut tracker = state.0.lock().unwrap();
+    tracker.grace_frames = grace_frames;
+    tracker.octave_correction = octave_correction;
+    tracker.yin_threshold = yin_threshold;
+}
+
 /// Process one audio buffer.
 /// Returns `[live_hz, live_midi, confirmed_midi]` as floats; -1.0 means absent.
 #[tauri::command]
 fn cmd_tracker_process(state: State<TrackerState>, samples: Vec<f32>, sample_rate: u32) -> (f32, i32, i32) {
     let result = state.0.lock().unwrap().process(&samples, sample_rate);
     (result.live_hz, result.live_midi, result.confirmed_midi)
+}
+
+// ── Calibration commands ─────────────────────────────────────────────────────
+
+#[tauri::command]
+fn cmd_calibration_start(
+    state: State<CalibrationState>,
+    range_start: i32,
+    range_end: i32,
+    silence_threshold: f32,
+    required_frames: u32,
+    warmup_frames: u32,
+    grace_frames: u32,
+    octave_correction: bool,
+    yin_threshold: f32,
+) -> Vec<i32> {
+    let starting = CalibrationParams {
+        silence_threshold,
+        required_frames,
+        warmup_frames,
+        grace_frames,
+        octave_correction,
+        yin_threshold,
+    };
+    let session = CalibrationSession::new(range_start, range_end, starting);
+    let notes = session.current_round().notes.clone();
+    *state.0.lock().unwrap() = Some(session);
+    notes
+}
+
+fn params_tuple(p: ear_ring_core::CalibrationParams) -> (f32, u32, u32, u32, bool, f32) {
+    (p.silence_threshold, p.required_frames, p.warmup_frames, p.grace_frames, p.octave_correction, p.yin_threshold)
+}
+
+#[tauri::command]
+fn cmd_calibration_current_params(state: State<CalibrationState>) -> (f32, u32, u32, u32, bool, f32) {
+    let guard = state.0.lock().unwrap();
+    params_tuple(guard.as_ref().expect("calibration not started").current_round().params)
+}
+
+#[tauri::command]
+fn cmd_calibration_record_round(state: State<CalibrationState>, detected: Vec<i32>, frames_to_confirm: Vec<u32>) -> (bool, Vec<i32>) {
+    let mut guard = state.0.lock().unwrap();
+    let session = guard.as_mut().expect("calibration not started");
+    let converged = session.record_round(&detected, &frames_to_confirm);
+    let next_notes = if converged { Vec::new() } else { session.current_round().notes.clone() };
+    (converged, next_notes)
+}
+
+#[tauri::command]
+fn cmd_calibration_best_params(state: State<CalibrationState>) -> (f32, u32, u32, u32, bool, f32) {
+    let guard = state.0.lock().unwrap();
+    params_tuple(guard.as_ref().expect("calibration not started").best_params())
+}
+
+#[tauri::command]
+fn cmd_calibration_best_score(state: State<CalibrationState>) -> f32 {
+    let guard = state.0.lock().unwrap();
+    guard.as_ref().map(|s| s.best_score()).unwrap_or(0.0)
+}
+
+#[tauri::command]
+fn cmd_calibration_last_round_no_signal(state: State<CalibrationState>) -> bool {
+    let guard = state.0.lock().unwrap();
+    guard.as_ref().map(|s| s.last_round_had_no_signal()).unwrap_or(false)
+}
+
+#[tauri::command]
+fn cmd_calibration_round_count(state: State<CalibrationState>) -> usize {
+    let guard = state.0.lock().unwrap();
+    guard.as_ref().map(|s| s.round_count()).unwrap_or(0)
 }
 
 // ── Other commands ───────────────────────────────────────────────────────────
@@ -289,12 +372,21 @@ fn cmd_sequence_timings(bpm: f32, durations: Vec<f32>) -> Vec<(u32, u32)> {
 fn main() {
     tauri::Builder::default()
         .manage(TrackerState(Mutex::new(PitchTracker::new(0.003, 3))))
+        .manage(CalibrationState(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             cmd_tracker_reset,
             cmd_tracker_reset_with_warmup,
             cmd_tracker_set_params,
             cmd_tracker_apply_instrument,
+            cmd_tracker_set_advanced_params,
             cmd_tracker_process,
+            cmd_calibration_start,
+            cmd_calibration_current_params,
+            cmd_calibration_record_round,
+            cmd_calibration_best_params,
+            cmd_calibration_best_score,
+            cmd_calibration_last_round_no_signal,
+            cmd_calibration_round_count,
             cmd_detect_pitch,
             cmd_freq_to_midi,
             cmd_freq_to_cents,
