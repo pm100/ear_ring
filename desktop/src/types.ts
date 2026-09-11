@@ -68,6 +68,14 @@ export interface ExerciseState {
   silenceThreshold: number;
   framesToConfirm: number;
   warmupFrames: number;
+  /** Detection params carried into the exercise. Resolved at startExercise() from
+   *  this instrument's saved Auto-Calibrate result when it has one, otherwise the
+   *  flat settings values — ExerciseScreen pushes them to the tracker after
+   *  cmd_tracker_apply_instrument so calibrated values aren't lost to the
+   *  instrument table's defaults. */
+  graceFrames: number;
+  octaveCorrection: boolean;
+  yinThreshold: number;
   postChordGapMs: number;
   wrongNotePauseMs: number;
   instrumentIndex: number;

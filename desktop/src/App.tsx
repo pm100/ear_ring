@@ -119,6 +119,10 @@ export default function App() {
   }, []);
 
   const startExercise = useCallback(async (rootNote: number, rangeStart: number, rangeEnd: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean, keySignatureMode: number, testType = 0) => {
+    // Auto-Calibrate's saved result for this instrument wins over the flat
+    // settings fields — without this the exercise ran on whatever the sliders
+    // and the instrument table happened to hold, and calibration was write-only.
+    const calibrated = settings.calibrationParamsByInstrument?.[settings.instrumentIndex];
     const baseExercise = {
       rootNote,
       rangeStart,
@@ -132,9 +136,12 @@ export default function App() {
       testType,
       maxRetries: settings.maxRetries,
       noteRetries: settings.noteRetries,
-      silenceThreshold: settings.silenceThreshold,
-      framesToConfirm: settings.framesToConfirm,
-      warmupFrames: settings.warmupFrames,
+      silenceThreshold: calibrated?.silenceThreshold ?? settings.silenceThreshold,
+      framesToConfirm: calibrated?.framesToConfirm ?? settings.framesToConfirm,
+      warmupFrames: calibrated?.warmupFrames ?? settings.warmupFrames,
+      graceFrames: calibrated?.graceFrames ?? settings.graceFrames,
+      octaveCorrection: calibrated?.octaveCorrection ?? settings.octaveCorrection,
+      yinThreshold: calibrated?.yinThreshold ?? settings.yinThreshold,
       postChordGapMs: settings.postChordGapMs,
       wrongNotePauseMs: settings.wrongNotePauseMs,
       instrumentIndex: settings.instrumentIndex,
@@ -235,6 +242,7 @@ export default function App() {
           graceFrames={settings.graceFrames}
           octaveCorrection={settings.octaveCorrection}
           yinThreshold={settings.yinThreshold}
+          calibrationParamsByInstrument={settings.calibrationParamsByInstrument}
         />
       )}
       {screen === 'progress' && (

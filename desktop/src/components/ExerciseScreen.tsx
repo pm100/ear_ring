@@ -116,18 +116,46 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   useEffect(() => { currentAttemptRef.current = currentAttempt; }, [currentAttempt]);
   useEffect(() => { sequenceRef.current = sequence; }, [sequence]);
 
-  // Load transposition semitones and apply instrument-specific tracker params.
+  // Load transposition semitones and configure the tracker for this exercise.
+  //
+  // Ordering matters: cmd_tracker_apply_instrument only ever writes the static
+  // INSTRUMENTS table's grace_frames/octave_correction, so it must run BEFORE the
+  // exercise's own (possibly Auto-Calibrated) params, never after — otherwise it
+  // silently reverts them. This is the single owner of the tracker's config for
+  // the exercise; the session effect below deliberately doesn't also set params.
   const [transpSemitones, setTranspSemitones] = useState(0);
   useEffect(() => {
     const instrIdx = exercise.instrumentIndex ?? 0;
-    invoke<string>('cmd_instrument_list')
-      .then(json => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const json = await invoke<string>('cmd_instrument_list');
+        if (cancelled) return;
         const list = JSON.parse(json) as { id: number; semitones: number }[];
         setTranspSemitones(list[instrIdx]?.semitones ?? 0);
-        void invoke('cmd_tracker_apply_instrument', { instrumentIndex: instrIdx });
-      })
-      .catch(() => {});
-  }, [exercise.instrumentIndex]);
+      } catch {
+        // Keep the last known transposition rather than snapping the staff to concert pitch.
+      }
+      if (cancelled) return;
+      try {
+        await invoke('cmd_tracker_apply_instrument', { instrumentIndex: instrIdx });
+        if (cancelled) return;
+        await invoke('cmd_tracker_set_advanced_params', {
+          graceFrames: exercise.graceFrames,
+          octaveCorrection: exercise.octaveCorrection,
+          yinThreshold: exercise.yinThreshold,
+        });
+        if (cancelled) return;
+        await invoke('cmd_tracker_set_params', {
+          silenceThreshold: exercise.silenceThreshold,
+          requiredFrames: exercise.framesToConfirm,
+        });
+      } catch (e) {
+        console.error('tracker configuration failed', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [exercise.instrumentIndex, exercise.graceFrames, exercise.octaveCorrection, exercise.yinThreshold, exercise.silenceThreshold, exercise.framesToConfirm]);
   const transpMidi = (midi: number) => Math.max(0, Math.min(127, midi + transpSemitones));
 
   const schedule = useCallback((callback: () => void, ms: number) => {
@@ -518,10 +546,9 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   }, [cancelPlayback, clearTimers, destroyCapture, onStop, maybeSaveSession]);
 
   useEffect(() => {
-    void invoke('cmd_tracker_set_params', {
-      silenceThreshold: exercise.silenceThreshold,
-      requiredFrames: exercise.framesToConfirm,
-    });
+    // Tracker params/advanced params are owned by the instrument effect above, which
+    // sequences them after cmd_tracker_apply_instrument. Setting them here too would
+    // race that ordering on every re-run of this effect.
     sessionRunningRef.current = true;
     startFreshGenRef.current++; // new generation: invalidates any prior startFreshTest invocation
     if (exercise.sequence.length === 0) {
