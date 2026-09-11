@@ -232,6 +232,9 @@ export default function App() {
           framesToConfirm={settings.framesToConfirm}
           warmupFrames={settings.warmupFrames}
           instrumentIndex={settings.instrumentIndex}
+          graceFrames={settings.graceFrames}
+          octaveCorrection={settings.octaveCorrection}
+          yinThreshold={settings.yinThreshold}
         />
       )}
       {screen === 'progress' && (
