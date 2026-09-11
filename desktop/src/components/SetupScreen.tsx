@@ -60,8 +60,28 @@ interface Props {
 }
 
 export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rangeEnd, rootChroma = 0, scaleId = 0, keySignatureMode = 0, silenceThreshold = 0.003, framesToConfirm = 3, warmupFrames = 4, instrumentIndex = 0, graceFrames = 3, octaveCorrection = false, yinThreshold = 0.15, calibrationParamsByInstrument = {} }: Props) {
-  const set = <K extends keyof ExerciseSettings>(key: K, value: ExerciseSettings[K]) =>
-    onUpdateSettings(prev => ({ ...prev, [key]: value }));
+  // Spec (design doc "Manual edits ... update that instrument's saved params
+  // directly"): a manual tweak to any of the 6 controls (basic or Advanced) must
+  // also land in calibrationParamsByInstrument[instrumentIndex] — the same map an
+  // Auto-Calibrate run writes to (finishCalibration) — so it's one params record
+  // per instrument regardless of source, and survives an instrument switch.
+  const setAndPersist = <K extends keyof ExerciseSettings>(key: K, value: ExerciseSettings[K]) => {
+    onUpdateSettings(prev => {
+      const next = { ...prev, [key]: value };
+      const current: CalibratedParams = {
+        silenceThreshold: next.silenceThreshold,
+        framesToConfirm: next.framesToConfirm,
+        warmupFrames: next.warmupFrames,
+        graceFrames: next.graceFrames,
+        octaveCorrection: next.octaveCorrection,
+        yinThreshold: next.yinThreshold,
+      };
+      return {
+        ...next,
+        calibrationParamsByInstrument: { ...next.calibrationParamsByInstrument, [instrumentIndex]: current },
+      };
+    });
+  };
 
   const [hz, setHz] = useState(0);
   const [mode, setMode] = useState<'manual' | 'auto'>('manual');
@@ -509,7 +529,7 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <input type="range" min={1} max={10} step={1}
               value={sensitivityDisplay}
-              onChange={e => set('silenceThreshold', parseFloat((0.011 - parseInt(e.target.value) * 0.001).toFixed(3)))}
+              onChange={e => setAndPersist('silenceThreshold', parseFloat((0.011 - parseInt(e.target.value) * 0.001).toFixed(3)))}
               style={{ flex: 1 }} />
             <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{sensitivityDisplay} / 10</span>
           </div>
@@ -519,7 +539,7 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
             {STABILITY_OPTIONS.map(n => (
               <button key={n} type="button"
                 className={`chip ${framesToConfirm === n ? 'chip-selected' : ''}`}
-                onClick={() => set('framesToConfirm', n)}>{n}</button>
+                onClick={() => setAndPersist('framesToConfirm', n)}>{n}</button>
             ))}
           </div>
 
@@ -528,7 +548,7 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
             {WARMUP_OPTIONS.map(n => (
               <button key={n} type="button"
                 className={`chip ${warmupFrames === n ? 'chip-selected' : ''}`}
-                onClick={() => set('warmupFrames', n)}>{n}</button>
+                onClick={() => setAndPersist('warmupFrames', n)}>{n}</button>
             ))}
           </div>
 
@@ -542,21 +562,21 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
                 {[0, 1, 2, 3, 4, 5, 6].map(n => (
                   <button key={n} type="button"
                     className={`chip ${graceFrames === n ? 'chip-selected' : ''}`}
-                    onClick={() => set('graceFrames', n)}>{n}</button>
+                    onClick={() => setAndPersist('graceFrames', n)}>{n}</button>
                 ))}
               </div>
 
               <span className="section-label">Octave Correction<TooltipIcon tooltipKey="octave_correction" /></span>
               <label className="switch-row">
                 <input type="checkbox" checked={octaveCorrection}
-                  onChange={e => set('octaveCorrection', e.target.checked)} />
+                  onChange={e => setAndPersist('octaveCorrection', e.target.checked)} />
               </label>
 
               <span className="section-label">YIN Threshold<TooltipIcon tooltipKey="yin_threshold" /></span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <input type="range" min={0.05} max={0.30} step={0.01}
                   value={yinThreshold}
-                  onChange={e => set('yinThreshold', parseFloat(e.target.value))}
+                  onChange={e => setAndPersist('yinThreshold', parseFloat(e.target.value))}
                   style={{ flex: 1 }} />
                 <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{yinThreshold.toFixed(2)}</span>
               </div>
