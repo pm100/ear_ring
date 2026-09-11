@@ -88,7 +88,7 @@ struct ExerciseView: View {
             return "Listen carefully…"
         case .listening:
             if model.isRetryingSameNote {
-                return "Wrong note. Try again…"
+                return "Wrong note. Try again (\(model.noteRetryCount)/\(model.noteRetries))…"
             }
             return "Play note \(model.currentNoteIndex + 1) of \(model.sequence.count)"
         case .retryDelay:

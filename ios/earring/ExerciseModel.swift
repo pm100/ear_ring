@@ -129,7 +129,7 @@ class ExerciseModel: ObservableObject {
     @Published var maxAttempts: Int = 5
     /// Consecutive wrong tries at the current note position — not persisted; reset on a
     /// correct note or whenever the sequence restarts (see EarRingCore.wrongNoteOutcome).
-    private var noteRetryCount: Int = 0
+    var noteRetryCount: Int = 0
     /// Total same-note retries used across the WHOLE current test, including any spent
     /// during an earlier attempt that then got restarted — feeds EarRingCore.noteRetryPenalty
     /// at completion. Reset only when a fresh test starts (unlike noteRetryCount).

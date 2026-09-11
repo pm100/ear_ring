@@ -548,7 +548,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         // listening (no capture stop/restart) rather than leaving 'listening' — this is
         // the only visible sign it happened, since the wrong note isn't drawn.
         return noteRetryCount > 0
-          ? 'Wrong note. Try again…'
+          ? `Wrong note. Try again (${noteRetryCount}/${exercise.noteRetries})…`
           : `Play note ${currentNoteIndex + 1} of ${sequence.length}`;
       case 'retry_delay':
         return detected[detected.length - 1]?.correct === false && currentAttempt < exercise.maxRetries

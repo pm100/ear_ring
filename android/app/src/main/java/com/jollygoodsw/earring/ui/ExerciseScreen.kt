@@ -259,7 +259,7 @@ private fun statusText(state: com.jollygoodsw.earring.ExerciseState): String =
             // listening (no capture stop/restart) rather than leaving LISTENING — this is
             // the only visible sign it happened, since the wrong note isn't drawn.
             if (state.noteRetryCount > 0) {
-                "Wrong note. Try again…"
+                "Wrong note. Try again (${state.noteRetryCount}/${state.noteRetries})…"
             } else {
                 "Play note ${state.currentNoteIndex + 1} of ${state.sequence.size}"
             }
