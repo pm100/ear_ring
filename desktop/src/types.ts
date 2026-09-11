@@ -32,6 +32,20 @@ export interface ExerciseSettings {
   silenceThreshold: number;   // default 0.003
   framesToConfirm: number;    // default 3
   warmupFrames: number;       // default 4
+  graceFrames: number;        // default 3 (Piano) — previously hidden per-instrument constant
+  octaveCorrection: boolean;  // default false (Piano) — previously hidden per-instrument constant
+  yinThreshold: number;       // default 0.15 — previously hidden global constant
+  /** Saved Auto-Calibrate results per instrument index. Falls back to the
+   *  INSTRUMENTS table's defaults (grace/octave) and the flat fields above
+   *  (sliders) when an instrument has never been calibrated. */
+  calibrationParamsByInstrument: Record<number, {
+    silenceThreshold: number;
+    framesToConfirm: number;
+    warmupFrames: number;
+    graceFrames: number;
+    octaveCorrection: boolean;
+    yinThreshold: number;
+  }>;
   postChordGapMs: number;     // default 800
   wrongNotePauseMs: number;   // default 3000
   instrumentIndex: number;    // default 0 (Piano)
