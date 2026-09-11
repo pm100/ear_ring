@@ -14,7 +14,13 @@ const WARMUP_OPTIONS = [0, 1, 2, 3, 4, 5, 6];
 // user's answer. Same value ExerciseScreen uses after its prompt.
 const CAPTURE_SETTLE_MS = 700;
 
-interface InstrumentInfo { id: number; name: string; semitones: number; }
+interface InstrumentInfo { id: number; name: string; semitones: number; graceFrames: number; octaveCorrection: boolean; }
+// Global default for yin_threshold: DEFAULT_YIN_THRESHOLD in rust/src/pitch_detection.rs.
+// apply_instrument never touches yin_threshold (it has no per-instrument INSTRUMENTS-table
+// entry, unlike grace_frames/octave_correction), so an uncalibrated instrument switch falls
+// back to this literal rather than a flat setting possibly left over from a different
+// instrument (or a different instrument's saved calibration).
+const DEFAULT_YIN_THRESHOLD = 0.15;
 interface CalibratedParams {
   silenceThreshold: number;
   framesToConfirm: number;
@@ -314,10 +320,11 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      let list: InstrumentInfo[] = [];
       try {
         const json = await invoke<string>('cmd_instrument_list');
         if (cancelled) return;
-        const list = JSON.parse(json) as InstrumentInfo[];
+        list = JSON.parse(json) as InstrumentInfo[];
         setTranspSemitones(list[instrumentIndex]?.semitones ?? 0);
       } catch {
         // Keep the last known transposition rather than snapping to concert pitch.
@@ -339,6 +346,21 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
           graceFrames: saved.graceFrames,
           octaveCorrection: saved.octaveCorrection,
           yinThreshold: saved.yinThreshold,
+        }));
+      } else {
+        // Never calibrated: apply_instrument (above) already set grace_frames/
+        // octave_correction correctly from the Rust INSTRUMENTS table — mirror those
+        // into settings (not the flat graceFrames/octaveCorrection props, which can be
+        // stale leftovers from whichever instrument was previously selected/calibrated)
+        // so the push effect below and the displayed values match what the tracker
+        // actually holds. yin_threshold has no table entry, so it gets the app-wide
+        // default instead of a possibly-stale flat value.
+        const info = list[instrumentIndex];
+        onUpdateSettings(prev => ({
+          ...prev,
+          graceFrames: info?.graceFrames ?? prev.graceFrames,
+          octaveCorrection: info?.octaveCorrection ?? prev.octaveCorrection,
+          yinThreshold: DEFAULT_YIN_THRESHOLD,
         }));
       }
       setInstrumentEpoch(e => e + 1);
