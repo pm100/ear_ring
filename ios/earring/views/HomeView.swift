@@ -213,8 +213,8 @@ struct HomeView: View {
                     enabled: true,
                     onSelect: { newType in
                         model.testType = newType
-                        // Auto-clamp seqLen for diatonic mode
-                        if newType == 2 && model.sequenceLength != 3 && model.sequenceLength != 4 {
+                        // 4-note (7th chord) arpeggios are suppressed for now — always 3 in diatonic mode.
+                        if newType == 2 {
                             model.sequenceLength = 3
                         }
                     }
@@ -272,7 +272,7 @@ struct HomeView: View {
                         rangeStart: model.rangeStart,
                         rangeEnd: model.rangeEnd,
                         enabled: model.testType != 1,
-                        onRangeChange: model.testType == 1 ? { _, _ in } : { s, e in model.rangeStart = s; model.rangeEnd = e }
+                        onRangeChange: model.testType == 1 ? { _, _ in } : { s, e in model.setRange(start: s, end: e) }
                     )
                     Button {
                         // Force any in-progress edit in the range fields to resign first
@@ -304,15 +304,15 @@ struct HomeView: View {
                     spacing: 6
                 ) {
                     ForEach(1...8, id: \.self) { len in
-                        let chipEnabled: Bool = {
-                            if model.testType == 1 { return false }
-                            if model.testType == 2 { return len == 3 || len == 4 }
-                            return true
-                        }()
+                        // Fully locked at 3 in diatonic mode (4-note/7th-chord arpeggios
+                        // are suppressed for now) — not narrowed to 3-4.
+                        let chipEnabled = model.testType == 0
                         Button("\(len)") {
                             if chipEnabled { model.sequenceLength = len }
                         }
-                        .buttonStyle(ChipButtonStyle(selected: model.sequenceLength == len && chipEnabled))
+                        // selected shows regardless of chipEnabled — a locked row should
+                        // still show its current value highlighted, not gray it out too.
+                        .buttonStyle(ChipButtonStyle(selected: model.sequenceLength == len))
                         .disabled(!chipEnabled)
                         .opacity(chipEnabled ? 1.0 : 0.38)
                     }
@@ -341,7 +341,7 @@ struct HomeView: View {
             PianoRangePickerFullScreen(
                 rangeStart: model.rangeStart,
                 rangeEnd: model.rangeEnd,
-                onRangeChange: model.testType == 1 ? { _, _ in } : { s, e in model.rangeStart = s; model.rangeEnd = e },
+                onRangeChange: model.testType == 1 ? { _, _ in } : { s, e in model.setRange(start: s, end: e) },
                 onDone: { showRangePicker = false }
             )
         }

@@ -240,21 +240,19 @@ struct EarRingCore {
         return buf.prefix(Int(written)).map { Int($0) }
     }
 
-    static func diatonicChordLabel(rootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: UInt64) -> String {
+    static func diatonicChordLabel(rootChroma: Int, scaleId: Int, noteCount: Int, rangeStart: Int, rangeEnd: Int, centerMidi: Int, seed: UInt64) -> String {
         var buf = [CChar](repeating: 0, count: 64)
-        let written = ear_ring_diatonic_chord_label(UInt8(rootChroma), UInt8(scaleId), UInt8(noteCount), UInt8(centerMidi), seed, &buf, 64)
+        let written = ear_ring_diatonic_chord_label(UInt8(rootChroma), UInt8(scaleId), UInt8(noteCount), UInt8(rangeStart), UInt8(rangeEnd), UInt8(centerMidi), seed, &buf, 64)
         guard written > 0 else { return "" }
         return String(cString: buf)
     }
 
-    static func writtenDiatonicChordLabel(concertRootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: UInt64, instrumentIndex: Int) -> String {
+    static func writtenDiatonicChordLabel(concertRootChroma: Int, scaleId: Int, noteCount: Int, rangeStart: Int, rangeEnd: Int, centerMidi: Int, seed: UInt64, instrumentIndex: Int) -> String {
         var buf = [CChar](repeating: 0, count: 64)
-        let written = ear_ring_written_diatonic_chord_label(UInt8(concertRootChroma), UInt8(scaleId), UInt8(noteCount), UInt8(centerMidi), seed, UInt32(instrumentIndex), &buf, 64)
+        let written = ear_ring_written_diatonic_chord_label(UInt8(concertRootChroma), UInt8(scaleId), UInt8(noteCount), UInt8(rangeStart), UInt8(rangeEnd), UInt8(centerMidi), seed, UInt32(instrumentIndex), &buf, 64)
         guard written > 0 else { return "" }
         return String(cString: buf)
     }
-
-
 
     static func writtenScaleLabel(concertRootChroma: Int, scaleId: Int, instrumentIndex: Int) -> String {
         var buf = [CChar](repeating: 0, count: 64)
@@ -265,6 +263,14 @@ struct EarRingCore {
 
     static func effectiveIntroRootMidi(rootNote: Int, scaleId: Int, rangeStart: Int) -> Int {
         Int(ear_ring_effective_intro_root_midi(UInt8(rootNote), UInt8(scaleId), UInt8(rangeStart)))
+    }
+
+    /// Clamp a user-edited exercise range to at least one octave.
+    static func enforceMinRangeSpan(newStart: Int, newEnd: Int, oldStart: Int, oldEnd: Int) -> (start: Int, end: Int) {
+        var outStart: UInt8 = 0
+        var outEnd: UInt8 = 0
+        ear_ring_enforce_min_range_span(UInt8(newStart), UInt8(newEnd), UInt8(oldStart), UInt8(oldEnd), &outStart, &outEnd)
+        return (Int(outStart), Int(outEnd))
     }
 
     /// Result from processing one audio buffer through the Rust pitch tracker.

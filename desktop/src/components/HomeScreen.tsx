@@ -360,7 +360,8 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
 
   const handleTestTypeChange = (newType: number) => {
     onUpdateSettings(prev => {
-      const newSeqLen = newType === 2 && prev.sequenceLength !== 3 && prev.sequenceLength !== 4 ? 3 : prev.sequenceLength;
+      // 4-note (7th chord) arpeggios are suppressed for now — always 3 in diatonic mode.
+      const newSeqLen = newType === 2 ? 3 : prev.sequenceLength;
       return { ...prev, testType: newType, sequenceLength: newSeqLen };
     });
   };
@@ -459,13 +460,17 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
         <span className="section-label">Sequence Length</span>
         <div className="chip-row">
           {[1, 2, 3, 4, 5, 6, 7, 8].map(len => {
-            const chipEnabled = isMelodyMode ? false : isDiatonicMode ? (len === 3 || len === 4) : true;
+            // Fully locked at 3 in diatonic mode (4-note/7th-chord arpeggios are
+            // suppressed for now), not just narrowed to 3-4.
+            const chipEnabled = isMelodyMode || isDiatonicMode ? false : true;
             return (
               <button
                 key={len}
                 type="button"
                 disabled={!chipEnabled}
-                className={`chip ${settings.sequenceLength === len && chipEnabled ? 'chip-selected' : ''}`}
+                // selected shows regardless of chipEnabled — a locked row should still
+                // show its current value highlighted, not gray it out too.
+                className={`chip ${settings.sequenceLength === len ? 'chip-selected' : ''}`}
                 style={{ opacity: chipEnabled ? 1 : 0.38 }}
                 onClick={() => chipEnabled && onUpdateSettings(prev => ({ ...prev, sequenceLength: len }))}
               >

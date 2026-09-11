@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use ear_ring_core::{
-    accidental_in_key, detect_pitch, diatonic_chord_label, effective_intro_root_midi, freq_to_note, generate_diatonic_chord, generate_sequence, help_sections_json,
+    accidental_in_key, detect_pitch, diatonic_chord_label, effective_intro_root_midi, enforce_min_range_span, freq_to_note, generate_diatonic_chord, generate_sequence, help_sections_json,
     intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions, label_to_midi,
     melody_count, melody_range_midi, melody_title, melody_to_midi_by_index, note_timing, preferred_midi_label,
     scale_notes, scale_type_from_id, shuffle_melody_indices, staff_position, test_score, note_retry_penalty, wrong_note_outcome, written_diatonic_chord_label, written_note_name, written_midi_label, written_scale_label,
@@ -101,15 +101,20 @@ fn cmd_generate_diatonic_chord(root_chroma: u8, scale_id: u8, note_count: u8, ra
 }
 
 #[tauri::command]
-fn cmd_diatonic_chord_label(root_chroma: u8, scale_id: u8, note_count: u8, center_midi: u8, seed: u64) -> String {
+fn cmd_diatonic_chord_label(root_chroma: u8, scale_id: u8, note_count: u8, range_start: u8, range_end: u8, center_midi: u8, seed: u64) -> String {
     let scale = scale_type_from_id(scale_id).unwrap_or(ScaleType::Major);
-    diatonic_chord_label(root_chroma, scale, note_count, center_midi, seed)
+    diatonic_chord_label(root_chroma, scale, note_count, range_start, range_end, center_midi, seed)
 }
 
 #[tauri::command]
-fn cmd_written_diatonic_chord_label(concert_root_chroma: u8, scale_id: u8, note_count: u8, center_midi: u8, seed: u64, instrument_index: u32) -> String {
+fn cmd_written_diatonic_chord_label(concert_root_chroma: u8, scale_id: u8, note_count: u8, range_start: u8, range_end: u8, center_midi: u8, seed: u64, instrument_index: u32) -> String {
     let scale = scale_type_from_id(scale_id).unwrap_or(ScaleType::Major);
-    written_diatonic_chord_label(concert_root_chroma, scale, note_count, center_midi, seed, instrument_index as usize)
+    written_diatonic_chord_label(concert_root_chroma, scale, note_count, range_start, range_end, center_midi, seed, instrument_index as usize)
+}
+
+#[tauri::command]
+fn cmd_enforce_min_range_span(new_start: u8, new_end: u8, old_start: u8, old_end: u8) -> (u8, u8) {
+    enforce_min_range_span(new_start, new_end, old_start, old_end)
 }
 
 #[tauri::command]
@@ -293,6 +298,7 @@ fn main() {
             cmd_generate_diatonic_chord,
             cmd_diatonic_chord_label,
             cmd_written_diatonic_chord_label,
+            cmd_enforce_min_range_span,
             cmd_intro_chord,
             cmd_scale_notes,
             cmd_is_correct_note,

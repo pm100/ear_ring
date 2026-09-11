@@ -3,7 +3,7 @@ pub mod pitch_detection;
 pub mod tracker;
 
 pub use music_theory::{
-    accidental_in_key, diatonic_chord_label, effective_key_chroma, effective_intro_root_midi, freq_to_note, generate_diatonic_chord, generate_sequence, intro_chord,
+    accidental_in_key, diatonic_chord_label, effective_key_chroma, effective_intro_root_midi, enforce_min_range_span, freq_to_note, generate_diatonic_chord, generate_sequence, intro_chord,
     is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions,
     key_signature_pitch_classes, label_to_midi, melody_count, melody_range_midi, melody_raw_notes, melody_title,
     melody_to_midi_by_index, midi_to_freq, midi_to_label, note_name, note_timing,
@@ -302,6 +302,8 @@ pub extern "C" fn ear_ring_diatonic_chord_label(
     root_chroma: c_uchar,
     scale_id: c_uchar,
     note_count: c_uchar,
+    range_start: c_uchar,
+    range_end: c_uchar,
     center_midi: c_uchar,
     seed: u64,
     out_buf: *mut c_char,
@@ -314,7 +316,7 @@ pub extern "C" fn ear_ring_diatonic_chord_label(
         Some(s) => s,
         None => return -1,
     };
-    let label = diatonic_chord_label(root_chroma, scale, note_count, center_midi, seed);
+    let label = diatonic_chord_label(root_chroma, scale, note_count, range_start, range_end, center_midi, seed);
     let bytes = label.as_bytes();
     let copy_len = bytes.len().min(buf_len as usize - 1);
     unsafe {
@@ -330,6 +332,8 @@ pub extern "C" fn ear_ring_written_diatonic_chord_label(
     concert_root_chroma: c_uchar,
     scale_id: c_uchar,
     note_count: c_uchar,
+    range_start: c_uchar,
+    range_end: c_uchar,
     center_midi: c_uchar,
     seed: u64,
     instrument_index: c_uint,
@@ -343,7 +347,7 @@ pub extern "C" fn ear_ring_written_diatonic_chord_label(
         Some(s) => s,
         None => return -1,
     };
-    let label = written_diatonic_chord_label(concert_root_chroma, scale, note_count, center_midi, seed, instrument_index as usize);
+    let label = written_diatonic_chord_label(concert_root_chroma, scale, note_count, range_start, range_end, center_midi, seed, instrument_index as usize);
     let bytes = label.as_bytes();
     let copy_len = bytes.len().min(buf_len as usize - 1);
     unsafe {
@@ -680,6 +684,24 @@ pub extern "C" fn ear_ring_effective_intro_root_midi(root_chroma: c_uchar, scale
     effective_intro_root_midi(root_chroma, scale_id, range_start)
 }
 
+/// Clamp a user-edited exercise range to at least one octave (12 semitones).
+/// Writes the clamped [start, end] into out_start/out_end.
+#[no_mangle]
+pub extern "C" fn ear_ring_enforce_min_range_span(
+    new_start: c_uchar,
+    new_end: c_uchar,
+    old_start: c_uchar,
+    old_end: c_uchar,
+    out_start: *mut c_uchar,
+    out_end: *mut c_uchar,
+) {
+    let (start, end) = enforce_min_range_span(new_start, new_end, old_start, old_end);
+    unsafe {
+        if !out_start.is_null() { *out_start = start; }
+        if !out_end.is_null() { *out_end = end; }
+    }
+}
+
 /// Returns 1 if the major key with this root chroma uses sharps, 0 for flats.
 #[no_mangle]
 pub extern "C" fn ear_ring_is_sharp_key(root_chroma: c_uchar) -> c_int {
@@ -870,7 +892,7 @@ mod android_jni {
     use jni::JNIEnv;
 
     use super::{
-        accidental_in_key, detect_pitch, diatonic_chord_label, effective_key_chroma, effective_intro_root_midi, freq_to_note,
+        accidental_in_key, detect_pitch, diatonic_chord_label, effective_key_chroma, effective_intro_root_midi, enforce_min_range_span, freq_to_note,
         generate_diatonic_chord, generate_sequence, intro_chord, is_correct_note, is_sharp_key,
         key_accidental_count, key_sig_staff_positions, label_to_midi, melody_count, melody_range_midi,
         melody_to_midi_by_index, midi_to_label, note_name, preferred_midi_label,
@@ -1002,11 +1024,13 @@ mod android_jni {
         root_chroma: jint,
         scale_id: jint,
         note_count: jint,
+        range_start: jint,
+        range_end: jint,
         center_midi: jint,
         seed: jlong,
     ) -> jstring {
         let scale = scale_type_from_id(scale_id as u8).unwrap_or(ScaleType::Major);
-        let label = diatonic_chord_label(root_chroma as u8, scale, note_count as u8, center_midi as u8, seed as u64);
+        let label = diatonic_chord_label(root_chroma as u8, scale, note_count as u8, range_start as u8, range_end as u8, center_midi as u8, seed as u64);
         env.new_string(label).map(|s| s.into_raw()).unwrap_or(std::ptr::null_mut())
     }
 
@@ -1017,13 +1041,29 @@ mod android_jni {
         concert_root_chroma: jint,
         scale_id: jint,
         note_count: jint,
+        range_start: jint,
+        range_end: jint,
         center_midi: jint,
         seed: jlong,
         instrument_index: jint,
     ) -> jstring {
         let scale = scale_type_from_id(scale_id as u8).unwrap_or(ScaleType::Major);
-        let label = written_diatonic_chord_label(concert_root_chroma as u8, scale, note_count as u8, center_midi as u8, seed as u64, instrument_index.max(0) as usize);
+        let label = written_diatonic_chord_label(concert_root_chroma as u8, scale, note_count as u8, range_start as u8, range_end as u8, center_midi as u8, seed as u64, instrument_index.max(0) as usize);
         env.new_string(label).map(|s| s.into_raw()).unwrap_or(std::ptr::null_mut())
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeEnforceMinRangeSpan(
+        _env: JNIEnv,
+        _class: JClass,
+        new_start: jint,
+        new_end: jint,
+        old_start: jint,
+        old_end: jint,
+    ) -> jlong {
+        let (start, end) = enforce_min_range_span(new_start as u8, new_end as u8, old_start as u8, old_end as u8);
+        // Packed as (start << 8 | end) — simpler than a JNI int-array round trip for two bytes.
+        ((start as jlong) << 8) | (end as jlong)
     }
 
     #[no_mangle]

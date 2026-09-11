@@ -55,10 +55,12 @@ object EarRingCore {
     @JvmStatic external fun nativePickMelodyByIndex(index: Int, rootChroma: Int): FloatArray
     @JvmStatic external fun nativeMelodyRangeMidi(index: Int, rootChroma: Int): IntArray
     @JvmStatic external fun nativeGenerateDiatonicChord(rootChroma: Int, scaleId: Int, noteCount: Int, rangeStart: Int, rangeEnd: Int, seed: Long): IntArray
-    @JvmStatic external fun nativeDiatonicChordLabel(rootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long): String
-    @JvmStatic external fun nativeWrittenDiatonicChordLabel(concertRootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long, instrumentIndex: Int): String
+    @JvmStatic external fun nativeDiatonicChordLabel(rootChroma: Int, scaleId: Int, noteCount: Int, rangeStart: Int, rangeEnd: Int, centerMidi: Int, seed: Long): String
+    @JvmStatic external fun nativeWrittenDiatonicChordLabel(concertRootChroma: Int, scaleId: Int, noteCount: Int, rangeStart: Int, rangeEnd: Int, centerMidi: Int, seed: Long, instrumentIndex: Int): String
     @JvmStatic external fun nativeWrittenScaleLabel(concertRootChroma: Int, scaleId: Int, instrumentIndex: Int): String
     @JvmStatic external fun nativeEffectiveIntroRootMidi(rootChroma: Int, scaleId: Int, rangeStart: Int): Int
+    // Packed as (start << 8 | end) — see Java_..._nativeEnforceMinRangeSpan in lib.rs.
+    @JvmStatic external fun nativeEnforceMinRangeSpan(newStart: Int, newEnd: Int, oldStart: Int, oldEnd: Int): Long
 
     // ── PitchTracker JNI ─────────────────────────────────────────────────────────
     @JvmStatic external fun nativeTrackerNew(silenceThreshold: Float, requiredFrames: Int): Long
@@ -304,12 +306,12 @@ object EarRingCore {
         if (loaded) nativeGenerateDiatonicChord(rootChroma, scaleId, noteCount, rangeStart, rangeEnd, seed)
         else IntArray(noteCount) { rangeStart }
 
-    fun diatonicChordLabel(rootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long): String =
-        if (loaded) nativeDiatonicChordLabel(rootChroma, scaleId, noteCount, centerMidi, seed)
+    fun diatonicChordLabel(rootChroma: Int, scaleId: Int, noteCount: Int, rangeStart: Int, rangeEnd: Int, centerMidi: Int, seed: Long): String =
+        if (loaded) nativeDiatonicChordLabel(rootChroma, scaleId, noteCount, rangeStart, rangeEnd, centerMidi, seed)
         else ""
 
-    fun writtenDiatonicChordLabel(concertRootChroma: Int, scaleId: Int, noteCount: Int, centerMidi: Int, seed: Long, instrumentIndex: Int): String =
-        if (loaded) nativeWrittenDiatonicChordLabel(concertRootChroma, scaleId, noteCount, centerMidi, seed, instrumentIndex)
+    fun writtenDiatonicChordLabel(concertRootChroma: Int, scaleId: Int, noteCount: Int, rangeStart: Int, rangeEnd: Int, centerMidi: Int, seed: Long, instrumentIndex: Int): String =
+        if (loaded) nativeWrittenDiatonicChordLabel(concertRootChroma, scaleId, noteCount, rangeStart, rangeEnd, centerMidi, seed, instrumentIndex)
         else ""
 
     fun writtenScaleLabel(concertRootChroma: Int, scaleId: Int, instrumentIndex: Int): String =
@@ -319,4 +321,11 @@ object EarRingCore {
     fun effectiveIntroRootMidi(rootChroma: Int, scaleId: Int, rangeStart: Int): Int =
         if (loaded) nativeEffectiveIntroRootMidi(rootChroma, scaleId, rangeStart)
         else rangeStart - ((rangeStart + 12 - rootChroma) % 12)
+
+    /** Clamp a user-edited exercise range to at least one octave (issue #14/range work). */
+    fun enforceMinRangeSpan(newStart: Int, newEnd: Int, oldStart: Int, oldEnd: Int): Pair<Int, Int> {
+        if (!loaded) return Pair(newStart, newEnd)
+        val packed = nativeEnforceMinRangeSpan(newStart, newEnd, oldStart, oldEnd)
+        return Pair(((packed shr 8) and 0xFF).toInt(), (packed and 0xFF).toInt())
+    }
 }

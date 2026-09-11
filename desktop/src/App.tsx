@@ -76,6 +76,9 @@ function loadSettings(): ExerciseSettings {
       if (parsed.testType === 1) parsed.testType = 0;
       // Merged descending-arpeggio mode (testType==3) into 2 (issue #5)
       if (parsed.testType === 3) parsed.testType = 2;
+      // 4-note (7th chord) arpeggios are suppressed for now — migrate a stored 4
+      // back to 3 for anyone who'd picked it in diatonic mode before this change.
+      if (parsed.testType === 2) parsed.sequenceLength = 3;
       return parsed;
     }
   } catch {}

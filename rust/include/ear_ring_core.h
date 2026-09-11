@@ -85,11 +85,16 @@ int32_t ear_ring_generate_diatonic_chord(uint8_t root_chroma,
                                           uint8_t *out_buf);
 
 /// Return a human-readable label for the diatonic chord with the given parameters.
+/// Takes the same note_count/range_start/range_end as ear_ring_generate_diatonic_chord
+/// so it resolves the same chord degree, including when a narrow range forces picking
+/// a degree other than the seed's naive pick (issue #14).
 /// Writes a null-terminated UTF-8 string into out_buf (e.g. "G – 1st Inversion").
 /// Returns bytes written (excluding null), or -1 on error.
 int32_t ear_ring_diatonic_chord_label(uint8_t root_chroma,
                                        uint8_t scale_id,
                                        uint8_t note_count,
+                                       uint8_t range_start,
+                                       uint8_t range_end,
                                        uint8_t center_midi,
                                        uint64_t seed,
                                        char *out_buf,
@@ -99,11 +104,22 @@ int32_t ear_ring_diatonic_chord_label(uint8_t root_chroma,
 int32_t ear_ring_written_diatonic_chord_label(uint8_t concert_root_chroma,
                                                uint8_t scale_id,
                                                uint8_t note_count,
+                                               uint8_t range_start,
+                                               uint8_t range_end,
                                                uint8_t center_midi,
                                                uint64_t seed,
                                                uint32_t instrument_index,
                                                char *out_buf,
                                                uint32_t buf_len);
+
+/// Clamp a user-edited exercise range to at least one octave (12 semitones).
+/// Writes the clamped [start, end] into out_start/out_end.
+void ear_ring_enforce_min_range_span(uint8_t new_start,
+                                      uint8_t new_end,
+                                      uint8_t old_start,
+                                      uint8_t old_end,
+                                      uint8_t *out_start,
+                                      uint8_t *out_end);
 
 /// Check whether a detected note is correct for the expected note.
 /// Returns 1 if correct, 0 otherwise.

@@ -31,7 +31,13 @@ class ExerciseModel: ObservableObject {
     @Published var scaleId: Int = ud.object(forKey: "scaleId") != nil ? ud.integer(forKey: "scaleId") : 0 {
         didSet { UserDefaults.standard.set(scaleId, forKey: "scaleId") }
     }
-    @Published var sequenceLength: Int = ud.object(forKey: "sequenceLength") != nil ? ud.integer(forKey: "sequenceLength") : 1 {
+    // 4-note (7th chord) arpeggios are suppressed for now — migrate a stored 4 back to
+    // 3 for anyone who'd picked it in diatonic mode before this change.
+    @Published var sequenceLength: Int = {
+        let stored = ud.object(forKey: "sequenceLength") != nil ? ud.integer(forKey: "sequenceLength") : 1
+        let testType = ud.object(forKey: "testType") != nil ? ud.integer(forKey: "testType") : 0
+        return (testType == 2 || testType == 3) ? 3 : stored  // 3 = old descending-arpeggio mode, merged into 2
+    }() {
         didSet { UserDefaults.standard.set(sequenceLength, forKey: "sequenceLength") }
     }
     @Published var tempoBpm: Int = ud.object(forKey: "tempoBpm") != nil ? ud.integer(forKey: "tempoBpm") : 100 {
@@ -139,6 +145,13 @@ class ExerciseModel: ObservableObject {
     /// Set rootNote and reset the range to one octave closest to middle C.
     func updateRangeForKey() {
         let (s, e) = ExerciseModel.defaultRange(rootNote: rootNote)
+        rangeStart = s
+        rangeEnd = e
+    }
+
+    /// Apply a user-edited range, clamped to at least one octave.
+    func setRange(start: Int, end: Int) {
+        let (s, e) = EarRingCore.enforceMinRangeSpan(newStart: start, newEnd: end, oldStart: rangeStart, oldEnd: rangeEnd)
         rangeStart = s
         rangeEnd = e
     }
@@ -298,7 +311,7 @@ class ExerciseModel: ObservableObject {
                 seed = UInt64(Date().timeIntervalSince1970 * 1000) &+ UInt64(attempt)
                 let generated = EarRingCore.generateDiatonicChord(
                     rootChroma: rootNote,
-                    scaleId: 0,
+                    scaleId: scaleId,
                     noteCount: sequenceLength,
                     rangeStart: rangeStart,
                     rangeEnd: rangeEnd,
@@ -310,8 +323,10 @@ class ExerciseModel: ObservableObject {
             sequence = notes
             chordLabel = EarRingCore.writtenDiatonicChordLabel(
                 concertRootChroma: rootNote,
-                scaleId: 0,
+                scaleId: scaleId,
                 noteCount: sequenceLength,
+                rangeStart: rangeStart,
+                rangeEnd: rangeEnd,
                 centerMidi: centerMidi,
                 seed: seed,
                 instrumentIndex: instrumentIndex

@@ -244,15 +244,15 @@ fun HomeScreen(
         }
         Spacer(Modifier.height(16.dp))
 
-        // Sequence length
+        // Sequence length — fully locked at 3 in diatonic mode (4-note/7th-chord
+        // arpeggios are suppressed for now), not just narrowed to 3-4.
         SectionLabel("Sequence Length")
-        val isDiatonicMode = state.testType == 2
         ChipRow(
             items = (1..8).map { it.toString() },
             selected = state.sequenceLength - 1,
             onSelect = { viewModel.setSequenceLength(it + 1) },
             enabled = state.testType == 0,
-            enabledIndices = if (isDiatonicMode) setOf(2, 3) else null  // indices 2=3, 3=4
+            enabledIndices = if (state.testType == 2) emptySet() else null
         )
         Spacer(Modifier.height(32.dp))
 
@@ -374,9 +374,11 @@ internal fun ChipRow(
     ) {
         items.forEachIndexed { index, label ->
             val chipEnabled = enabledIndices?.contains(index) ?: enabled
-            val isSelected = index == selected && chipEnabled
+            // Selection shows regardless of chipEnabled — a disabled row (e.g. Sequence
+            // Length locked to 3 in diatonic mode) should still show its current value
+            // highlighted, not gray out the very chip that names the active setting.
             FilterChip(
-                selected = isSelected,
+                selected = index == selected,
                 onClick = { if (chipEnabled) onSelect(index) },
                 label = { Text(label, fontSize = 13.sp) },
                 modifier = Modifier.weight(1f).alpha(if (chipEnabled) 1f else 0.38f),

@@ -134,12 +134,23 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     private fun loadInitialState(): ExerciseState {
         val rootNote = prefs.getInt(PREF_ROOT_NOTE, 0)
         val defaultRange = ExerciseState.defaultRange(rootNote)
+        val testType = prefs.getInt(PREF_TEST_TYPE, 0).let {
+            when (it) {
+                1 -> 0  // Melody mode reset (no longer in UI)
+                3 -> 2  // Merged descending-arpeggio mode into 2 (issue #5)
+                else -> it
+            }
+        }
+        // 4-note (7th chord) arpeggios are suppressed for now — migrate a stored 4
+        // back to 3 for anyone who'd picked it before this change.
+        val storedSeqLen = prefs.getInt(PREF_SEQUENCE_LENGTH, 1)
+        val sequenceLength = if (testType == 2) 3 else storedSeqLen
         return ExerciseState(
             rootNote = rootNote,
             rangeStart = prefs.getInt(PREF_RANGE_START, defaultRange.first),
             rangeEnd = prefs.getInt(PREF_RANGE_END, defaultRange.second),
             scaleId = prefs.getInt(PREF_SCALE_ID, 0),
-            sequenceLength = prefs.getInt(PREF_SEQUENCE_LENGTH, 1),
+            sequenceLength = sequenceLength,
             tempoBpm = prefs.getInt(PREF_TEMPO_BPM, 100),
             showTestNotes = prefs.getBoolean(PREF_SHOW_TEST_NOTES, false),
             playPassFailSounds = prefs.getBoolean(PREF_PLAY_PASS_FAIL_SOUNDS, true),
@@ -153,13 +164,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             postChordGapMs = prefs.getLong(PREF_POST_CHORD_GAP_MS, DEFAULT_POST_CHORD_GAP_MS),
             wrongNotePauseMs = prefs.getLong(PREF_WRONG_NOTE_PAUSE_MS, DEFAULT_WRONG_NOTE_PAUSE_MS),
             instrumentIndex = prefs.getInt(PREF_INSTRUMENT_INDEX, 0),
-            testType = prefs.getInt(PREF_TEST_TYPE, 0).let {
-                when (it) {
-                    1 -> 0  // Melody mode reset (no longer in UI)
-                    3 -> 2  // Merged descending-arpeggio mode into 2 (issue #5)
-                    else -> it
-                }
-            },
+            testType = testType,
             isPremium = prefs.getBoolean(PREF_IS_PREMIUM, false),
         )
     }
@@ -239,7 +244,12 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         _state.value = _state.value.copy(rootNote = note, rangeStart = start, rangeEnd = end)
         saveSettings(_state.value)
     }
-    fun setRange(start: Int, end: Int) { _state.value = _state.value.copy(rangeStart = start, rangeEnd = end); saveSettings(_state.value) }
+    fun setRange(start: Int, end: Int) {
+        val old = _state.value
+        val (clampedStart, clampedEnd) = EarRingCore.enforceMinRangeSpan(start, end, old.rangeStart, old.rangeEnd)
+        _state.value = old.copy(rangeStart = clampedStart, rangeEnd = clampedEnd)
+        saveSettings(_state.value)
+    }
     fun setScaleId(id: Int) { _state.value = _state.value.copy(scaleId = id); saveSettings(_state.value) }
     fun setSequenceLength(len: Int) { _state.value = _state.value.copy(sequenceLength = len); saveSettings(_state.value) }
     fun setTempoBpm(bpm: Int) { _state.value = _state.value.copy(tempoBpm = bpm); saveSettings(_state.value) }
@@ -264,7 +274,8 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     fun setPremium(premium: Boolean) { _state.value = _state.value.copy(isPremium = premium); saveSettings(_state.value) }
     fun setTestType(type: Int) {
         val current = _state.value
-        val newSeqLen = if (type == 2 && current.sequenceLength !in setOf(3, 4)) 3 else current.sequenceLength
+        // 4-note (7th chord) arpeggios are suppressed for now — always 3 in diatonic mode.
+        val newSeqLen = if (type == 2) 3 else current.sequenceLength
         _state.value = current.copy(testType = type, sequenceLength = newSeqLen)
         saveSettings(_state.value)
     }
@@ -372,13 +383,16 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             for (attempt in 0 until 8) {
                 seed = System.currentTimeMillis() + attempt
                 val generated = EarRingCore.generateDiatonicChord(
-                    state.rootNote, 0, state.sequenceLength,
+                    state.rootNote, state.scaleId, state.sequenceLength,
                     state.rangeStart, state.rangeEnd, seed
                 ).toList()
                 midiNotes = if (kotlin.random.Random.nextBoolean()) generated.reversed() else generated
                 if (midiNotes.size == state.sequenceLength && midiNotes.firstOrNull() != avoidFirstMidi) break
             }
-            val label = EarRingCore.writtenDiatonicChordLabel(state.rootNote, 0, state.sequenceLength, centerMidi, seed, state.instrumentIndex)
+            val label = EarRingCore.writtenDiatonicChordLabel(
+                state.rootNote, state.scaleId, state.sequenceLength,
+                state.rangeStart, state.rangeEnd, centerMidi, seed, state.instrumentIndex
+            )
             _state.value = state.copy(
                 sequence = midiNotes,
                 melodyDurations = emptyList(),

@@ -229,7 +229,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         seed = Date.now() + attempt;
         const seq = await invoke<number[]>('cmd_generate_diatonic_chord', {
           rootChroma: exercise.rootNote,
-          scaleId: 0,
+          scaleId: exercise.scaleId,
           noteCount: exercise.sequenceLength,
           rangeStart: exercise.rangeStart,
           rangeEnd: exercise.rangeEnd,
@@ -240,8 +240,10 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       }
       const label = await invoke<string>('cmd_written_diatonic_chord_label', {
         concertRootChroma: exercise.rootNote,
-        scaleId: 0,
+        scaleId: exercise.scaleId,
         noteCount: exercise.sequenceLength,
+        rangeStart: exercise.rangeStart,
+        rangeEnd: exercise.rangeEnd,
         centerMidi,
         seed,
         instrumentIndex: exercise.instrumentIndex ?? 0,
