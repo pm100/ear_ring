@@ -388,6 +388,11 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
       // before it's stability-confirmed — that's the user starting to play.
       if (frame.liveMidi >= 0) {
         onsetTimeRef.current = now;
+        // Reset the frame counter here: it feeds `frames` (→ framesToConfirm)
+        // for cmd_calibration_record_round, whose slowness/dropout heuristics
+        // (rust/src/calibration.rs) expect confirm-phase duration only — an
+        // onset delay of even a couple of seconds must not get baked in.
+        noteFrameCountRef.current = 0;
         waitPhaseRef.current = 'waiting_confirm';
         setWaitPhase('waiting_confirm');
         return;
