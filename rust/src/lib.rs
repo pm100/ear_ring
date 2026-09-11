@@ -17,6 +17,10 @@ pub use music_theory::{
 };
 pub use pitch_detection::{detect_pitch, DEFAULT_YIN_THRESHOLD};
 pub use tracker::{FrameResult, PitchTracker};
+pub use calibration::{
+    CalibrationParams, CalibrationRound, CalibrationScore, CalibrationSession,
+    MAX_NOTES_PER_ROUND, ROUND_CAP, PER_NOTE_TIMEOUT_FRAMES,
+};
 
 // ── Help content ──────────────────────────────────────────────────────────────
 
