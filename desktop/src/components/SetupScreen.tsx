@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import PitchMeter from './PitchMeter';
 import MusicStaff from './MusicStaff';
 import { useAudioCapture, TrackerFrame } from '../hooks/useAudioCapture';
+import { useAudioPlayback } from '../hooks/useAudioPlayback';
 import { ExerciseSettings } from '../types';
 import { TooltipIcon } from './Tooltip';
 
@@ -48,6 +49,20 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
   const { start, stop, destroy } = useAudioCapture();
+  const { playSequence } = useAudioPlayback();
+
+  const [roundNotes, setRoundNotes] = useState<number[]>([]);
+  const [roundIndex, setRoundIndex] = useState(0);      // which note within the round we're listening for
+  const [roundNumber, setRoundNumber] = useState(0);
+  const [calibrating, setCalibrating] = useState(false);
+  const [bestScoreSoFar, setBestScoreSoFar] = useState<number | null>(null);
+  const [calibrationError, setCalibrationError] = useState<string | null>(null);
+  const [calibrationDone, setCalibrationDone] = useState<null | { silenceThreshold: number; framesToConfirm: number; warmupFrames: number; graceFrames: number; octaveCorrection: boolean; yinThreshold: number }>(null);
+  const [roundNoteLabels, setRoundNoteLabels] = useState<string[]>([]);
+  const roundDetectedRef = useRef<number[]>([]);
+  const roundFramesRef = useRef<number[]>([]);
+  const noteFrameCountRef = useRef(0);
+  const capturingRef = useRef(false); // guards against the manual-mode handleFrame firing during auto mode
 
   const NOTE_STEP = 44;
 
@@ -65,6 +80,120 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
     }
   }, [rangeStart, rangeEnd]);
 
+  const beginRound = useCallback(async (notes: number[]) => {
+    const params = await invoke<[number, number, number, number, boolean, number]>('cmd_calibration_current_params');
+    const [st, rf, wf, gf, oc, yt] = params;
+    await invoke('cmd_tracker_set_params', { silenceThreshold: st, requiredFrames: rf });
+    await invoke('cmd_tracker_set_advanced_params', { graceFrames: gf, octaveCorrection: oc, yinThreshold: yt });
+    roundDetectedRef.current = [];
+    roundFramesRef.current = [];
+    setRoundIndex(0);
+    setCalibrating(true);
+    await playSequence(notes, () => {}, () => {}, 100);
+    await invoke('cmd_tracker_reset_with_warmup', { warmupFrames: wf });
+    noteFrameCountRef.current = 0;
+  }, [playSequence]);
+
+  const startCalibrationRun = useCallback(async () => {
+    setCalibrationDone(null);
+    setCalibrationError(null);
+    setBestScoreSoFar(null);
+    setRoundNumber(1);
+    capturingRef.current = true;
+    const notes = await invoke<number[]>('cmd_calibration_start', {
+      rangeStart, rangeEnd,
+      silenceThreshold, requiredFrames: framesToConfirm, warmupFrames,
+      graceFrames, octaveCorrection, yinThreshold,
+    });
+    setRoundNotes(notes);
+    await beginRound(notes);
+  }, [rangeStart, rangeEnd, silenceThreshold, framesToConfirm, warmupFrames, graceFrames, octaveCorrection, yinThreshold, beginRound]);
+
+  // Resolve each round's MIDI notes to display labels (e.g. "C4") for the text
+  // prompt, the same written/transposed label the rest of the app uses.
+  useEffect(() => {
+    if (roundNotes.length === 0) { setRoundNoteLabels([]); return; }
+    let cancelled = false;
+    Promise.all(roundNotes.map(m => invoke<string>('cmd_written_midi_label', { concertMidi: m, instrumentIndex })))
+      .then(labels => { if (!cancelled) setRoundNoteLabels(labels); });
+    return () => { cancelled = true; };
+  }, [roundNotes, instrumentIndex]);
+
+  // Shared by every path that ends a calibration run early or normally (perfect
+  // round, plateau/round-cap convergence, no-signal abort, or the user's Stop
+  // button): read whatever the session's best-scoring round was, apply it live,
+  // and persist it for this instrument. `errorMessage` is non-null only for the
+  // no-signal abort path — every other caller passes null (spec: Error handling
+  // — "keep whatever was the best-scoring round so far" applies uniformly).
+  const finishCalibration = useCallback(async (errorMessage: string | null) => {
+    capturingRef.current = false;
+    setCalibrating(false);
+    const best = await invoke<[number, number, number, number, boolean, number]>('cmd_calibration_best_params');
+    const [st, rf, wf, gf, oc, yt] = best;
+    const result = { silenceThreshold: st, framesToConfirm: rf, warmupFrames: wf, graceFrames: gf, octaveCorrection: oc, yinThreshold: yt };
+    onUpdateSettings(prev => ({
+      ...prev,
+      silenceThreshold: st, framesToConfirm: rf, warmupFrames: wf,
+      graceFrames: gf, octaveCorrection: oc, yinThreshold: yt,
+      calibrationParamsByInstrument: { ...prev.calibrationParamsByInstrument, [instrumentIndex]: result },
+    }));
+    await invoke('cmd_tracker_set_params', { silenceThreshold: st, requiredFrames: rf });
+    await invoke('cmd_tracker_set_advanced_params', { graceFrames: gf, octaveCorrection: oc, yinThreshold: yt });
+    setCalibrationDone(result);
+    setCalibrationError(errorMessage);
+  }, [instrumentIndex, onUpdateSettings]);
+
+  const handleCalibrationFrame = useCallback(async (frame: TrackerFrame) => {
+    if (!capturingRef.current) return;
+    noteFrameCountRef.current += 1;
+    let detected = -1;
+    let frames = 0;
+    if (frame.confirmedMidi >= 0) {
+      detected = frame.confirmedMidi;
+      frames = noteFrameCountRef.current;
+    } else if (noteFrameCountRef.current >= 55 /* PER_NOTE_TIMEOUT_FRAMES */) {
+      detected = -1;
+      frames = 0;
+    } else {
+      return; // still listening for this note
+    }
+
+    roundDetectedRef.current = [...roundDetectedRef.current, detected];
+    roundFramesRef.current = [...roundFramesRef.current, frames];
+    await invoke('cmd_tracker_reset');
+    noteFrameCountRef.current = 0;
+
+    if (roundDetectedRef.current.length < roundNotes.length) {
+      setRoundIndex(i => i + 1);
+      return;
+    }
+
+    // Round complete — score it and either move on, finish, or abort on silence.
+    const [converged, nextNotes] = await invoke<[boolean, number[]]>('cmd_calibration_record_round', {
+      detected: roundDetectedRef.current,
+      framesToConfirm: roundFramesRef.current,
+    });
+    const score = await invoke<number>('cmd_calibration_best_score');
+    setBestScoreSoFar(score);
+
+    const noSignal = await invoke<boolean>('cmd_calibration_last_round_no_signal');
+    if (noSignal) {
+      await finishCalibration('No sound detected — check mic permissions/input.');
+      return;
+    }
+    if (converged) {
+      await finishCalibration(null);
+    } else {
+      setRoundNumber(n => n + 1);
+      setRoundNotes(nextNotes);
+      beginRound(nextNotes);
+    }
+  }, [roundNotes, beginRound, finishCalibration]);
+
+  const stopCalibration = useCallback(async () => {
+    await finishCalibration(null);
+  }, [finishCalibration]);
+
   // Load instrument transposition semitones and apply instrument-specific tracker params.
   const [transpSemitones, setTranspSemitones] = useState(0);
   useEffect(() => {
@@ -77,18 +206,28 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
       .catch(() => {});
   }, [instrumentIndex]);
 
-  // Configure tracker on entry, then auto-start.  Full cleanup on unmount.
+  // Configure tracker on entry, then auto-start with the callback for the active
+  // mode.  Full cleanup on unmount, and also re-runs on mode switch (tearing down
+  // and restarting capture with the right callback).
   useEffect(() => {
     void invoke('cmd_tracker_set_params', { silenceThreshold, requiredFrames: framesToConfirm });
     void invoke('cmd_tracker_set_advanced_params', { graceFrames, octaveCorrection, yinThreshold });
     void invoke('cmd_tracker_reset_with_warmup', { warmupFrames });
-    start(handleFrame);
+    start(mode === 'auto' ? handleCalibrationFrame : handleFrame);
     return () => {
+      // Spec (Error handling): navigating away or switching back to Manual
+      // mid-run must not silently discard progress — keep whatever was the
+      // best-scoring round so far, same as an explicit Stop. Fire-and-forget:
+      // this cleanup can't be async, and the component may already be
+      // unmounting, but the invoke calls and onUpdateSettings still complete.
+      if (capturingRef.current) {
+        void finishCalibration(null);
+      }
       stop();
       void invoke('cmd_tracker_reset');
       destroy();
     };
-  }, [start, stop, destroy, handleFrame]);
+  }, [start, stop, destroy, handleFrame, handleCalibrationFrame, finishCalibration, mode]);
 
   const transpMidi = (midi: number) => Math.max(0, Math.min(127, midi + transpSemitones));
   // Staff notation shows written pitch, like a transposing instrument's part.
@@ -194,6 +333,39 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
                   style={{ flex: 1 }} />
                 <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{yinThreshold.toFixed(2)}</span>
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {mode === 'auto' && (
+        <div style={{ marginTop: 16 }}>
+          {!calibrating && !calibrationDone && (
+            <button type="button" className="btn-primary" onClick={() => void startCalibrationRun()}>
+              Start Auto-Calibrate
+            </button>
+          )}
+          {calibrating && (
+            <>
+              <p className="setup-instruction">Round {roundNumber} — Play: {roundNoteLabels.length === roundNotes.length ? roundNoteLabels.join(' → ') : '…'}</p>
+              <p className="setup-instruction" style={{ fontSize: 13, opacity: 0.7 }}>Note {roundIndex + 1} of {roundNotes.length}</p>
+              {bestScoreSoFar !== null && (
+                <p className="setup-instruction" style={{ fontSize: 13, opacity: 0.7 }}>Best so far: {Math.round(bestScoreSoFar * 100)}%</p>
+              )}
+              <button type="button" className="btn-secondary" onClick={() => void stopCalibration()}>Stop</button>
+            </>
+          )}
+          {calibrationDone && (
+            <div>
+              {calibrationError ? (
+                <p className="setup-instruction" style={{ color: '#b00020' }}>{calibrationError}</p>
+              ) : (
+                <p className="setup-instruction">Calibration complete for this instrument.</p>
+              )}
+              <p style={{ fontSize: 13 }}>
+                {calibrationError ? 'Best result kept: ' : ''}Sensitivity threshold {calibrationDone.silenceThreshold.toFixed(4)}, stability {calibrationDone.framesToConfirm}, warmup {calibrationDone.warmupFrames}, grace {calibrationDone.graceFrames}, octave correction {calibrationDone.octaveCorrection ? 'on' : 'off'}, YIN {calibrationDone.yinThreshold.toFixed(2)}.
+              </p>
+              <button type="button" className="btn-secondary" onClick={() => setMode('manual')}>View in Manual</button>
             </div>
           )}
         </div>
