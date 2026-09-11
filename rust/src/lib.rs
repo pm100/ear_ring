@@ -953,7 +953,7 @@ mod android_jni {
         accidental_in_key, detect_pitch, diatonic_chord_label, effective_key_chroma, effective_intro_root_midi, enforce_min_range_span, freq_to_note,
         generate_diatonic_chord, generate_sequence, intro_chord, is_correct_note, is_sharp_key,
         key_accidental_count, key_sig_staff_positions, label_to_midi, melody_count, melody_range_midi,
-        melody_to_midi_by_index, midi_to_label, note_name, preferred_midi_label,
+        melody_to_midi_by_index, midi_to_label, note_name, pitch_detection, preferred_midi_label,
         preferred_note_label, scale_label, scale_name, scale_notes, scale_type_from_id, shuffle_melody_indices, staff_position,
         staff_position_in_key, test_score, note_retry_penalty, wrong_note_outcome, written_diatonic_chord_label, written_scale_label, Note, ScaleType,
     };
