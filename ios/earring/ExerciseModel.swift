@@ -70,6 +70,31 @@ class ExerciseModel: ObservableObject {
     @Published var warmupFrames: Int = ud.object(forKey: "warmupFrames") != nil ? ud.integer(forKey: "warmupFrames") : 4 {
         didSet { UserDefaults.standard.set(warmupFrames, forKey: "warmupFrames") }
     }
+    /// Previously hidden per-instrument constant (grace_frames in the Rust INSTRUMENTS
+    /// table). Live-pushed to the tracker on every edit (see didSet) rather than only at
+    /// the next startLivePitchDetection() call — mirrors Android/desktop's Advanced
+    /// controls, where a manual slider change takes effect immediately.
+    @Published var graceFrames: Int = ud.object(forKey: "graceFrames") != nil ? ud.integer(forKey: "graceFrames") : 3 {
+        didSet {
+            UserDefaults.standard.set(graceFrames, forKey: "graceFrames")
+            pushAdvancedParams()
+        }
+    }
+    /// Previously hidden per-instrument constant (octave_correction in the Rust
+    /// INSTRUMENTS table).
+    @Published var octaveCorrection: Bool = ud.object(forKey: "octaveCorrection") != nil ? ud.bool(forKey: "octaveCorrection") : false {
+        didSet {
+            UserDefaults.standard.set(octaveCorrection, forKey: "octaveCorrection")
+            pushAdvancedParams()
+        }
+    }
+    /// Previously hidden global constant (DEFAULT_YIN_THRESHOLD in pitch_detection.rs).
+    @Published var yinThreshold: Float = ud.object(forKey: "yinThreshold") != nil ? Float(ud.double(forKey: "yinThreshold")) : 0.15 {
+        didSet {
+            UserDefaults.standard.set(Double(yinThreshold), forKey: "yinThreshold")
+            pushAdvancedParams()
+        }
+    }
     @Published var postChordGapNanoseconds: UInt64 = ud.object(forKey: "postChordGapNs") != nil ? UInt64(ud.integer(forKey: "postChordGapNs")) : 800_000_000 {
         didSet { UserDefaults.standard.set(Int(postChordGapNanoseconds), forKey: "postChordGapNs") }
     }
@@ -243,6 +268,7 @@ class ExerciseModel: ObservableObject {
         confirmedLiveMidi = nil
         pitchTracker.setParams(silenceThreshold: silenceThreshold, requiredFrames: framesToConfirm)
         pitchTracker.applyInstrument(index: instrumentIndex)
+        pushAdvancedParams()
         // Mic Setup passes warmup=0 (user-triggered, no settling needed).
         // Exercise passes nil to use the configured warmupFrames setting.
         let frames = warmup ?? warmupFrames
@@ -268,6 +294,14 @@ class ExerciseModel: ObservableObject {
         liveMidi = nil
         liveCents = 0
         confirmedLiveMidi = nil
+    }
+
+    /// Push the current grace/octave/YIN overrides to the shared pitchTracker. Called on
+    /// every live edit of the 3 properties (so a Mic Setup Advanced-sheet change takes
+    /// effect immediately) and once more at startLivePitchDetection() so a fresh session
+    /// always starts with the current values.
+    private func pushAdvancedParams() {
+        pitchTracker.setAdvancedParams(graceFrames: graceFrames, octaveCorrection: octaveCorrection, yinThreshold: yinThreshold)
     }
 
     private func startFreshTest() async {
@@ -596,7 +630,8 @@ class ExerciseModel: ObservableObject {
         let ud = UserDefaults.standard
         let keys = ["rootNote","rangeStart","rangeEnd","scaleId","sequenceLength","tempoBpm",
                     "showTestNotes","keySignatureMode","introSoundMode","maxRetries","noteRetries","silenceThreshold",
-                    "framesToConfirm","warmupFrames","postChordGapNs","wrongNotePauseNs",
+                    "framesToConfirm","warmupFrames","graceFrames","octaveCorrection","yinThreshold",
+                    "postChordGapNs","wrongNotePauseNs",
                     "instrumentIndex","testType","playPassFailSounds","hasLaunched"]
         keys.forEach { ud.removeObject(forKey: $0) }
         rootNote = 0
@@ -613,6 +648,9 @@ class ExerciseModel: ObservableObject {
         silenceThreshold = 0.003
         framesToConfirm = 2
         warmupFrames = 4
+        graceFrames = 3
+        octaveCorrection = false
+        yinThreshold = 0.15
         postChordGapNanoseconds = 800_000_000
         wrongNotePauseNanoseconds = 3_000_000_000
         instrumentIndex = 0

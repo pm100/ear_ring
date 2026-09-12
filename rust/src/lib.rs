@@ -14,7 +14,7 @@ pub use music_theory::{
     MelodyNote, MelodySnippet, Note, NoteName, ScaleType, FLAT_ORDER,
     FLAT_STAFF_POSITIONS, SHARP_ORDER, SHARP_STAFF_POSITIONS,
 };
-pub use pitch_detection::detect_pitch;
+pub use pitch_detection::{detect_pitch, DEFAULT_YIN_THRESHOLD};
 pub use tracker::{FrameResult, PitchTracker};
 
 // ── Help content ──────────────────────────────────────────────────────────────
@@ -228,7 +228,7 @@ pub extern "C" fn ear_ring_detect_pitch(
         return 0;
     }
     let slice = unsafe { std::slice::from_raw_parts(samples, num_samples as usize) };
-    match detect_pitch(slice, sample_rate) {
+    match detect_pitch(slice, sample_rate, pitch_detection::DEFAULT_YIN_THRESHOLD) {
         Some(hz) => {
             unsafe { *out_hz = hz };
             1
@@ -908,6 +908,27 @@ pub extern "C" fn ear_ring_tracker_apply_instrument(tracker: *mut PitchTracker, 
     }
 }
 
+/// Directly set the previously-hidden detection params (grace frames, octave
+/// correction, YIN threshold) that `apply_instrument`'s INSTRUMENTS table doesn't
+/// cover (YIN threshold) or that the user has manually overridden (grace frames,
+/// octave correction) via the Mic Setup Advanced controls. `octave_correction` is
+/// 0/1 (C has no bool type in this header).
+#[no_mangle]
+pub extern "C" fn ear_ring_tracker_set_advanced_params(
+    tracker: *mut PitchTracker,
+    grace_frames: c_uint,
+    octave_correction: c_int,
+    yin_threshold: c_float,
+) {
+    if !tracker.is_null() {
+        unsafe {
+            (*tracker).grace_frames = grace_frames;
+            (*tracker).octave_correction = octave_correction != 0;
+            (*tracker).yin_threshold = yin_threshold;
+        }
+    }
+}
+
 /// Process one audio buffer.
 ///
 /// * `out_live_hz`  – set to the detected frequency (0.0 if silent/undetected)
@@ -941,14 +962,14 @@ pub extern "C" fn ear_ring_tracker_process(
 #[cfg(target_os = "android")]
 mod android_jni {
     use jni::objects::{JClass, JFloatArray, JIntArray, JString};
-    use jni::sys::{jfloat, jfloatArray, jint, jintArray, jlong, jstring};
+    use jni::sys::{jboolean, jfloat, jfloatArray, jint, jintArray, jlong, jstring};
     use jni::JNIEnv;
 
     use super::{
         accidental_in_key, detect_pitch, diatonic_chord_label, effective_key_chroma, effective_intro_root_midi, enforce_min_range_span, freq_to_note,
         generate_diatonic_chord, generate_sequence, intro_chord, is_correct_note, is_sharp_key,
         key_accidental_count, key_sig_staff_positions, label_to_midi, melody_count, melody_range_midi,
-        melody_to_midi_by_index, midi_to_label, note_name, preferred_midi_label,
+        melody_to_midi_by_index, midi_to_label, note_name, pitch_detection, preferred_midi_label,
         preferred_note_label, scale_label, scale_name, scale_notes, scale_type_from_id, shuffle_melody_indices, staff_position,
         staff_position_in_key, test_score, note_retry_penalty, wrong_note_outcome, written_diatonic_chord_label, written_scale_label, Note, ScaleType,
     };
@@ -969,7 +990,7 @@ mod android_jni {
         if env.get_float_array_region(&arr, 0, &mut buf).is_err() {
             return -1.0;
         }
-        match detect_pitch(&buf, sample_rate as u32) {
+        match detect_pitch(&buf, sample_rate as u32, pitch_detection::DEFAULT_YIN_THRESHOLD) {
             Some(hz) => hz,
             None => -1.0,
         }
@@ -1544,6 +1565,27 @@ mod android_jni {
     ) {
         if handle != 0 {
             unsafe { (*(handle as *mut super::PitchTracker)).apply_instrument(instrument_index.max(0) as usize); }
+        }
+    }
+
+    /// Directly set the previously-hidden detection params (grace frames, octave
+    /// correction, YIN threshold) — mirrors desktop's cmd_tracker_set_advanced_params.
+    #[no_mangle]
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeTrackerSetAdvancedParams(
+        _env: JNIEnv,
+        _class: JClass,
+        handle: jlong,
+        grace_frames: jint,
+        octave_correction: jboolean,
+        yin_threshold: jfloat,
+    ) {
+        if handle != 0 {
+            unsafe {
+                let tracker = &mut *(handle as *mut super::PitchTracker);
+                tracker.grace_frames = grace_frames.max(0) as u32;
+                tracker.octave_correction = octave_correction != 0;
+                tracker.yin_threshold = yin_threshold;
+            }
         }
     }
 

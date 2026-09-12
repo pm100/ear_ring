@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use ear_ring_core::{
-    accidental_in_key, detect_pitch, diatonic_chord_label, effective_intro_root_midi, enforce_min_range_span, freq_to_note, generate_diatonic_chord, generate_sequence, help_sections_json, tooltips_json,
+    accidental_in_key, detect_pitch, DEFAULT_YIN_THRESHOLD, diatonic_chord_label, effective_intro_root_midi, enforce_min_range_span, freq_to_note, generate_diatonic_chord, generate_sequence, help_sections_json, tooltips_json,
     intro_chord, is_correct_note, is_sharp_key, key_accidental_count, key_sig_staff_positions, label_to_midi,
     melody_count, melody_range_midi, melody_title, melody_to_midi_by_index, note_timing, preferred_midi_label,
     scale_notes, scale_type_from_id, shuffle_melody_indices, staff_position, test_score, note_retry_penalty, wrong_note_outcome, written_diatonic_chord_label, written_note_name, written_midi_label, written_scale_label,
@@ -39,6 +39,18 @@ fn cmd_tracker_apply_instrument(state: State<TrackerState>, instrument_index: us
     state.0.lock().unwrap().apply_instrument(instrument_index);
 }
 
+/// Directly set the previously-hidden detection params (grace frames, octave
+/// correction, YIN threshold) that `apply_instrument`'s INSTRUMENTS table doesn't
+/// cover (YIN threshold) or that the user has manually overridden (grace frames,
+/// octave correction) via the Mic Setup Advanced controls.
+#[tauri::command]
+fn cmd_tracker_set_advanced_params(state: State<TrackerState>, grace_frames: u32, octave_correction: bool, yin_threshold: f32) {
+    let mut tracker = state.0.lock().unwrap();
+    tracker.grace_frames = grace_frames;
+    tracker.octave_correction = octave_correction;
+    tracker.yin_threshold = yin_threshold;
+}
+
 /// Process one audio buffer.
 /// Returns `[live_hz, live_midi, confirmed_midi]` as floats; -1.0 means absent.
 #[tauri::command]
@@ -55,7 +67,7 @@ fn cmd_detect_pitch(samples: Vec<f32>, sample_rate: u32, silence_threshold: f32)
     if rms < silence_threshold {
         return -1.0;
     }
-    match detect_pitch(&samples, sample_rate) {
+    match detect_pitch(&samples, sample_rate, DEFAULT_YIN_THRESHOLD) {
         Some(hz) => hz,
         None => -1.0,
     }
@@ -294,6 +306,7 @@ fn main() {
             cmd_tracker_reset_with_warmup,
             cmd_tracker_set_params,
             cmd_tracker_apply_instrument,
+            cmd_tracker_set_advanced_params,
             cmd_tracker_process,
             cmd_detect_pitch,
             cmd_freq_to_midi,

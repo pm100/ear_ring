@@ -70,6 +70,7 @@ object EarRingCore {
     @JvmStatic external fun nativeTrackerResetWithWarmup(handle: Long, warmupFrames: Int)
     @JvmStatic external fun nativeTrackerSetParams(handle: Long, silenceThreshold: Float, requiredFrames: Int)
     @JvmStatic external fun nativeTrackerApplyInstrument(handle: Long, instrumentIndex: Int)
+    @JvmStatic external fun nativeTrackerSetAdvancedParams(handle: Long, graceFrames: Int, octaveCorrection: Boolean, yinThreshold: Float)
     /** Returns FloatArray[3]: [live_hz, live_midi_f32, confirmed_midi_f32]. -1 means absent. */
     @JvmStatic external fun nativeTrackerProcess(handle: Long, samples: FloatArray, sampleRate: Int): FloatArray
 
@@ -90,6 +91,12 @@ object EarRingCore {
 
     fun trackerApplyInstrument(handle: Long, instrumentIndex: Int) {
         if (loaded && handle != 0L) nativeTrackerApplyInstrument(handle, instrumentIndex)
+    }
+
+    /** Directly set the previously-hidden detection params (grace frames, octave
+     *  correction, YIN threshold) — mirrors desktop's cmd_tracker_set_advanced_params. */
+    fun trackerSetAdvancedParams(handle: Long, graceFrames: Int, octaveCorrection: Boolean, yinThreshold: Float) {
+        if (loaded && handle != 0L) nativeTrackerSetAdvancedParams(handle, graceFrames, octaveCorrection, yinThreshold)
     }
 
     /** Process one audio buffer via the Rust tracker. Returns a [PitchFrame]. */
@@ -280,6 +287,15 @@ object EarRingCore {
 
     fun writtenMidiLabel(concertMidi: Int, instrumentIndex: Int): String =
         if (loaded) nativeWrittenMidiLabel(concertMidi, instrumentIndex) else midiToLabel(concertMidi)
+
+    /** Combined "written (concert)" label for one note, e.g. "D (C4)" for a tenor
+     *  sax's C4 concert pitch, or "C (C4)" for piano. Written side has no octave
+     *  (spoken note name); concert side is key-aware and includes it. */
+    fun dualNoteLabel(concertMidi: Int, instrumentIndex: Int, rootChroma: Int): String {
+        val written = writtenNoteName(((concertMidi % 12) + 12) % 12, instrumentIndex)
+        val concert = preferredMidiLabel(concertMidi, rootChroma)
+        return "$written ($concert)"
+    }
 
     fun melodyCount(): Int =
         if (loaded) nativeMelodyCount() else 0

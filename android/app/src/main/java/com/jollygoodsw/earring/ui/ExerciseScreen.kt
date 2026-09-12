@@ -72,6 +72,9 @@ fun ExerciseScreen(
         framesToConfirm = state.framesToConfirm,
         instrumentIndex = state.instrumentIndex,
         warmupFrames = state.warmupFrames,
+        graceFrames = state.graceFrames,
+        octaveCorrection = state.octaveCorrection,
+        yinThreshold = state.yinThreshold,
         onConfirmed = { midi, hz ->
             val cents = EarRingCore.freqToCents(hz)
             viewModel.confirmNote(midi, cents)
@@ -192,7 +195,9 @@ fun ExerciseScreen(
 
         PitchMeter(
             detectedMidi = liveMidi,
-            detectedHz = liveHz
+            detectedHz = liveHz,
+            instrumentIndex = instrIdx,
+            rootChroma = concertKeyChroma
         )
 
         if (state.detected.isNotEmpty()) {
@@ -208,7 +213,7 @@ fun ExerciseScreen(
             ) {
                 state.detected.forEach {
                     Text(
-                        text = EarRingCore.preferredMidiLabel(it.midi, concertKeyChroma),
+                        text = EarRingCore.dualNoteLabel(it.midi, instrIdx, concertKeyChroma),
                         color = if (it.correct) androidx.compose.ui.graphics.Color(0xFF4CAF50) else androidx.compose.ui.graphics.Color(0xFFF44336),
                         fontWeight = FontWeight.SemiBold
                     )

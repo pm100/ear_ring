@@ -164,11 +164,15 @@ fun EarRingApp() {
                     rangeStart = state.rangeStart,
                     rangeEnd = state.rangeEnd,
                     rootChroma = (EarRingCore.effectiveKeyChroma(state.rootNote, state.scaleId) + instrKeyTranspose) % 12,
+                    concertKeyChroma = EarRingCore.effectiveKeyChroma(state.rootNote, state.scaleId),
                     keySignatureMode = state.keySignatureMode,
                     silenceThreshold = state.silenceThreshold,
                     framesToConfirm = state.framesToConfirm,
                     warmupFrames = state.warmupFrames,
-                    instrumentIndex = state.instrumentIndex
+                    instrumentIndex = state.instrumentIndex,
+                    graceFrames = state.graceFrames,
+                    octaveCorrection = state.octaveCorrection,
+                    yinThreshold = state.yinThreshold
                 )
             }
             composable(Routes.PROGRESS) {

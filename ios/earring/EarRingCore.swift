@@ -118,6 +118,15 @@ struct EarRingCore {
         return String(cString: buf)
     }
 
+    /// Combined "written (concert)" label for one note, e.g. "D (C4)" for a tenor
+    /// sax's C4 concert pitch, or "C (C4)" for piano. Written side has no octave
+    /// (spoken note name); concert side is key-aware and includes it.
+    static func dualNoteLabel(concertMidi: Int, instrumentIndex: Int, rootChroma: Int) -> String {
+        let written = writtenNoteName(concertChroma: ((concertMidi % 12) + 12) % 12, instrumentIndex: instrumentIndex)
+        let concert = preferredMidiLabel(midi: concertMidi, rootChroma: rootChroma)
+        return "\(written) (\(concert))"
+    }
+
     /// Display name for a scale ID (0–4).
     static func scaleName(scaleId: Int) -> String {
         var buf = [CChar](repeating: 0, count: 32)
@@ -315,6 +324,13 @@ struct EarRingCore {
         /// Call whenever the instrument selection changes.
         func applyInstrument(index: Int) {
             ear_ring_tracker_apply_instrument(handle, Int32(index))
+        }
+
+        /// Directly set the previously-hidden detection params (grace frames, octave
+        /// correction, YIN threshold) — mirrors Android's trackerSetAdvancedParams and
+        /// desktop's cmd_tracker_set_advanced_params.
+        func setAdvancedParams(graceFrames: Int, octaveCorrection: Bool, yinThreshold: Float) {
+            ear_ring_tracker_set_advanced_params(handle, UInt32(graceFrames), octaveCorrection ? 1 : 0, yinThreshold)
         }
 
         func process(samples: [Float], sampleRate: UInt32) -> TrackerFrame {

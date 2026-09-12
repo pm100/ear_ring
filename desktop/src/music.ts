@@ -74,6 +74,27 @@ export function midiToLabel(midi: number): string {
   return `${NOTE_NAMES[midi % 12]}${octave}`;
 }
 
+// Written note name for a transposing instrument — shift the concert chroma by
+// the instrument's semitones, then spell it with the plain sharp-based table
+// (matches Rust written_note_name, which is NOT key-aware — the same fixed
+// spelling regardless of the selected key). No octave: this is the "how a
+// musician would say it" form, meant to sit next to a full concert label.
+export function writtenNoteName(concertChroma: number, transposeSemitones: number): string {
+  const c = ((concertChroma + transposeSemitones) % 12 + 12) % 12;
+  return NOTE_NAMES[c];
+}
+
+// Combined "written (concert)" label for one note, e.g. "D (C4)" for a tenor
+// sax's C4 concert pitch, or "C (C4)" for piano (written === concert pitch
+// class there, so both halves show "C" — only the concert side carries the
+// octave). Written side omits the octave (spoken note name); concert side is
+// key-aware and includes it (precise pitch reference).
+export function dualNoteLabel(concertMidi: number, transposeSemitones: number, concertKeyChroma: number): string {
+  const written = writtenNoteName(concertMidi % 12, transposeSemitones);
+  const concert = preferredMidiLabel(concertMidi, concertKeyChroma);
+  return `${written} (${concert})`;
+}
+
 export function freqToMidi(hz: number): number {
   if (!Number.isFinite(hz) || hz <= 0) {
     return -1;

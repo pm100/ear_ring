@@ -8,6 +8,7 @@ struct SetupView: View {
     @State private var concertMidi: Int = -1
     @State private var concertHistory: [Int] = []
     @State private var transpSemitones: Int = 0
+    @State private var advancedOpen = false
 
     // Pitch Detection lives here rather than in Settings — this screen already
     // gives live feedback on what the mic hears, so sensitivity/stability
@@ -16,6 +17,11 @@ struct SetupView: View {
     // primary purpose.
     private let stabilityOptions = [2, 3, 4, 5]
     private let warmupOptions = [0, 1, 2, 3, 4, 5, 6]
+    // Grace Frames, Octave Correction, and YIN Threshold are optional/advanced —
+    // unlike the 3 above, they open from an Advanced button rather than sitting
+    // inline, mirroring Android's modal bottom sheet and desktop's collapsible
+    // section (see AGENTS.md's Mic Setup spec).
+    private let graceFramesOptions = [0, 1, 2, 3, 4, 5, 6]
 
     private var isIPad: Bool { hsc == .regular }
     private var staffHeight: CGFloat { isIPad ? 220 : 130 }
@@ -79,8 +85,12 @@ struct SetupView: View {
             Spacer().frame(height: 10)
             HStack {
                 Spacer()
-                PitchMeterView(midi: model.liveMidi, isActive: model.isCapturing)
-                    .frame(width: meterSize, height: meterSize)
+                PitchMeterView(
+                    midi: model.liveMidi, isActive: model.isCapturing,
+                    instrumentIndex: model.instrumentIndex,
+                    rootChroma: EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId)
+                )
+                .frame(width: meterSize, height: meterSize)
                 Spacer()
             }
 
@@ -109,6 +119,11 @@ struct SetupView: View {
                      count: warmupOptions.count) { idx in
                 model.warmupFrames = warmupOptions[idx]
             }
+
+            Spacer().frame(height: 8)
+            Button("Advanced") { advancedOpen = true }
+                .font(.subheadline.weight(.semibold))
+                .sheet(isPresented: $advancedOpen) { advancedSheet }
 
             Spacer()
         }
@@ -152,6 +167,55 @@ struct SetupView: View {
             return
         }
         transpSemitones = (arr[model.instrumentIndex]["semitones"] as? Int) ?? 0
+    }
+
+    // A List (not ScrollView+VStack), same reasoning as SettingsView: Toggle only
+    // renders as a true native UISwitch inside a List/Form.
+    private var advancedSheet: some View {
+        NavigationView {
+            List {
+                Section {
+                    VStack(alignment: .leading, spacing: 16) {
+                        sectionLabel("Grace Frames", tooltipKey: "grace_frames")
+                        chipGrid(options: graceFramesOptions.map { "\($0)" },
+                                 selected: graceFramesOptions.firstIndex(of: model.graceFrames) ?? 3,
+                                 count: graceFramesOptions.count) { idx in
+                            model.graceFrames = graceFramesOptions[idx]
+                        }
+
+                        Toggle(isOn: Binding(
+                            get: { model.octaveCorrection },
+                            set: { model.octaveCorrection = $0 }
+                        )) {
+                            HStack(spacing: 4) {
+                                Text("Octave Correction")
+                                TooltipIcon(key: "octave_correction")
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            sectionLabel("YIN Threshold", tooltipKey: "yin_threshold")
+                            Text(String(format: "%.2f", model.yinThreshold))
+                                .font(.caption).foregroundColor(.erCaption)
+                            Slider(value: Binding(
+                                get: { Double(model.yinThreshold) },
+                                set: { model.yinThreshold = Float(max(0.05, min(0.30, $0))) }
+                            ), in: 0.05...0.30, step: 0.01)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                }
+            }
+            .navigationTitle("Advanced")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { advancedOpen = false }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 
     @ViewBuilder

@@ -18,8 +18,10 @@ import com.jollygoodsw.earring.ui.components.StaffNote
 import kotlin.math.roundToInt
 
 @Composable
-fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, rootChroma: Int = 0, keySignatureMode: Int = 0, silenceThreshold: Float = 0.003f, framesToConfirm: Int = 3, warmupFrames: Int = 4, instrumentIndex: Int = 0) {
+@OptIn(ExperimentalMaterial3Api::class)
+fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, rootChroma: Int = 0, concertKeyChroma: Int = 0, keySignatureMode: Int = 0, silenceThreshold: Float = 0.003f, framesToConfirm: Int = 3, warmupFrames: Int = 4, instrumentIndex: Int = 0, graceFrames: Int = 3, octaveCorrection: Boolean = false, yinThreshold: Float = 0.15f) {
     val noteStepDp = 44.dp
+    var advancedOpen by remember { mutableStateOf(false) }
     // Mic Setup exists to test what the mic can hear, independent of whatever
     // range the exercise happens to be configured for right now — a narrow
     // exercise range (e.g. the default one-octave Piano range) must not make
@@ -40,6 +42,9 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
         framesToConfirm = framesToConfirm,
         instrumentIndex = instrumentIndex,
         warmupFrames = warmupFrames,
+        graceFrames = graceFrames,
+        octaveCorrection = octaveCorrection,
+        yinThreshold = yinThreshold,
         onConfirmed = { midi, _ ->
             concertMidi = midi
             if (midi in rangeStart..rangeEnd) {
@@ -108,7 +113,7 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
         // large note-name/Hz text that used to sit here was removed to make room
         // for the always-visible Pitch Detection controls, without this screen
         // needing to scroll.
-        PitchMeter(detectedMidi = concertMidi, detectedHz = liveHz)
+        PitchMeter(detectedMidi = concertMidi, detectedHz = liveHz, instrumentIndex = instrumentIndex, rootChroma = concertKeyChroma)
         Spacer(Modifier.height(16.dp))
 
         // Pitch Detection controls live here rather than in Settings — this screen
@@ -147,5 +152,59 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
             selected = warmupOptions.indexOf(warmupFrames).coerceAtLeast(0),
             onSelect = { viewModel.setWarmupFrames(warmupOptions[it]) }
         )
+
+        Spacer(Modifier.height(8.dp))
+        TextButton(
+            onClick = { advancedOpen = true },
+            modifier = Modifier.align(Alignment.Start)
+        ) {
+            Text("Advanced")
+        }
+    }
+
+    if (advancedOpen) {
+        ModalBottomSheet(onDismissRequest = { advancedOpen = false }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+                    .padding(bottom = 24.dp)
+            ) {
+                Text(
+                    "Advanced",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(16.dp))
+            val graceFramesOptions = listOf(0, 1, 2, 3, 4, 5, 6)
+            SectionLabel("Grace Frames", tooltipKey = "grace_frames")
+            ChipRow(
+                items = graceFramesOptions.map { it.toString() },
+                selected = graceFramesOptions.indexOf(graceFrames).coerceAtLeast(0),
+                onSelect = { viewModel.setGraceFrames(graceFramesOptions[it]) }
+            )
+
+            Spacer(Modifier.height(8.dp))
+            SettingSwitchRow(
+                label = "Octave Correction",
+                checked = octaveCorrection,
+                tooltipKey = "octave_correction",
+                onCheckedChange = { viewModel.setOctaveCorrection(it) }
+            )
+
+            Spacer(Modifier.height(8.dp))
+            SectionLabel("YIN Threshold", tooltipKey = "yin_threshold")
+            Text("%.2f".format(yinThreshold),
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 4.dp))
+            Slider(
+                value = yinThreshold,
+                onValueChange = { viewModel.setYinThreshold(it.coerceIn(0.05f, 0.30f)) },
+                valueRange = 0.05f..0.30f,
+                steps = 24,
+                modifier = Modifier.fillMaxWidth()
+            )
+            }
+        }
     }
 }

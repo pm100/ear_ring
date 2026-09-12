@@ -38,6 +38,9 @@ fun rememberPitchDetector(
     framesToConfirm: Int = 3,
     instrumentIndex: Int = 0,
     warmupFrames: Int = 0,
+    graceFrames: Int = 3,
+    octaveCorrection: Boolean = false,
+    yinThreshold: Float = 0.15f,
     onConfirmed: (midi: Int, hz: Float) -> Unit
 ): Float {
     val audioCapture = remember { AudioCapture() }
@@ -45,9 +48,13 @@ fun rememberPitchDetector(
     val liveHzState = remember { mutableFloatStateOf(-1f) }
 
     // Apply per-instrument detection params (grace frames, octave correction) whenever the
-    // instrument changes. This does not reset any accumulated stability state.
-    LaunchedEffect(instrumentIndex) {
+    // instrument changes, then push the caller's grace/octave/yin overrides on top — both
+    // JNI calls are synchronous, so this ordering can't race the way an async round-trip
+    // could. Also re-runs on a live edit to any of the 3 overrides, so a manual slider
+    // change takes effect immediately without waiting for an instrument switch.
+    LaunchedEffect(instrumentIndex, graceFrames, octaveCorrection, yinThreshold) {
         EarRingCore.trackerApplyInstrument(trackerHandle, instrumentIndex)
+        EarRingCore.trackerSetAdvancedParams(trackerHandle, graceFrames, octaveCorrection, yinThreshold)
     }
 
     // Tracker lifetime is tied to the composable, NOT to active — freeing on every

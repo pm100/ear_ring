@@ -455,6 +455,12 @@ Mic Setup **starts listening automatically on entry** — there is NO Start List
 and NO Stop button. The user exits by tapping another tab.
 
 NO test note buttons.
+
+Optional advanced pitch-detection controls (Grace Frames, Octave Correction, and YIN
+Threshold) open from an `Advanced` button rather than expanding inline: Android via a
+modal bottom sheet, iOS via a sheet, Desktop via a collapsible section below the
+always-visible controls. On Android/iOS the base Mic Setup screen must remain
+non-scrolling, with its primary controls staying above the bottom navigation.
 ```
 
 The staff visual style, horizontal spacing, and note-detection pipeline are

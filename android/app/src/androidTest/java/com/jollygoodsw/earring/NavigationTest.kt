@@ -61,6 +61,18 @@ class NavigationTest {
     }
 
     @Test
+    fun micTab_advancedPitchDetectionControls_areVisibleWhenOpened() {
+        goHome()
+        composeRule.onNodeWithText("Mic").performClick()
+
+        composeRule.onNodeWithText("Advanced").performClick()
+
+        composeRule.onNodeWithText("Grace Frames").assertIsDisplayed()
+        composeRule.onNodeWithText("Octave Correction").assertIsDisplayed()
+        composeRule.onNodeWithText("YIN Threshold").assertIsDisplayed()
+    }
+
+    @Test
     fun progressTab_showsSessionHistory() {
         goHome()
         composeRule.onNodeWithText("Progress").performClick()

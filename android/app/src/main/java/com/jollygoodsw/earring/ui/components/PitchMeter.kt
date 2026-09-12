@@ -12,12 +12,14 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.jollygoodsw.earring.MusicTheory
+import com.jollygoodsw.earring.EarRingCore
 
 @Composable
 fun PitchMeter(
-    detectedMidi: Int,      // -1 = no pitch
+    detectedMidi: Int,      // -1 = no pitch, concert MIDI
     detectedHz: Float,      // for display accuracy; not required
+    instrumentIndex: Int = 0,
+    rootChroma: Int = 0,    // concert-pitch key chroma, for spelling the concert half
     modifier: Modifier = Modifier
 ) {
     val isDetecting = detectedMidi >= 0
@@ -25,7 +27,7 @@ fun PitchMeter(
     // ▶/■/↻ button glyphs), not a bare "—", so the idle state reads as "no note
     // detected yet" rather than a misplaced divider (fixed during the UI review,
     // issue #30).
-    val label = if (isDetecting) MusicTheory.midiToLabel(detectedMidi) else "♪"
+    val label = if (isDetecting) EarRingCore.dualNoteLabel(detectedMidi, instrumentIndex, rootChroma) else "♪"
     val borderColor = if (isDetecting) Color(0xFF4CAF50) else Color(0xFFBDBDBD)
 
     Box(
@@ -41,7 +43,7 @@ fun PitchMeter(
         }
         Text(
             text = label,
-            fontSize = if (label.length > 2) 16.sp else 20.sp,
+            fontSize = if (label.length > 5) 13.sp else if (label.length > 2) 16.sp else 20.sp,
             fontWeight = FontWeight.Bold,
             color = if (isDetecting) Color(0xFF212121) else Color(0xFFBDBDBD)
         )

@@ -31,6 +31,9 @@ const defaultSettings: ExerciseSettings = (() => {
     silenceThreshold: 0.003,
     framesToConfirm: 3,
     warmupFrames: 4,
+    graceFrames: 3,
+    octaveCorrection: false,
+    yinThreshold: 0.15,
     postChordGapMs: 800,
     wrongNotePauseMs: 3000,
     instrumentIndex: 0,
@@ -131,6 +134,9 @@ export default function App() {
       silenceThreshold: settings.silenceThreshold,
       framesToConfirm: settings.framesToConfirm,
       warmupFrames: settings.warmupFrames,
+      graceFrames: settings.graceFrames,
+      octaveCorrection: settings.octaveCorrection,
+      yinThreshold: settings.yinThreshold,
       postChordGapMs: settings.postChordGapMs,
       wrongNotePauseMs: settings.wrongNotePauseMs,
       instrumentIndex: settings.instrumentIndex,
@@ -228,6 +234,9 @@ export default function App() {
           framesToConfirm={settings.framesToConfirm}
           warmupFrames={settings.warmupFrames}
           instrumentIndex={settings.instrumentIndex}
+          graceFrames={settings.graceFrames}
+          octaveCorrection={settings.octaveCorrection}
+          yinThreshold={settings.yinThreshold}
         />
       )}
       {screen === 'progress' && (

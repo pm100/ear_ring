@@ -34,13 +34,17 @@ interface Props {
   framesToConfirm?: number;
   warmupFrames?: number;
   instrumentIndex?: number;
+  graceFrames?: number;
+  octaveCorrection?: boolean;
+  yinThreshold?: number;
 }
 
-export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rangeEnd, rootChroma = 0, scaleId = 0, keySignatureMode = 0, silenceThreshold = 0.003, framesToConfirm = 3, warmupFrames = 4, instrumentIndex = 0 }: Props) {
+export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rangeEnd, rootChroma = 0, scaleId = 0, keySignatureMode = 0, silenceThreshold = 0.003, framesToConfirm = 3, warmupFrames = 4, instrumentIndex = 0, graceFrames = 3, octaveCorrection = false, yinThreshold = 0.15 }: Props) {
   const set = <K extends keyof ExerciseSettings>(key: K, value: ExerciseSettings[K]) =>
     onUpdateSettings(prev => ({ ...prev, [key]: value }));
 
   const [hz, setHz] = useState(0);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [noteHistory, setNoteHistory] = useState<number[]>([]);
   const { start, stop, destroy } = useAudioCapture();
 
@@ -75,6 +79,7 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
   // Configure tracker on entry, then auto-start.  Full cleanup on unmount.
   useEffect(() => {
     void invoke('cmd_tracker_set_params', { silenceThreshold, requiredFrames: framesToConfirm });
+    void invoke('cmd_tracker_set_advanced_params', { graceFrames, octaveCorrection, yinThreshold });
     void invoke('cmd_tracker_reset_with_warmup', { warmupFrames });
     start(handleFrame);
     return () => {
@@ -119,7 +124,7 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
           make room for the always-visible Pitch Detection controls, without this
           screen needing to scroll. */}
       <div className="pitch-meter-circle">
-        <PitchMeter hz={hz} />
+        <PitchMeter hz={hz} transposeSemitones={transpSemitones} keyChroma={effectiveKeyChroma(rootChroma, scaleId)} />
       </div>
 
       <div style={{ marginTop: 16 }}>
@@ -149,6 +154,37 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
               onClick={() => set('warmupFrames', n)}>{n}</button>
           ))}
         </div>
+
+        <button type="button" className="advanced-toggle" onClick={() => setAdvancedOpen(o => !o)}>
+          {advancedOpen ? '▾' : '▸'} Advanced
+        </button>
+        {advancedOpen && (
+          <div className="advanced-section">
+            <span className="section-label">Grace Frames<TooltipIcon tooltipKey="grace_frames" /></span>
+            <div className="chip-row">
+              {[0, 1, 2, 3, 4, 5, 6].map(n => (
+                <button key={n} type="button"
+                  className={`chip ${graceFrames === n ? 'chip-selected' : ''}`}
+                  onClick={() => { set('graceFrames', n); void invoke('cmd_tracker_set_advanced_params', { graceFrames: n, octaveCorrection, yinThreshold }); }}>{n}</button>
+              ))}
+            </div>
+
+            <span className="section-label">Octave Correction<TooltipIcon tooltipKey="octave_correction" /></span>
+            <label className="switch-row">
+              <input type="checkbox" checked={octaveCorrection}
+                onChange={e => { set('octaveCorrection', e.target.checked); void invoke('cmd_tracker_set_advanced_params', { graceFrames, octaveCorrection: e.target.checked, yinThreshold }); }} />
+            </label>
+
+            <span className="section-label">YIN Threshold<TooltipIcon tooltipKey="yin_threshold" /></span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <input type="range" min={0.05} max={0.30} step={0.01}
+                value={yinThreshold}
+                onChange={e => { const v = parseFloat(e.target.value); set('yinThreshold', v); void invoke('cmd_tracker_set_advanced_params', { graceFrames, octaveCorrection, yinThreshold: v }); }}
+                style={{ flex: 1 }} />
+              <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{yinThreshold.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

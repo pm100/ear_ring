@@ -139,7 +139,8 @@ struct ExerciseView: View {
     }
 
     private var pitchMeter: some View {
-        PitchMeterView(midi: model.liveMidi, isActive: model.status == .listening)
+        let concertKeyChroma = EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId)
+        return PitchMeterView(midi: model.liveMidi, isActive: model.status == .listening, instrumentIndex: model.instrumentIndex, rootChroma: concertKeyChroma)
             .frame(width: meterSize, height: meterSize)
     }
 
@@ -183,9 +184,11 @@ struct ExerciseView: View {
                     .foregroundColor(.erCaption)
                 HStack(spacing: 10) {
                     ForEach(Array(model.detectedNotes.enumerated()), id: \.offset) { _, note in
-                        // Always the actual (concert) pitch, regardless of instrument
-                        // transposition — this is a readout, not notation to read/play.
-                        Text(EarRingCore.preferredMidiLabel(midi: note.midi, rootChroma: concertKeyChroma))
+                        // Written half spoken as the instrument reads it; concert half
+                        // (parenthesised, key-aware) always the actual pitch regardless of
+                        // instrument transposition — this is a readout, not notation to
+                        // read/play.
+                        Text(EarRingCore.dualNoteLabel(concertMidi: note.midi, instrumentIndex: model.instrumentIndex, rootChroma: concertKeyChroma))
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(note.isCorrect ? .erSuccess : .erError)
                     }

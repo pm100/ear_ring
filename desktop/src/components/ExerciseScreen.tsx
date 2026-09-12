@@ -5,7 +5,7 @@ import MusicStaff from './MusicStaff';
 import PitchMeter from './PitchMeter';
 import { useAudioCapture, TrackerFrame } from '../hooks/useAudioCapture';
 import { useAudioPlayback } from '../hooks/useAudioPlayback';
-import { freqToCents, midiToLabel, preferredMidiLabel, preferredNoteName, NOTE_NAMES } from '../music';
+import { freqToCents, midiToLabel, preferredMidiLabel, preferredNoteName, dualNoteLabel, NOTE_NAMES } from '../music';
 
 interface Props {
   exercise: ExerciseState;
@@ -117,17 +117,34 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   useEffect(() => { sequenceRef.current = sequence; }, [sequence]);
 
   // Load transposition semitones and apply instrument-specific tracker params.
+  // apply_instrument (INSTRUMENTS-table grace_frames/octave_correction) is awaited
+  // before pushing the exercise's own grace/octave/yin values, so a stale-order race
+  // can't let the table defaults land after (and silently override) the values this
+  // exercise was actually configured with.
   const [transpSemitones, setTranspSemitones] = useState(0);
   useEffect(() => {
     const instrIdx = exercise.instrumentIndex ?? 0;
-    invoke<string>('cmd_instrument_list')
-      .then(json => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const json = await invoke<string>('cmd_instrument_list');
+        if (cancelled) return;
         const list = JSON.parse(json) as { id: number; semitones: number }[];
         setTranspSemitones(list[instrIdx]?.semitones ?? 0);
-        void invoke('cmd_tracker_apply_instrument', { instrumentIndex: instrIdx });
-      })
-      .catch(() => {});
-  }, [exercise.instrumentIndex]);
+      } catch { /* keep the last known transposition */ }
+      if (cancelled) return;
+      try {
+        await invoke('cmd_tracker_apply_instrument', { instrumentIndex: instrIdx });
+      } catch { /* non-fatal: the params push below still runs */ }
+      if (cancelled) return;
+      void invoke('cmd_tracker_set_advanced_params', {
+        graceFrames: exercise.graceFrames,
+        octaveCorrection: exercise.octaveCorrection,
+        yinThreshold: exercise.yinThreshold,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [exercise.instrumentIndex, exercise.graceFrames, exercise.octaveCorrection, exercise.yinThreshold]);
   const transpMidi = (midi: number) => Math.max(0, Math.min(127, midi + transpSemitones));
 
   const schedule = useCallback((callback: () => void, ms: number) => {
@@ -606,7 +623,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       <div className="exercise-meta">Attempt {currentAttempt} of {exercise.maxRetries} • Tests {testsCompleted} • Score {score}%</div>
 
       <div className="pitch-meter-circle">
-        <PitchMeter hz={liveHz} />
+        <PitchMeter hz={liveHz} transposeSemitones={transpSemitones} keyChroma={exerciseKeyChroma} />
       </div>
 
       {detected.length > 0 && (
@@ -615,7 +632,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
           <div className="note-tracker">
             {detected.map((note, i) => (
               <div key={i} className={`note-tracker-item ${note.correct ? 'tracker-correct' : 'tracker-incorrect'}`}>
-                <div className="tracker-note">{preferredMidiLabel(note.midi, effectiveKeyChroma(exercise.rootNote, exercise.scaleId))}</div>
+                <div className="tracker-note">{dualNoteLabel(note.midi, transpSemitones, effectiveKeyChroma(exercise.rootNote, exercise.scaleId))}</div>
               </div>
             ))}
           </div>

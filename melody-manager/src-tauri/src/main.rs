@@ -3,7 +3,7 @@
 use ear_ring_core::{
     melody_count, melody_raw_notes, melody_to_midi_by_index, melody_title, note_timing,
     staff_position, preferred_midi_label, accidental_in_key, key_sig_staff_positions,
-    key_accidental_count, is_sharp_key, Note, detect_pitch,
+    key_accidental_count, is_sharp_key, Note, detect_pitch, DEFAULT_YIN_THRESHOLD,
 };
 use serde::Serialize;
 
@@ -125,7 +125,7 @@ fn cmd_save_file(content: String, path: String) -> Result<String, String> {
 /// Returns the frequency in Hz, or null if not detected.
 #[tauri::command]
 fn cmd_detect_pitch(samples: Vec<f32>, sample_rate: u32) -> Option<f32> {
-    detect_pitch(&samples, sample_rate)
+    detect_pitch(&samples, sample_rate, DEFAULT_YIN_THRESHOLD)
 }
 
 /// Fetch the raw text content of any URL (for ABC file import by URL).

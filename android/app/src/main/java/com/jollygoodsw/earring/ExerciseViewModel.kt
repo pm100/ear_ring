@@ -36,6 +36,12 @@ data class ExerciseState(
     val silenceThreshold: Float = DEFAULT_SILENCE_THRESHOLD,
     val framesToConfirm: Int = DEFAULT_FRAMES_TO_CONFIRM,
     val warmupFrames: Int = DEFAULT_WARMUP_FRAMES,
+    /** Previously hidden per-instrument constant (grace_frames in the Rust INSTRUMENTS table). */
+    val graceFrames: Int = DEFAULT_GRACE_FRAMES,
+    /** Previously hidden per-instrument constant (octave_correction in the Rust INSTRUMENTS table). */
+    val octaveCorrection: Boolean = DEFAULT_OCTAVE_CORRECTION,
+    /** Previously hidden global constant (DEFAULT_YIN_THRESHOLD in pitch_detection.rs). */
+    val yinThreshold: Float = DEFAULT_YIN_THRESHOLD,
     val postChordGapMs: Long = DEFAULT_POST_CHORD_GAP_MS,
     val wrongNotePauseMs: Long = DEFAULT_WRONG_NOTE_PAUSE_MS,
     val instrumentIndex: Int = 0,
@@ -90,6 +96,9 @@ private const val DEFAULT_NOTE_RETRIES = 2
 private const val DEFAULT_SILENCE_THRESHOLD = 0.003f
 private const val DEFAULT_FRAMES_TO_CONFIRM = 3
 private const val DEFAULT_WARMUP_FRAMES = 4
+private const val DEFAULT_GRACE_FRAMES = 3          // Piano's INSTRUMENTS-table value
+private const val DEFAULT_OCTAVE_CORRECTION = false // Piano's INSTRUMENTS-table value
+private const val DEFAULT_YIN_THRESHOLD = 0.15f
 private const val DEFAULT_POST_CHORD_GAP_MS = 800L
 private const val DEFAULT_WRONG_NOTE_PAUSE_MS = 3000L
 // Gap between the last note of the sequence ending and mic start.
@@ -113,6 +122,9 @@ private const val PREF_NOTE_RETRIES = "noteRetries"
 private const val PREF_SILENCE_THRESHOLD = "silenceThreshold"
 private const val PREF_FRAMES_TO_CONFIRM = "framesToConfirm"
 private const val PREF_WARMUP_FRAMES = "warmupFrames"
+private const val PREF_GRACE_FRAMES = "graceFrames"
+private const val PREF_OCTAVE_CORRECTION = "octaveCorrection"
+private const val PREF_YIN_THRESHOLD = "yinThreshold"
 private const val PREF_POST_CHORD_GAP_MS = "postChordGapMs"
 private const val PREF_WRONG_NOTE_PAUSE_MS = "wrongNotePauseMs"
 private const val PREF_INSTRUMENT_INDEX = "instrumentIndex"
@@ -161,6 +173,9 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             silenceThreshold = prefs.getFloat(PREF_SILENCE_THRESHOLD, DEFAULT_SILENCE_THRESHOLD),
             framesToConfirm = prefs.getInt(PREF_FRAMES_TO_CONFIRM, DEFAULT_FRAMES_TO_CONFIRM),
             warmupFrames = prefs.getInt(PREF_WARMUP_FRAMES, DEFAULT_WARMUP_FRAMES),
+            graceFrames = prefs.getInt(PREF_GRACE_FRAMES, DEFAULT_GRACE_FRAMES),
+            octaveCorrection = prefs.getBoolean(PREF_OCTAVE_CORRECTION, DEFAULT_OCTAVE_CORRECTION),
+            yinThreshold = prefs.getFloat(PREF_YIN_THRESHOLD, DEFAULT_YIN_THRESHOLD),
             postChordGapMs = prefs.getLong(PREF_POST_CHORD_GAP_MS, DEFAULT_POST_CHORD_GAP_MS),
             wrongNotePauseMs = prefs.getLong(PREF_WRONG_NOTE_PAUSE_MS, DEFAULT_WRONG_NOTE_PAUSE_MS),
             instrumentIndex = prefs.getInt(PREF_INSTRUMENT_INDEX, 0),
@@ -186,6 +201,9 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putFloat(PREF_SILENCE_THRESHOLD, state.silenceThreshold)
             .putInt(PREF_FRAMES_TO_CONFIRM, state.framesToConfirm)
             .putInt(PREF_WARMUP_FRAMES, state.warmupFrames)
+            .putInt(PREF_GRACE_FRAMES, state.graceFrames)
+            .putBoolean(PREF_OCTAVE_CORRECTION, state.octaveCorrection)
+            .putFloat(PREF_YIN_THRESHOLD, state.yinThreshold)
             .putLong(PREF_POST_CHORD_GAP_MS, state.postChordGapMs)
             .putLong(PREF_WRONG_NOTE_PAUSE_MS, state.wrongNotePauseMs)
             .putInt(PREF_INSTRUMENT_INDEX, state.instrumentIndex)
@@ -215,6 +233,9 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putFloat(PREF_SILENCE_THRESHOLD, defaults.silenceThreshold)
             .putInt(PREF_FRAMES_TO_CONFIRM, defaults.framesToConfirm)
             .putInt(PREF_WARMUP_FRAMES, defaults.warmupFrames)
+            .putInt(PREF_GRACE_FRAMES, defaults.graceFrames)
+            .putBoolean(PREF_OCTAVE_CORRECTION, defaults.octaveCorrection)
+            .putFloat(PREF_YIN_THRESHOLD, defaults.yinThreshold)
             .putLong(PREF_POST_CHORD_GAP_MS, defaults.postChordGapMs)
             .putLong(PREF_WRONG_NOTE_PAUSE_MS, defaults.wrongNotePauseMs)
             .putInt(PREF_INSTRUMENT_INDEX, defaults.instrumentIndex)
@@ -262,6 +283,9 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     fun setSilenceThreshold(v: Float) { _state.value = _state.value.copy(silenceThreshold = v); saveSettings(_state.value) }
     fun setFramesToConfirm(n: Int) { _state.value = _state.value.copy(framesToConfirm = n); saveSettings(_state.value) }
     fun setWarmupFrames(n: Int) { _state.value = _state.value.copy(warmupFrames = n); saveSettings(_state.value) }
+    fun setGraceFrames(n: Int) { _state.value = _state.value.copy(graceFrames = n); saveSettings(_state.value) }
+    fun setOctaveCorrection(v: Boolean) { _state.value = _state.value.copy(octaveCorrection = v); saveSettings(_state.value) }
+    fun setYinThreshold(v: Float) { _state.value = _state.value.copy(yinThreshold = v); saveSettings(_state.value) }
     fun setPostChordGapMs(ms: Long) { _state.value = _state.value.copy(postChordGapMs = ms); saveSettings(_state.value) }
     fun setWrongNotePauseMs(ms: Long) { _state.value = _state.value.copy(wrongNotePauseMs = ms); saveSettings(_state.value) }
     fun setInstrumentIndex(idx: Int) {

@@ -1,8 +1,10 @@
 import SwiftUI
 
 struct PitchMeterView: View {
-    var midi: Int?       // nil = silent / not detected
+    var midi: Int?       // nil = silent / not detected, concert MIDI
     var isActive: Bool
+    var instrumentIndex: Int = 0
+    var rootChroma: Int = 0    // concert-pitch key chroma, for spelling the concert half
 
     // "♪" (plain monochrome glyph, no emoji presentation — same family as the
     // app's ▶/■/↻ button glyphs), not a bare "—", so the idle state reads as
@@ -10,7 +12,7 @@ struct PitchMeterView: View {
     // UI review, issue #30).
     private var noteLabel: String {
         guard let midi = midi else { return "♪" }
-        return MusicTheory.midiToLabel(midi)
+        return EarRingCore.dualNoteLabel(concertMidi: midi, instrumentIndex: instrumentIndex, rootChroma: rootChroma)
     }
 
     private var isDetected: Bool { midi != nil }
@@ -26,7 +28,7 @@ struct PitchMeterView: View {
     var body: some View {
         GeometryReader { geo in
             let size = min(geo.size.width, geo.size.height)
-            let fontSize: CGFloat = noteLabel.count >= 3 ? size * 0.18 : size * 0.22
+            let fontSize: CGFloat = noteLabel.count > 5 ? size * 0.14 : noteLabel.count >= 3 ? size * 0.18 : size * 0.22
             ZStack {
                 Circle()
                     .strokeBorder(ringColor, lineWidth: size * 0.044)
