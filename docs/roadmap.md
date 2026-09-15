@@ -140,20 +140,6 @@ for how inversion selection should work alongside that rejection rule.
 
 Requested 2026-09-01.
 
-### Range picker: move off the Home screen into a popup
-Home screen currently always shows the full interactive piano keyboard
-(`PianoRangePicker`) inline for range selection — desktop: a local component defined
-inside `HomeScreen.tsx` (not a separate file); Android: `ui/PianoRangePicker.kt`; iOS:
-`views/PianoRangePickerView.swift`. Replace the always-visible keyboard with a compact
-text label showing the current range (e.g. "C4–D5", reusing the existing
-`midiLabel`/`MusicTheory.midiToLabel` helpers already used to render range labels
-elsewhere), tappable/clickable to open the *same* picker in a popup instead — a modal
-on Desktop, an `AlertDialog`/bottom-sheet-wrapped composable on Android, a `.sheet`
-on iOS. No new range-picking logic needed: this is relocating the existing widget
-behind a trigger, not rebuilding it. Should also visibly shorten the Home screen,
-which is already a fairly tall scrolling form (Test Type, Key, Scale, Range, Sequence
-Length, two checkboxes, Start button).
-
 ### Progress screen: graph of score over days
 Add a chart to `ProgressScreen`/`ProgressScreen.kt`/`ProgressScreen.swift` plotting
 score over time across days. The data already exists — `SessionRecord`'s `date` +
@@ -254,6 +240,41 @@ generating a new sequence. See the issue for the design questions to settle
 
 ---
 
+## Config Packs / Difficulty Presets (not premium-specific)
+
+Added 2026-09-14. Bundle sensible starting values for the settings that most affect
+difficulty into named presets — e.g. **Beginner**, **Progressing**, **Advanced** —
+selectable from Home or Settings, rather than requiring a new user to tune each knob
+individually before their first session. Generalizes the existing single hardcoded
+default (`resetSettings()` in `ExerciseViewModel.kt`, which resets every field to
+`ExerciseState()`'s defaults) into several named default sets instead of just one.
+
+Candidate fields to vary per pack — the ones that actually drive perceived musical
+difficulty, as opposed to settings this doc otherwise treats as user taste
+(`instrumentIndex`, `introSoundMode`):
+- `sequenceLength` — number of notes per test
+- `rangeStart`/`rangeEnd` — pitch range width (narrower = easier)
+- `maxRetries`/`noteRetries` — forgiveness on wrong answers
+- `tempoBpm` — playback speed
+- `showTestNotes` — visual crutch on/off
+
+Pitch-detection leniency (`silenceThreshold`, `framesToConfirm`, `graceFrames`,
+`octaveCorrection`, `yinThreshold`) arguably should stay untouched by presets, since
+those are mic/device tuning rather than musical difficulty — a beginner and an
+advanced player on the same phone need the same detection settings to work reliably.
+Worth deciding explicitly rather than defaulting to "presets touch everything."
+
+Open questions: how many packs and what exactly differentiates them (Beginner/
+Progressing/Advanced above is a starting point, not a final spec); whether applying a
+pack overwrites every current setting or only the fields it defines (the latter
+preserves a user's other customizations, e.g. instrument choice, when switching packs);
+whether picking a pack is a one-time action like today's Reset, or a persisted "current
+pack" the user can see and change later; and whether it belongs on the Home screen (a
+quick difficulty switcher) or in Settings (a bulk-apply action) — plausibly both, e.g.
+a Home-screen dropdown for the common case plus a Settings action for full control.
+
+---
+
 ## Detection & Exercise-Mode R&D (not premium-specific)
 
 ### Mic setup auto-calibration
@@ -273,3 +294,31 @@ single-note detection per frame; polyphonic detection (resolving 2-3 simultaneou
 pitches from one mic signal) is a different algorithm, not a mode flag on top of the
 existing one. Worth spiking on the Rust side before committing to a UI design — the
 detection approach determines what's actually gradeable.
+
+### Silent staff-prompt mode (sight-reading / audiation)
+Added 2026-09-14. New exercise mode: show the prompt note(s) on the staff — the same
+rendering `showTestNotes` already gates today — but skip playing the audio cue
+entirely (`playPrompt()` in `ExerciseViewModel.kt`, and its equivalents on iOS/desktop).
+The user must read the notation and produce the pitch themselves, by singing or
+playing their instrument, before capture/grading starts. Two use cases motivate this:
+**sight-singing/audiation practice** (reading notation and audiating the pitch before
+producing it — a core ear-training skill distinct from echoing a pitch just heard) and
+**general staff-reading fluency** (mapping a written note to a fingering/pitch without
+an audio crutch, useful even for instrumentalists with no singing involved).
+
+This is closer to a config flag on today's flow than a new grading mechanism — the
+existing mic-capture/scoring pipeline is unchanged; only the prompt step changes from
+"play audio, optionally also reveal the staff" to "show the staff, don't play audio."
+It likely needs its own toggle rather than reusing `showTestNotes` as-is, since that
+setting today means "reveal the answer in addition to the audio," not "replace the
+audio with the visual" — the two could still compose (e.g. `showTestNotes` off would
+mean nothing is shown at all in this mode, which may not make sense as a combination
+worth allowing). The singing use case also depends on "Voice as an instrument" above;
+the staff-reading use case works today with any existing instrument, no new pitch
+detection required.
+
+Open questions: whether a reference pitch (root note or tonic chord) still plays as an
+anchor even though the tested note itself stays silent, since singing cold with no
+pitch reference at all is a much harder skill than sight-singing typically expects;
+and whether this becomes its own Test Type, a per-Test-Type toggle, or is scoped to
+specific test types (e.g. Random Notes and Diatonic Arpeggios, not Melody Snippets).
