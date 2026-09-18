@@ -894,7 +894,10 @@ pub const INSTRUMENTS: &[InstrumentInfo] = &[
     InstrumentInfo { name: "Transposed Guitar", semitones: 12, range_start: 52, range_end: 64, grace_frames: 5, octave_correction: true,  pitch_tolerance_cents: 50.0 },
     InstrumentInfo { name: "Soprano Sax",       semitones:  2, range_start: 58, range_end: 70, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0 },
     InstrumentInfo { name: "Alto Sax",          semitones:  9, range_start: 51, range_end: 63, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0 },
-    InstrumentInfo { name: "Tenor Sax",         semitones:  2, range_start: 46, range_end: 58, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0 },
+    // +14 (a major ninth), not +2: real tenor sax notation is written an octave above
+    // Soprano Sax/Trumpet/Clarinet's plain major-second Bb transposition, since tenor
+    // sits a physical octave lower and would otherwise sit deep in ledger lines.
+    InstrumentInfo { name: "Tenor Sax",         semitones: 14, range_start: 46, range_end: 58, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0 },
     InstrumentInfo { name: "Trumpet",           semitones:  2, range_start: 55, range_end: 67, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0 },
     InstrumentInfo { name: "Clarinet",          semitones:  2, range_start: 55, range_end: 67, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0 },
     // Voice has no mechanical stop pinning pitch to an exact value — natural vibrato
@@ -905,16 +908,19 @@ pub const INSTRUMENTS: &[InstrumentInfo] = &[
     // blown note benefits from absorbing more consecutive quiet frames before resetting.
     // Neither depends on voice type/tessitura (wobble and breathy onset are the same
     // underlying detection challenge regardless of range), so all three share them —
-    // only the default range differs, one comfortably-central octave per voice type
-    // (sounding pitch, not transposed — `semitones: 0` like Piano/Guitar, so the note
-    // shown is the note sung, which is what ear training wants). Like every other
-    // instrument's range here, each is just the Home screen's starting point — freely
+    // only the default range and transposition differ. Like every other instrument's
+    // range here, each range is just the Home screen's starting point — freely
     // adjustable via the range picker, not an enforced limit. Named "___ Voice" (not
     // bare "Soprano"/"Alto"/"Tenor") to stay unambiguous next to "Soprano Sax" etc.
     // above in the same dropdown.
+    // Soprano/Alto Voice show sounding pitch (semitones: 0, like Piano/Guitar) — the
+    // note shown is the note sung, which is what ear training wants.
     InstrumentInfo { name: "Soprano Voice",     semitones:  0, range_start: 60, range_end: 72, grace_frames: 5, octave_correction: false, pitch_tolerance_cents: 80.0 },
     InstrumentInfo { name: "Alto Voice",        semitones:  0, range_start: 55, range_end: 67, grace_frames: 5, octave_correction: false, pitch_tolerance_cents: 80.0 },
-    InstrumentInfo { name: "Tenor Voice",       semitones:  0, range_start: 48, range_end: 60, grace_frames: 5, octave_correction: false, pitch_tolerance_cents: 80.0 },
+    // Tenor Voice is +12 (an octave), not 0: real tenor vocal parts are conventionally
+    // written an octave above sounding pitch (treble clef with an implied 8vb) to avoid
+    // the excessive ledger lines below the staff a sounding-pitch tenor line would need.
+    InstrumentInfo { name: "Tenor Voice",       semitones: 12, range_start: 48, range_end: 60, grace_frames: 5, octave_correction: false, pitch_tolerance_cents: 80.0 },
 ];
 
 /// Convert a concert MIDI number to the written/display MIDI for a given instrument.

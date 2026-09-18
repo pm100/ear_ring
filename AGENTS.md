@@ -938,9 +938,12 @@ note-name/Hz readout, only the staff and pitch meter — see its own section abo
 | Transposed Guitar  | +12       | Octave-transposing; written C4 = concert C3 |
 | Soprano Sax        | +2        | Bb instrument |
 | Alto Sax           | +9        | Eb instrument |
-| Tenor Sax          | +2        | Detect A4/440Hz → display B4 |
+| Tenor Sax          | +14       | Bb instrument, octave-displaced; written a major 9th above concert, not just a major 2nd, since tenor sits a physical octave below soprano/trumpet/clarinet |
 | Trumpet            | +2        | Bb instrument |
 | Clarinet           | +2        | Bb instrument |
+| Soprano Voice      | 0         | Sounding pitch — the note shown is the note sung |
+| Alto Voice         | 0         | Sounding pitch — the note shown is the note sung |
+| Tenor Voice        | +12       | Octave-transposing; real tenor vocal parts are conventionally written an octave above sounding pitch (treble clef with implied 8vb) to avoid ledger lines below the staff |
 
 The instrument index (0 = Piano) is persisted across restarts on all platforms.
 
