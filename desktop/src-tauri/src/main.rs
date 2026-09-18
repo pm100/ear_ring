@@ -40,15 +40,17 @@ fn cmd_tracker_apply_instrument(state: State<TrackerState>, instrument_index: us
 }
 
 /// Directly set the previously-hidden detection params (grace frames, octave
-/// correction, YIN threshold) that `apply_instrument`'s INSTRUMENTS table doesn't
-/// cover (YIN threshold) or that the user has manually overridden (grace frames,
-/// octave correction) via the Mic Setup Advanced controls.
+/// correction, YIN threshold, pitch tolerance) that `apply_instrument`'s INSTRUMENTS
+/// table doesn't cover (YIN threshold) or that the user has manually overridden
+/// (grace frames, octave correction, pitch tolerance) via the Mic Setup Advanced
+/// controls.
 #[tauri::command]
-fn cmd_tracker_set_advanced_params(state: State<TrackerState>, grace_frames: u32, octave_correction: bool, yin_threshold: f32) {
+fn cmd_tracker_set_advanced_params(state: State<TrackerState>, grace_frames: u32, octave_correction: bool, yin_threshold: f32, pitch_tolerance_cents: f32) {
     let mut tracker = state.0.lock().unwrap();
     tracker.grace_frames = grace_frames;
     tracker.octave_correction = octave_correction;
     tracker.yin_threshold = yin_threshold;
+    tracker.pitch_tolerance_cents = pitch_tolerance_cents;
 }
 
 /// Process one audio buffer.

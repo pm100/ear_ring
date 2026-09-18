@@ -327,10 +327,10 @@ struct EarRingCore {
         }
 
         /// Directly set the previously-hidden detection params (grace frames, octave
-        /// correction, YIN threshold) — mirrors Android's trackerSetAdvancedParams and
-        /// desktop's cmd_tracker_set_advanced_params.
-        func setAdvancedParams(graceFrames: Int, octaveCorrection: Bool, yinThreshold: Float) {
-            ear_ring_tracker_set_advanced_params(handle, UInt32(graceFrames), octaveCorrection ? 1 : 0, yinThreshold)
+        /// correction, YIN threshold, pitch tolerance) — mirrors Android's
+        /// trackerSetAdvancedParams and desktop's cmd_tracker_set_advanced_params.
+        func setAdvancedParams(graceFrames: Int, octaveCorrection: Bool, yinThreshold: Float, pitchToleranceCents: Float) {
+            ear_ring_tracker_set_advanced_params(handle, UInt32(graceFrames), octaveCorrection ? 1 : 0, yinThreshold, pitchToleranceCents)
         }
 
         func process(samples: [Float], sampleRate: UInt32) -> TrackerFrame {

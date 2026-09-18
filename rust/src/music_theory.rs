@@ -121,17 +121,26 @@ pub fn midi_to_freq(midi: u8) -> f32 {
     440.0 * 2.0_f32.powf((midi as f32 - 69.0) / 12.0)
 }
 
-/// Convert frequency to the nearest note and the deviation in cents.
-/// Returns `None` if the frequency is outside the audible/MIDI range.
-pub fn freq_to_note(hz: f32) -> Option<(Note, i32)> {
+/// Convert frequency to a fractional MIDI number (A4 = 440 Hz = 69.0), not rounded
+/// to a note. Returns `None` if `hz` is silent/negative or outside the MIDI range.
+/// Shared by `freq_to_note` and the pitch tracker's cents-based hysteresis band
+/// (`PitchTracker`'s `pitch_tolerance_cents`), which needs cents-distance to an
+/// arbitrary reference MIDI note rather than to the nearest one.
+pub fn hz_to_midi_f32(hz: f32) -> Option<f32> {
     if hz <= 0.0 {
         return None;
     }
-    // MIDI float
     let midi_f = 69.0 + 12.0 * (hz / 440.0).log2();
     if !(0.0..=127.0).contains(&midi_f) {
         return None;
     }
+    Some(midi_f)
+}
+
+/// Convert frequency to the nearest note and the deviation in cents.
+/// Returns `None` if the frequency is outside the audible/MIDI range.
+pub fn freq_to_note(hz: f32) -> Option<(Note, i32)> {
+    let midi_f = hz_to_midi_f32(hz)?;
     let midi = midi_f.round() as u8;
     let cents = ((midi_f - midi as f32) * 100.0).round() as i32;
     Some((Note::from_midi(midi), cents))
@@ -870,17 +879,42 @@ pub struct InstrumentInfo {
     /// When true, detections exactly ±12 semitones from the current stable note are absorbed
     /// rather than resetting stability. Prevents octave-harmonic glitches on guitar.
     pub octave_correction: bool,
+    /// Cents-of-drift tolerance for `PitchTracker`'s stability check — see
+    /// `PitchTracker::pitch_tolerance_cents` for the full explanation. 50.0 (the
+    /// default for every mechanically-quantized instrument below) reproduces the
+    /// original exact-semitone-match behavior. Only instruments with no mechanical
+    /// stop pinning the pitch to a fixed value (voice, and eventually trombone/
+    /// fretless strings) need a wider value to tolerate natural vibrato/wobble.
+    pub pitch_tolerance_cents: f32,
 }
 
 pub const INSTRUMENTS: &[InstrumentInfo] = &[
-    InstrumentInfo { name: "Piano",             semitones:  0, range_start: 60, range_end: 72, grace_frames: 3, octave_correction: false },
-    InstrumentInfo { name: "Guitar",            semitones:  0, range_start: 52, range_end: 64, grace_frames: 5, octave_correction: true  },
-    InstrumentInfo { name: "Transposed Guitar", semitones: 12, range_start: 52, range_end: 64, grace_frames: 5, octave_correction: true  },
-    InstrumentInfo { name: "Soprano Sax",       semitones:  2, range_start: 58, range_end: 70, grace_frames: 3, octave_correction: false },
-    InstrumentInfo { name: "Alto Sax",          semitones:  9, range_start: 51, range_end: 63, grace_frames: 3, octave_correction: false },
-    InstrumentInfo { name: "Tenor Sax",         semitones:  2, range_start: 46, range_end: 58, grace_frames: 3, octave_correction: false },
-    InstrumentInfo { name: "Trumpet",           semitones:  2, range_start: 55, range_end: 67, grace_frames: 3, octave_correction: false },
-    InstrumentInfo { name: "Clarinet",          semitones:  2, range_start: 55, range_end: 67, grace_frames: 3, octave_correction: false },
+    InstrumentInfo { name: "Piano",             semitones:  0, range_start: 60, range_end: 72, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0 },
+    InstrumentInfo { name: "Guitar",            semitones:  0, range_start: 52, range_end: 64, grace_frames: 5, octave_correction: true,  pitch_tolerance_cents: 50.0 },
+    InstrumentInfo { name: "Transposed Guitar", semitones: 12, range_start: 52, range_end: 64, grace_frames: 5, octave_correction: true,  pitch_tolerance_cents: 50.0 },
+    InstrumentInfo { name: "Soprano Sax",       semitones:  2, range_start: 58, range_end: 70, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0 },
+    InstrumentInfo { name: "Alto Sax",          semitones:  9, range_start: 51, range_end: 63, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0 },
+    InstrumentInfo { name: "Tenor Sax",         semitones:  2, range_start: 46, range_end: 58, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0 },
+    InstrumentInfo { name: "Trumpet",           semitones:  2, range_start: 55, range_end: 67, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0 },
+    InstrumentInfo { name: "Clarinet",          semitones:  2, range_start: 55, range_end: 67, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0 },
+    // Voice has no mechanical stop pinning pitch to an exact value — natural vibrato
+    // (~±30-100 cents, see roadmap.md) routinely crosses a semitone boundary frame-to-
+    // frame. 80 cents tolerates typical vibrato swing while still being narrower than
+    // the 100-cent gap to a genuinely different adjacent semitone, and grace_frames=5
+    // matches Guitar's rationale: a slower, breathier attack/sustain than a struck or
+    // blown note benefits from absorbing more consecutive quiet frames before resetting.
+    // Neither depends on voice type/tessitura (wobble and breathy onset are the same
+    // underlying detection challenge regardless of range), so all three share them —
+    // only the default range differs, one comfortably-central octave per voice type
+    // (sounding pitch, not transposed — `semitones: 0` like Piano/Guitar, so the note
+    // shown is the note sung, which is what ear training wants). Like every other
+    // instrument's range here, each is just the Home screen's starting point — freely
+    // adjustable via the range picker, not an enforced limit. Named "___ Voice" (not
+    // bare "Soprano"/"Alto"/"Tenor") to stay unambiguous next to "Soprano Sax" etc.
+    // above in the same dropdown.
+    InstrumentInfo { name: "Soprano Voice",     semitones:  0, range_start: 60, range_end: 72, grace_frames: 5, octave_correction: false, pitch_tolerance_cents: 80.0 },
+    InstrumentInfo { name: "Alto Voice",        semitones:  0, range_start: 55, range_end: 67, grace_frames: 5, octave_correction: false, pitch_tolerance_cents: 80.0 },
+    InstrumentInfo { name: "Tenor Voice",       semitones:  0, range_start: 48, range_end: 60, grace_frames: 5, octave_correction: false, pitch_tolerance_cents: 80.0 },
 ];
 
 /// Convert a concert MIDI number to the written/display MIDI for a given instrument.

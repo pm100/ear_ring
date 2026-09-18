@@ -303,14 +303,15 @@ void ear_ring_tracker_set_params(EarRingTracker *tracker, float silence_threshol
 void ear_ring_tracker_apply_instrument(EarRingTracker *tracker, int32_t instrument_index);
 
 /// Directly set the previously-hidden detection params (grace frames, octave correction,
-/// YIN threshold) that ear_ring_tracker_apply_instrument's INSTRUMENTS table doesn't cover
-/// (YIN threshold) or that the user has manually overridden (grace frames, octave
-/// correction) via the Mic Setup Advanced controls. octave_correction is 0/1, matching
-/// this header's existing bool-as-int32_t convention.
+/// YIN threshold, pitch tolerance) that ear_ring_tracker_apply_instrument's INSTRUMENTS
+/// table doesn't cover (YIN threshold) or that the user has manually overridden (grace
+/// frames, octave correction, pitch tolerance) via the Mic Setup Advanced controls.
+/// octave_correction is 0/1, matching this header's existing bool-as-int32_t convention.
 void ear_ring_tracker_set_advanced_params(EarRingTracker *tracker,
                                           uint32_t grace_frames,
                                           int32_t octave_correction,
-                                          float yin_threshold);
+                                          float yin_threshold,
+                                          float pitch_tolerance_cents);
 
 /// Process one audio buffer.
 /// Writes the detected frequency (0.0 if silent) into *out_live_hz.

@@ -2,6 +2,8 @@ package com.jollygoodsw.earring.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,11 +17,12 @@ import com.jollygoodsw.earring.ui.components.MusicStaff
 import com.jollygoodsw.earring.ui.components.NoteState
 import com.jollygoodsw.earring.ui.components.PitchMeter
 import com.jollygoodsw.earring.ui.components.StaffNote
+import com.jollygoodsw.earring.ui.components.TunerMeter
 import kotlin.math.roundToInt
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, rootChroma: Int = 0, concertKeyChroma: Int = 0, keySignatureMode: Int = 0, silenceThreshold: Float = 0.003f, framesToConfirm: Int = 3, warmupFrames: Int = 4, instrumentIndex: Int = 0, graceFrames: Int = 3, octaveCorrection: Boolean = false, yinThreshold: Float = 0.15f) {
+fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, rootChroma: Int = 0, concertKeyChroma: Int = 0, keySignatureMode: Int = 0, silenceThreshold: Float = 0.003f, framesToConfirm: Int = 3, warmupFrames: Int = 4, instrumentIndex: Int = 0, graceFrames: Int = 3, octaveCorrection: Boolean = false, yinThreshold: Float = 0.15f, pitchToleranceCents: Float = 50f, useTunerMeter: Boolean = false) {
     val noteStepDp = 44.dp
     var advancedOpen by remember { mutableStateOf(false) }
     // Mic Setup exists to test what the mic can hear, independent of whatever
@@ -30,6 +33,8 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
     val midiMax = 127
     val maxHistory = 8
 
+    // Only needed for the classic PitchMeter (confirm-gated); TunerMeter reads liveHz
+    // directly instead.
     var concertMidi by remember { mutableIntStateOf(-1) }
     val concertHistory = remember { mutableStateListOf<Int>() }
 
@@ -45,6 +50,7 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
         graceFrames = graceFrames,
         octaveCorrection = octaveCorrection,
         yinThreshold = yinThreshold,
+        pitchToleranceCents = pitchToleranceCents,
         onConfirmed = { midi, _ ->
             concertMidi = midi
             if (midi in rangeStart..rangeEnd) {
@@ -54,7 +60,7 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
         }
     )
 
-    // Clear display when silence detected
+    // Clear the classic meter's display when silence detected.
     if (liveHz <= 0f) concertMidi = -1
 
     // Apply instrument transposition for display
@@ -65,6 +71,7 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -109,21 +116,36 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
         )
         Spacer(Modifier.height(12.dp))
 
-        // The pitch meter is the only detected-note readout below the staff — the
-        // large note-name/Hz text that used to sit here was removed to make room
-        // for the always-visible Pitch Detection controls, without this screen
-        // needing to scroll.
-        PitchMeter(detectedMidi = concertMidi, detectedHz = liveHz, instrumentIndex = instrumentIndex, rootChroma = concertKeyChroma)
+        // Display style: Tuner needle (TunerMeter) or the classic note-name circle
+        // (PitchMeter) — defaults per-instrument (see ExerciseViewModel.setInstrumentIndex)
+        // but user-overridable here, since it's a display preference rather than a
+        // detection-tuning parameter, so it sits inline rather than in Advanced.
+        SectionLabel("Display", tooltipKey = "meter_display")
+        ChipRow(
+            items = listOf("Tuner", "Classic"),
+            selected = if (useTunerMeter) 0 else 1,
+            onSelect = { viewModel.setUseTunerMeter(it == 0) }
+        )
+        Spacer(Modifier.height(8.dp))
+
+        // The meter is the only detected-note readout below the staff — the large
+        // note-name/Hz text that used to sit here was removed to make room for the
+        // always-visible Pitch Detection controls, without this screen needing to
+        // scroll. TunerMeter reads liveHz directly (not gated on note confirmation) so
+        // it behaves like a real tuner — see TunerMeter's doc.
+        if (useTunerMeter) {
+            TunerMeter(hz = liveHz, instrumentIndex = instrumentIndex, rootChroma = concertKeyChroma)
+        } else {
+            PitchMeter(detectedMidi = concertMidi, detectedHz = liveHz, instrumentIndex = instrumentIndex, rootChroma = concertKeyChroma)
+        }
         Spacer(Modifier.height(16.dp))
 
-        // Pitch Detection controls live here rather than in Settings — this screen
-        // already gives live feedback on what the mic hears, so sensitivity/stability
-        // adjustments can be tuned by ear against that feedback instead of blind.
-        // Always visible (no heading, no collapse) since this is the screen's
-        // primary purpose.
-        val stabilityOptions = listOf(2, 3, 4, 5)
-        val warmupOptions = listOf(0, 1, 2, 3, 4, 5, 6)
-
+        // Mic Sensitivity lives here rather than in Settings — this screen already
+        // gives live feedback on what the mic hears, so it can be tuned by ear against
+        // that feedback instead of blind. Always visible (no heading, no collapse)
+        // since this is the screen's primary purpose. Note Stability and Mic Warmup
+        // Frames moved into Advanced alongside the other detection-tuning controls —
+        // Mic Sensitivity is the only one most people ever need to touch.
         SectionLabel("Mic Sensitivity", tooltipKey = "mic_sensitivity")
         val sensitivity = ((0.011f - silenceThreshold) / 0.001f).roundToInt().coerceIn(1, 10)
         Text("${sensitivity} / 10",
@@ -135,22 +157,6 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
             valueRange = 1f..10f,
             steps = 8,
             modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(Modifier.height(8.dp))
-        SectionLabel("Note Stability (frames to confirm)", tooltipKey = "note_stability")
-        ChipRow(
-            items = stabilityOptions.map { it.toString() },
-            selected = stabilityOptions.indexOf(framesToConfirm).coerceAtLeast(0),
-            onSelect = { viewModel.setFramesToConfirm(stabilityOptions[it]) }
-        )
-
-        Spacer(Modifier.height(8.dp))
-        SectionLabel("Mic Warmup Frames", tooltipKey = "mic_warmup_frames")
-        ChipRow(
-            items = warmupOptions.map { it.toString() },
-            selected = warmupOptions.indexOf(warmupFrames).coerceAtLeast(0),
-            onSelect = { viewModel.setWarmupFrames(warmupOptions[it]) }
         )
 
         Spacer(Modifier.height(8.dp))
@@ -167,6 +173,7 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp, vertical = 8.dp)
                     .padding(bottom = 24.dp)
             ) {
@@ -176,7 +183,26 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(16.dp))
+            val stabilityOptions = listOf(2, 3, 4, 5)
+            val warmupOptions = listOf(0, 1, 2, 3, 4, 5, 6)
             val graceFramesOptions = listOf(0, 1, 2, 3, 4, 5, 6)
+
+            SectionLabel("Note Stability (frames to confirm)", tooltipKey = "note_stability")
+            ChipRow(
+                items = stabilityOptions.map { it.toString() },
+                selected = stabilityOptions.indexOf(framesToConfirm).coerceAtLeast(0),
+                onSelect = { viewModel.setFramesToConfirm(stabilityOptions[it]) }
+            )
+
+            Spacer(Modifier.height(8.dp))
+            SectionLabel("Mic Warmup Frames", tooltipKey = "mic_warmup_frames")
+            ChipRow(
+                items = warmupOptions.map { it.toString() },
+                selected = warmupOptions.indexOf(warmupFrames).coerceAtLeast(0),
+                onSelect = { viewModel.setWarmupFrames(warmupOptions[it]) }
+            )
+
+            Spacer(Modifier.height(8.dp))
             SectionLabel("Grace Frames", tooltipKey = "grace_frames")
             ChipRow(
                 items = graceFramesOptions.map { it.toString() },
@@ -202,6 +228,19 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
                 onValueChange = { viewModel.setYinThreshold(it.coerceIn(0.05f, 0.30f)) },
                 valueRange = 0.05f..0.30f,
                 steps = 24,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(8.dp))
+            SectionLabel("Pitch Tolerance (cents)", tooltipKey = "pitch_tolerance_cents")
+            Text("%.0f".format(pitchToleranceCents),
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 4.dp))
+            Slider(
+                value = pitchToleranceCents,
+                onValueChange = { viewModel.setPitchToleranceCents(it.coerceIn(50f, 150f)) },
+                valueRange = 50f..150f,
+                steps = 19,
                 modifier = Modifier.fillMaxWidth()
             )
             }

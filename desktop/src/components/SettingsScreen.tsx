@@ -41,7 +41,7 @@ function CollapsibleSection({ title, children }: { title: string; children: Reac
   );
 }
 
-interface InstrumentInfo { id: number; name: string; semitones: number; rangeStart: number; rangeEnd: number; }
+interface InstrumentInfo { id: number; name: string; semitones: number; rangeStart: number; rangeEnd: number; graceFrames: number; octaveCorrection: boolean; pitchToleranceCents: number; }
 
 function defaultRangeForKey(rootNote: number): [number, number] {
   let best = 60 + rootNote;
@@ -60,7 +60,7 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
   useEffect(() => {
     invoke<string>('cmd_instrument_list')
       .then(json => setInstruments(JSON.parse(json) as InstrumentInfo[]))
-      .catch(() => setInstruments([{ id: 0, name: 'Piano', semitones: 0, rangeStart: 60, rangeEnd: 72 }]));
+      .catch(() => setInstruments([{ id: 0, name: 'Piano', semitones: 0, rangeStart: 60, rangeEnd: 72, graceFrames: 3, octaveCorrection: false, pitchToleranceCents: 50 }]));
   }, []);
 
   const [gitHash, setGitHash] = useState('unknown');
@@ -84,8 +84,20 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
             const idx = parseInt(e.target.value);
             const inst = instruments[idx];
             onUpdateSettings(prev => {
-              const [rangeStart, rangeEnd] = defaultRangeForKey(prev.rootNote);
-              return { ...prev, instrumentIndex: idx, rangeStart, rangeEnd };
+              const [rangeStart, rangeEnd] = inst ? [inst.rangeStart, inst.rangeEnd] : defaultRangeForKey(prev.rootNote);
+              // Snap grace/octave/tolerance to the new instrument's own table values too —
+              // otherwise these Advanced overrides stay stuck at whatever the previous
+              // instrument left them at (e.g. selecting a Voice instrument would silently
+              // keep Piano's strict 50-cent pitch tolerance instead of picking up Voice's
+              // wider 80, defeating the vibrato-tolerance feature entirely).
+              const graceFrames = inst ? inst.graceFrames : prev.graceFrames;
+              const octaveCorrection = inst ? inst.octaveCorrection : prev.octaveCorrection;
+              const pitchToleranceCents = inst ? inst.pitchToleranceCents : prev.pitchToleranceCents;
+              // Tuner-meter default reuses the same pitchToleranceCents > 50 signal that
+              // already marks an instrument as lacking a mechanical pitch stop — no
+              // separate "continuous pitch" flag needed on the Rust side.
+              const useTunerMeter = inst ? inst.pitchToleranceCents > 50 : prev.useTunerMeter;
+              return { ...prev, instrumentIndex: idx, rangeStart, rangeEnd, graceFrames, octaveCorrection, pitchToleranceCents, useTunerMeter };
             });
           }}
           style={{ width: '100%', padding: '8px 12px', fontSize: 14, borderRadius: 4, border: '1px solid #bdbdbd', marginBottom: 4 }}

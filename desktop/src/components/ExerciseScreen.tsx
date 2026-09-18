@@ -141,10 +141,11 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         graceFrames: exercise.graceFrames,
         octaveCorrection: exercise.octaveCorrection,
         yinThreshold: exercise.yinThreshold,
+        pitchToleranceCents: exercise.pitchToleranceCents,
       });
     })();
     return () => { cancelled = true; };
-  }, [exercise.instrumentIndex, exercise.graceFrames, exercise.octaveCorrection, exercise.yinThreshold]);
+  }, [exercise.instrumentIndex, exercise.graceFrames, exercise.octaveCorrection, exercise.yinThreshold, exercise.pitchToleranceCents]);
   const transpMidi = (midi: number) => Math.max(0, Math.min(127, midi + transpSemitones));
 
   const schedule = useCallback((callback: () => void, ms: number) => {

@@ -136,6 +136,13 @@ html, body, #root {
   border-color: var(--primary);
 }
 
+/* .chip:hover's `color` would otherwise win on specificity (0,2,0 beats 0,1,0),
+   turning a selected chip's label the same blue as its own background — invisible —
+   the moment the cursor sits over it. */
+.chip-selected:hover {
+  color: white;
+}
+
 /* Buttons */
 .btn {
   border-radius: 8px;

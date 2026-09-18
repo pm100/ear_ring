@@ -10,22 +10,23 @@ struct SetupView: View {
     @State private var transpSemitones: Int = 0
     @State private var advancedOpen = false
 
-    // Pitch Detection lives here rather than in Settings — this screen already
-    // gives live feedback on what the mic hears, so sensitivity/stability
-    // adjustments can be tuned by ear against that feedback instead of blind.
-    // Always visible (no heading, no collapse) since this is the screen's
-    // primary purpose.
+    // Mic Sensitivity lives here rather than in Settings — this screen already
+    // gives live feedback on what the mic hears, so it can be tuned by ear against
+    // that feedback instead of blind. Always visible (no heading, no collapse)
+    // since this is the screen's primary purpose.
+    // Note Stability, Mic Warmup Frames, Grace Frames, Octave Correction, YIN
+    // Threshold, and Pitch Tolerance are all optional/advanced — they open from an
+    // Advanced button rather than sitting inline, mirroring Android's modal bottom
+    // sheet and desktop's collapsible section (see AGENTS.md's Mic Setup spec).
     private let stabilityOptions = [2, 3, 4, 5]
     private let warmupOptions = [0, 1, 2, 3, 4, 5, 6]
-    // Grace Frames, Octave Correction, and YIN Threshold are optional/advanced —
-    // unlike the 3 above, they open from an Advanced button rather than sitting
-    // inline, mirroring Android's modal bottom sheet and desktop's collapsible
-    // section (see AGENTS.md's Mic Setup spec).
     private let graceFramesOptions = [0, 1, 2, 3, 4, 5, 6]
 
     private var isIPad: Bool { hsc == .regular }
     private var staffHeight: CGFloat { isIPad ? 220 : 130 }
-    private var meterSize: CGFloat { isIPad ? 130 : 80 }
+    private var meterWidth: CGFloat { isIPad ? 300 : 200 }
+    private var meterHeight: CGFloat { isIPad ? 165 : 110 }
+    private var classicMeterSize: CGFloat { isIPad ? 130 : 80 }
 
     private var displayHistory: [Int] {
         concertHistory.map { min(127, max(0, $0 + transpSemitones)) }
@@ -77,20 +78,43 @@ struct SetupView: View {
             )
             .frame(height: staffHeight)
 
-            // ── Pitch meter ───────────────────────────────────────────────
+            // ── Display style ────────────────────────────────────────────
+            // Tuner needle (TunerMeterView) or the classic note-name circle
+            // (PitchMeterView) — defaults per-instrument (see instrumentIndex's
+            // didSet in ExerciseModel) but user-overridable here, since it's a
+            // display preference rather than a detection-tuning parameter, so it
+            // sits inline rather than in Advanced.
+            Spacer().frame(height: 10)
+            sectionLabel("Display", tooltipKey: "meter_display")
+            chipGrid(options: ["Tuner", "Classic"], selected: model.useTunerMeter ? 0 : 1, count: 2) { idx in
+                model.useTunerMeter = idx == 0
+            }
+
+            // ── Meter ─────────────────────────────────────────────────────
             // The only detected-note readout below the staff — the large
             // note-name/Hz text that used to sit here was removed to make room
             // for the always-visible Pitch Detection controls, without this
-            // screen needing to scroll.
+            // screen needing to scroll. TunerMeterView reads the model's live
+            // midi/cents directly (not gated on note confirmation) so it behaves
+            // like a real tuner — see TunerMeterView's doc.
             Spacer().frame(height: 10)
             HStack {
                 Spacer()
-                PitchMeterView(
-                    midi: model.liveMidi, isActive: model.isCapturing,
-                    instrumentIndex: model.instrumentIndex,
-                    rootChroma: EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId)
-                )
-                .frame(width: meterSize, height: meterSize)
+                if model.useTunerMeter {
+                    TunerMeterView(
+                        midi: model.liveMidi, cents: model.liveCents,
+                        instrumentIndex: model.instrumentIndex,
+                        rootChroma: EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId),
+                        width: meterWidth, height: meterHeight
+                    )
+                } else {
+                    PitchMeterView(
+                        midi: model.liveMidi, isActive: model.isCapturing,
+                        instrumentIndex: model.instrumentIndex,
+                        rootChroma: EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId)
+                    )
+                    .frame(width: classicMeterSize, height: classicMeterSize)
+                }
                 Spacer()
             }
 
@@ -103,22 +127,6 @@ struct SetupView: View {
                 get: { Double(sensitivity) },
                 set: { model.silenceThreshold = Float(max(0.001, min(0.010, 0.011 - $0 * 0.001))) }
             ), in: 1...10, step: 1)
-
-            Spacer().frame(height: 6)
-            sectionLabel("Note Stability (frames to confirm)", tooltipKey: "note_stability")
-            chipGrid(options: stabilityOptions.map { "\($0)" },
-                     selected: stabilityOptions.firstIndex(of: model.framesToConfirm) ?? 0,
-                     count: stabilityOptions.count) { idx in
-                model.framesToConfirm = stabilityOptions[idx]
-            }
-
-            Spacer().frame(height: 6)
-            sectionLabel("Mic Warmup Frames", tooltipKey: "mic_warmup_frames")
-            chipGrid(options: warmupOptions.map { "\($0)" },
-                     selected: warmupOptions.firstIndex(of: model.warmupFrames) ?? 4,
-                     count: warmupOptions.count) { idx in
-                model.warmupFrames = warmupOptions[idx]
-            }
 
             Spacer().frame(height: 8)
             Button("Advanced") { advancedOpen = true }
@@ -176,6 +184,20 @@ struct SetupView: View {
             List {
                 Section {
                     VStack(alignment: .leading, spacing: 16) {
+                        sectionLabel("Note Stability (frames to confirm)", tooltipKey: "note_stability")
+                        chipGrid(options: stabilityOptions.map { "\($0)" },
+                                 selected: stabilityOptions.firstIndex(of: model.framesToConfirm) ?? 0,
+                                 count: stabilityOptions.count) { idx in
+                            model.framesToConfirm = stabilityOptions[idx]
+                        }
+
+                        sectionLabel("Mic Warmup Frames", tooltipKey: "mic_warmup_frames")
+                        chipGrid(options: warmupOptions.map { "\($0)" },
+                                 selected: warmupOptions.firstIndex(of: model.warmupFrames) ?? 4,
+                                 count: warmupOptions.count) { idx in
+                            model.warmupFrames = warmupOptions[idx]
+                        }
+
                         sectionLabel("Grace Frames", tooltipKey: "grace_frames")
                         chipGrid(options: graceFramesOptions.map { "\($0)" },
                                  selected: graceFramesOptions.firstIndex(of: model.graceFrames) ?? 3,
@@ -201,6 +223,16 @@ struct SetupView: View {
                                 get: { Double(model.yinThreshold) },
                                 set: { model.yinThreshold = Float(max(0.05, min(0.30, $0))) }
                             ), in: 0.05...0.30, step: 0.01)
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            sectionLabel("Pitch Tolerance (cents)", tooltipKey: "pitch_tolerance_cents")
+                            Text(String(format: "%.0f", model.pitchToleranceCents))
+                                .font(.caption).foregroundColor(.erCaption)
+                            Slider(value: Binding(
+                                get: { Double(model.pitchToleranceCents) },
+                                set: { model.pitchToleranceCents = Float(max(50, min(150, $0))) }
+                            ), in: 50...150, step: 5)
                         }
                     }
                     .padding(.vertical, 6)

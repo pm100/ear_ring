@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 
 
 data class DetectedNote(val midi: Int, val cents: Int, val correct: Boolean)
@@ -42,6 +43,11 @@ data class ExerciseState(
     val octaveCorrection: Boolean = DEFAULT_OCTAVE_CORRECTION,
     /** Previously hidden global constant (DEFAULT_YIN_THRESHOLD in pitch_detection.rs). */
     val yinThreshold: Float = DEFAULT_YIN_THRESHOLD,
+    /** Previously hidden per-instrument constant (pitch_tolerance_cents in the Rust INSTRUMENTS table). */
+    val pitchToleranceCents: Float = DEFAULT_PITCH_TOLERANCE_CENTS,
+    /** Mic Setup meter style: true = tuner-style needle meter, false = classic note-name
+     *  circle. Defaults per-instrument (see [setInstrumentIndex]) but user-overridable. */
+    val useTunerMeter: Boolean = DEFAULT_USE_TUNER_METER,
     val postChordGapMs: Long = DEFAULT_POST_CHORD_GAP_MS,
     val wrongNotePauseMs: Long = DEFAULT_WRONG_NOTE_PAUSE_MS,
     val instrumentIndex: Int = 0,
@@ -99,6 +105,8 @@ private const val DEFAULT_WARMUP_FRAMES = 4
 private const val DEFAULT_GRACE_FRAMES = 3          // Piano's INSTRUMENTS-table value
 private const val DEFAULT_OCTAVE_CORRECTION = false // Piano's INSTRUMENTS-table value
 private const val DEFAULT_YIN_THRESHOLD = 0.15f
+private const val DEFAULT_PITCH_TOLERANCE_CENTS = 50f // Piano's INSTRUMENTS-table value
+private const val DEFAULT_USE_TUNER_METER = false      // Piano's implied default (fixed-pitch)
 private const val DEFAULT_POST_CHORD_GAP_MS = 800L
 private const val DEFAULT_WRONG_NOTE_PAUSE_MS = 3000L
 // Gap between the last note of the sequence ending and mic start.
@@ -125,6 +133,8 @@ private const val PREF_WARMUP_FRAMES = "warmupFrames"
 private const val PREF_GRACE_FRAMES = "graceFrames"
 private const val PREF_OCTAVE_CORRECTION = "octaveCorrection"
 private const val PREF_YIN_THRESHOLD = "yinThreshold"
+private const val PREF_PITCH_TOLERANCE_CENTS = "pitchToleranceCents"
+private const val PREF_USE_TUNER_METER = "useTunerMeter"
 private const val PREF_POST_CHORD_GAP_MS = "postChordGapMs"
 private const val PREF_WRONG_NOTE_PAUSE_MS = "wrongNotePauseMs"
 private const val PREF_INSTRUMENT_INDEX = "instrumentIndex"
@@ -176,6 +186,8 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             graceFrames = prefs.getInt(PREF_GRACE_FRAMES, DEFAULT_GRACE_FRAMES),
             octaveCorrection = prefs.getBoolean(PREF_OCTAVE_CORRECTION, DEFAULT_OCTAVE_CORRECTION),
             yinThreshold = prefs.getFloat(PREF_YIN_THRESHOLD, DEFAULT_YIN_THRESHOLD),
+            pitchToleranceCents = prefs.getFloat(PREF_PITCH_TOLERANCE_CENTS, DEFAULT_PITCH_TOLERANCE_CENTS),
+            useTunerMeter = prefs.getBoolean(PREF_USE_TUNER_METER, DEFAULT_USE_TUNER_METER),
             postChordGapMs = prefs.getLong(PREF_POST_CHORD_GAP_MS, DEFAULT_POST_CHORD_GAP_MS),
             wrongNotePauseMs = prefs.getLong(PREF_WRONG_NOTE_PAUSE_MS, DEFAULT_WRONG_NOTE_PAUSE_MS),
             instrumentIndex = prefs.getInt(PREF_INSTRUMENT_INDEX, 0),
@@ -204,6 +216,8 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putInt(PREF_GRACE_FRAMES, state.graceFrames)
             .putBoolean(PREF_OCTAVE_CORRECTION, state.octaveCorrection)
             .putFloat(PREF_YIN_THRESHOLD, state.yinThreshold)
+            .putFloat(PREF_PITCH_TOLERANCE_CENTS, state.pitchToleranceCents)
+            .putBoolean(PREF_USE_TUNER_METER, state.useTunerMeter)
             .putLong(PREF_POST_CHORD_GAP_MS, state.postChordGapMs)
             .putLong(PREF_WRONG_NOTE_PAUSE_MS, state.wrongNotePauseMs)
             .putInt(PREF_INSTRUMENT_INDEX, state.instrumentIndex)
@@ -236,6 +250,8 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             .putInt(PREF_GRACE_FRAMES, defaults.graceFrames)
             .putBoolean(PREF_OCTAVE_CORRECTION, defaults.octaveCorrection)
             .putFloat(PREF_YIN_THRESHOLD, defaults.yinThreshold)
+            .putFloat(PREF_PITCH_TOLERANCE_CENTS, defaults.pitchToleranceCents)
+            .putBoolean(PREF_USE_TUNER_METER, defaults.useTunerMeter)
             .putLong(PREF_POST_CHORD_GAP_MS, defaults.postChordGapMs)
             .putLong(PREF_WRONG_NOTE_PAUSE_MS, defaults.wrongNotePauseMs)
             .putInt(PREF_INSTRUMENT_INDEX, defaults.instrumentIndex)
@@ -286,11 +302,32 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     fun setGraceFrames(n: Int) { _state.value = _state.value.copy(graceFrames = n); saveSettings(_state.value) }
     fun setOctaveCorrection(v: Boolean) { _state.value = _state.value.copy(octaveCorrection = v); saveSettings(_state.value) }
     fun setYinThreshold(v: Float) { _state.value = _state.value.copy(yinThreshold = v); saveSettings(_state.value) }
+    fun setPitchToleranceCents(v: Float) { _state.value = _state.value.copy(pitchToleranceCents = v); saveSettings(_state.value) }
+    fun setUseTunerMeter(v: Boolean) { _state.value = _state.value.copy(useTunerMeter = v); saveSettings(_state.value) }
     fun setPostChordGapMs(ms: Long) { _state.value = _state.value.copy(postChordGapMs = ms); saveSettings(_state.value) }
     fun setWrongNotePauseMs(ms: Long) { _state.value = _state.value.copy(wrongNotePauseMs = ms); saveSettings(_state.value) }
     fun setInstrumentIndex(idx: Int) {
-        val (start, end) = ExerciseState.defaultRange(_state.value.rootNote)
-        _state.value = _state.value.copy(instrumentIndex = idx, rangeStart = start, rangeEnd = end)
+        val current = _state.value
+        // Snap grace/octave/tolerance/meter-style to the new instrument's own table
+        // values, same as range just below — otherwise these Advanced overrides stay
+        // stuck at whatever the previous instrument left them at (e.g. selecting a Voice
+        // instrument would silently keep Piano's strict 50-cent pitch tolerance instead
+        // of picking up Voice's wider 80, defeating the vibrato-tolerance feature
+        // entirely). Tuner-meter default reuses the same pitchToleranceCents > 50 signal
+        // that already marks an instrument as lacking a mechanical pitch stop — no
+        // separate "continuous pitch" flag needed on the Rust side.
+        val obj = try { JSONArray(EarRingCore.instrumentList()).getJSONObject(idx) } catch (_: Exception) { null }
+        val (defStart, defEnd) = ExerciseState.defaultRange(current.rootNote)
+        val tolerance = obj?.optDouble("pitchToleranceCents", current.pitchToleranceCents.toDouble())?.toFloat() ?: current.pitchToleranceCents
+        _state.value = current.copy(
+            instrumentIndex = idx,
+            rangeStart = obj?.optInt("rangeStart", defStart) ?: defStart,
+            rangeEnd = obj?.optInt("rangeEnd", defEnd) ?: defEnd,
+            graceFrames = obj?.optInt("graceFrames", current.graceFrames) ?: current.graceFrames,
+            octaveCorrection = obj?.optBoolean("octaveCorrection", current.octaveCorrection) ?: current.octaveCorrection,
+            pitchToleranceCents = tolerance,
+            useTunerMeter = if (obj != null) tolerance > 50f else current.useTunerMeter
+        )
         saveSettings(_state.value)
     }
     /** Ad-free / paid entitlement. Called once purchase state is confirmed (e.g. from

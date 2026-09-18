@@ -95,6 +95,20 @@ class ExerciseModel: ObservableObject {
             pushAdvancedParams()
         }
     }
+    /// Previously hidden per-instrument constant (pitch_tolerance_cents in the Rust
+    /// INSTRUMENTS table).
+    @Published var pitchToleranceCents: Float = ud.object(forKey: "pitchToleranceCents") != nil ? Float(ud.double(forKey: "pitchToleranceCents")) : 50 {
+        didSet {
+            UserDefaults.standard.set(Double(pitchToleranceCents), forKey: "pitchToleranceCents")
+            pushAdvancedParams()
+        }
+    }
+    /// Mic Setup meter style: true = tuner-style needle meter, false = classic
+    /// note-name circle. Defaults per-instrument (see instrumentIndex's didSet below)
+    /// but user-overridable — not pushed to the tracker, purely a display preference.
+    @Published var useTunerMeter: Bool = ud.object(forKey: "useTunerMeter") != nil ? ud.bool(forKey: "useTunerMeter") : false {
+        didSet { UserDefaults.standard.set(useTunerMeter, forKey: "useTunerMeter") }
+    }
     @Published var postChordGapNanoseconds: UInt64 = ud.object(forKey: "postChordGapNs") != nil ? UInt64(ud.integer(forKey: "postChordGapNs")) : 800_000_000 {
         didSet { UserDefaults.standard.set(Int(postChordGapNanoseconds), forKey: "postChordGapNs") }
     }
@@ -104,9 +118,23 @@ class ExerciseModel: ObservableObject {
     @Published var instrumentIndex: Int = ud.object(forKey: "instrumentIndex") != nil ? ud.integer(forKey: "instrumentIndex") : 0 {
         didSet {
             UserDefaults.standard.set(instrumentIndex, forKey: "instrumentIndex")
-            let (s, e) = ExerciseModel.defaultRange(rootNote: rootNote)
+            let (s, e) = ExerciseModel.instrumentRange(index: instrumentIndex, rootNote: rootNote)
             rangeStart = s
             rangeEnd = e
+            // Snap grace/octave/tolerance/meter-style to the new instrument's own table
+            // values — otherwise these Advanced overrides stay stuck at whatever the
+            // previous instrument left them at (e.g. selecting a Voice instrument would
+            // silently keep Piano's strict 50-cent pitch tolerance instead of picking up
+            // Voice's wider 80, defeating the vibrato-tolerance feature entirely).
+            // Tuner-meter default reuses the same pitchToleranceCents > 50 signal that
+            // already marks an instrument as lacking a mechanical pitch stop — no
+            // separate "continuous pitch" flag needed on the Rust side.
+            if let params = ExerciseModel.instrumentAdvancedParams(index: instrumentIndex) {
+                graceFrames = params.graceFrames
+                octaveCorrection = params.octaveCorrection
+                pitchToleranceCents = params.pitchToleranceCents
+                useTunerMeter = params.pitchToleranceCents > 50
+            }
         }
     }
     @Published var testType: Int = {
@@ -179,6 +207,38 @@ class ExerciseModel: ObservableObject {
         let (s, e) = EarRingCore.enforceMinRangeSpan(newStart: start, newEnd: end, oldStart: rangeStart, oldEnd: rangeEnd)
         rangeStart = s
         rangeEnd = e
+    }
+
+    /// The selected instrument's own registered range (from the Rust `INSTRUMENTS`
+    /// table, via `instrumentList()`), falling back to the generic root-based
+    /// default if the instrument list can't be parsed or `index` is out of range.
+    static func instrumentRange(index: Int, rootNote: Int) -> (Int, Int) {
+        guard let json = try? JSONSerialization.jsonObject(with: Data(EarRingCore.instrumentList().utf8)) as? [[String: Any]],
+              index >= 0, index < json.count,
+              let start = json[index]["rangeStart"] as? Int,
+              let end = json[index]["rangeEnd"] as? Int else {
+            return defaultRange(rootNote: rootNote)
+        }
+        return (start, end)
+    }
+
+    /// The selected instrument's own registered grace frames / octave correction / pitch
+    /// tolerance (from the Rust `INSTRUMENTS` table, via `instrumentList()`). Returns nil
+    /// (leave the caller's current values alone) if the instrument list can't be parsed
+    /// or `index` is out of range.
+    static func instrumentAdvancedParams(index: Int) -> (graceFrames: Int, octaveCorrection: Bool, pitchToleranceCents: Float)? {
+        guard let json = try? JSONSerialization.jsonObject(with: Data(EarRingCore.instrumentList().utf8)) as? [[String: Any]],
+              index >= 0, index < json.count,
+              let grace = json[index]["graceFrames"] as? Int,
+              let octave = json[index]["octaveCorrection"] as? Bool,
+              // NSNumber, not `as? Double` directly: the Rust side emits whole-number
+              // cents (e.g. "50", not "50.0"), which JSONSerialization boxes as an
+              // integer-typed NSNumber — `as? Double` fails to bridge that and silently
+              // returns nil, so this must go through .doubleValue instead.
+              let toleranceNumber = json[index]["pitchToleranceCents"] as? NSNumber else {
+            return nil
+        }
+        return (grace, octave, Float(toleranceNumber.doubleValue))
     }
 
     static func defaultRange(rootNote: Int) -> (Int, Int) {
@@ -296,12 +356,12 @@ class ExerciseModel: ObservableObject {
         confirmedLiveMidi = nil
     }
 
-    /// Push the current grace/octave/YIN overrides to the shared pitchTracker. Called on
-    /// every live edit of the 3 properties (so a Mic Setup Advanced-sheet change takes
-    /// effect immediately) and once more at startLivePitchDetection() so a fresh session
-    /// always starts with the current values.
+    /// Push the current grace/octave/YIN/pitch-tolerance overrides to the shared
+    /// pitchTracker. Called on every live edit of the 4 properties (so a Mic Setup
+    /// Advanced-sheet change takes effect immediately) and once more at
+    /// startLivePitchDetection() so a fresh session always starts with the current values.
     private func pushAdvancedParams() {
-        pitchTracker.setAdvancedParams(graceFrames: graceFrames, octaveCorrection: octaveCorrection, yinThreshold: yinThreshold)
+        pitchTracker.setAdvancedParams(graceFrames: graceFrames, octaveCorrection: octaveCorrection, yinThreshold: yinThreshold, pitchToleranceCents: pitchToleranceCents)
     }
 
     private func startFreshTest() async {
@@ -630,7 +690,7 @@ class ExerciseModel: ObservableObject {
         let ud = UserDefaults.standard
         let keys = ["rootNote","rangeStart","rangeEnd","scaleId","sequenceLength","tempoBpm",
                     "showTestNotes","keySignatureMode","introSoundMode","maxRetries","noteRetries","silenceThreshold",
-                    "framesToConfirm","warmupFrames","graceFrames","octaveCorrection","yinThreshold",
+                    "framesToConfirm","warmupFrames","graceFrames","octaveCorrection","yinThreshold","pitchToleranceCents","useTunerMeter",
                     "postChordGapNs","wrongNotePauseNs",
                     "instrumentIndex","testType","playPassFailSounds","hasLaunched"]
         keys.forEach { ud.removeObject(forKey: $0) }
@@ -651,6 +711,8 @@ class ExerciseModel: ObservableObject {
         graceFrames = 3
         octaveCorrection = false
         yinThreshold = 0.15
+        pitchToleranceCents = 50
+        useTunerMeter = false
         postChordGapNanoseconds = 800_000_000
         wrongNotePauseNanoseconds = 3_000_000_000
         instrumentIndex = 0

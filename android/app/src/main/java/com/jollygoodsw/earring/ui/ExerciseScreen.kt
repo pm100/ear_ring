@@ -75,6 +75,7 @@ fun ExerciseScreen(
         graceFrames = state.graceFrames,
         octaveCorrection = state.octaveCorrection,
         yinThreshold = state.yinThreshold,
+        pitchToleranceCents = state.pitchToleranceCents,
         onConfirmed = { midi, hz ->
             val cents = EarRingCore.freqToCents(hz)
             viewModel.confirmNote(midi, cents)

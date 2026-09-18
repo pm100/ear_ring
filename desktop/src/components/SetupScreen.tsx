@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
+import TunerMeter from './TunerMeter';
 import PitchMeter from './PitchMeter';
 import MusicStaff from './MusicStaff';
 import { useAudioCapture, TrackerFrame } from '../hooks/useAudioCapture';
@@ -37,9 +38,11 @@ interface Props {
   graceFrames?: number;
   octaveCorrection?: boolean;
   yinThreshold?: number;
+  pitchToleranceCents?: number;
+  useTunerMeter?: boolean;
 }
 
-export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rangeEnd, rootChroma = 0, scaleId = 0, keySignatureMode = 0, silenceThreshold = 0.003, framesToConfirm = 3, warmupFrames = 4, instrumentIndex = 0, graceFrames = 3, octaveCorrection = false, yinThreshold = 0.15 }: Props) {
+export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rangeEnd, rootChroma = 0, scaleId = 0, keySignatureMode = 0, silenceThreshold = 0.003, framesToConfirm = 3, warmupFrames = 4, instrumentIndex = 0, graceFrames = 3, octaveCorrection = false, yinThreshold = 0.15, pitchToleranceCents = 50, useTunerMeter = false }: Props) {
   const set = <K extends keyof ExerciseSettings>(key: K, value: ExerciseSettings[K]) =>
     onUpdateSettings(prev => ({ ...prev, [key]: value }));
 
@@ -79,7 +82,7 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
   // Configure tracker on entry, then auto-start.  Full cleanup on unmount.
   useEffect(() => {
     void invoke('cmd_tracker_set_params', { silenceThreshold, requiredFrames: framesToConfirm });
-    void invoke('cmd_tracker_set_advanced_params', { graceFrames, octaveCorrection, yinThreshold });
+    void invoke('cmd_tracker_set_advanced_params', { graceFrames, octaveCorrection, yinThreshold, pitchToleranceCents });
     void invoke('cmd_tracker_reset_with_warmup', { warmupFrames });
     start(handleFrame);
     return () => {
@@ -119,12 +122,31 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
         keySignatureMode={keySignatureMode}
       />
 
-      {/* The pitch meter alone carries "what's being detected right now" below the
-          staff — the large note-name/Hz text that used to sit here was removed to
-          make room for the always-visible Pitch Detection controls, without this
-          screen needing to scroll. */}
+      {/* Display style: Tuner needle (TunerMeter) or the classic note-name circle
+          (PitchMeter) — defaults per-instrument (see SettingsScreen's instrument
+          selector) but user-overridable here, since it's a display preference rather
+          than a detection-tuning parameter, so it sits inline rather than in Advanced. */}
+      <div style={{ marginTop: 16 }}>
+        <span className="section-label" style={{ marginTop: 0 }}>Display<TooltipIcon tooltipKey="meter_display" /></span>
+        <div className="chip-row">
+          <button type="button" className={`chip ${useTunerMeter ? 'chip-selected' : ''}`}
+            onClick={() => set('useTunerMeter', true)}>Tuner</button>
+          <button type="button" className={`chip ${!useTunerMeter ? 'chip-selected' : ''}`}
+            onClick={() => set('useTunerMeter', false)}>Classic</button>
+        </div>
+      </div>
+
+      {/* The meter is the only detected-note readout below the staff — the large
+          note-name/Hz text that used to sit here was removed to make room for the
+          always-visible Pitch Detection controls, without this screen needing to
+          scroll. TunerMeter reads hz directly (not gated on note confirmation) so it
+          behaves like a real tuner — see TunerMeter's doc. */}
       <div className="pitch-meter-circle">
-        <PitchMeter hz={hz} transposeSemitones={transpSemitones} keyChroma={effectiveKeyChroma(rootChroma, scaleId)} />
+        {useTunerMeter ? (
+          <TunerMeter hz={hz} transposeSemitones={transpSemitones} keyChroma={effectiveKeyChroma(rootChroma, scaleId)} />
+        ) : (
+          <PitchMeter hz={hz} transposeSemitones={transpSemitones} keyChroma={effectiveKeyChroma(rootChroma, scaleId)} />
+        )}
       </div>
 
       <div style={{ marginTop: 16 }}>
@@ -137,51 +159,60 @@ export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rang
           <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{Math.round((0.011 - silenceThreshold) / 0.001)} / 10</span>
         </div>
 
-        <span className="section-label">Note Stability (frames to confirm)<TooltipIcon tooltipKey="note_stability" /></span>
-        <div className="chip-row">
-          {STABILITY_OPTIONS.map(n => (
-            <button key={n} type="button"
-              className={`chip ${framesToConfirm === n ? 'chip-selected' : ''}`}
-              onClick={() => set('framesToConfirm', n)}>{n}</button>
-          ))}
-        </div>
-
-        <span className="section-label">Mic Warmup Frames<TooltipIcon tooltipKey="mic_warmup_frames" /></span>
-        <div className="chip-row">
-          {WARMUP_OPTIONS.map(n => (
-            <button key={n} type="button"
-              className={`chip ${warmupFrames === n ? 'chip-selected' : ''}`}
-              onClick={() => set('warmupFrames', n)}>{n}</button>
-          ))}
-        </div>
-
         <button type="button" className="advanced-toggle" onClick={() => setAdvancedOpen(o => !o)}>
           {advancedOpen ? '▾' : '▸'} Advanced
         </button>
         {advancedOpen && (
           <div className="advanced-section">
+            <span className="section-label">Note Stability (frames to confirm)<TooltipIcon tooltipKey="note_stability" /></span>
+            <div className="chip-row">
+              {STABILITY_OPTIONS.map(n => (
+                <button key={n} type="button"
+                  className={`chip ${framesToConfirm === n ? 'chip-selected' : ''}`}
+                  onClick={() => set('framesToConfirm', n)}>{n}</button>
+              ))}
+            </div>
+
+            <span className="section-label">Mic Warmup Frames<TooltipIcon tooltipKey="mic_warmup_frames" /></span>
+            <div className="chip-row">
+              {WARMUP_OPTIONS.map(n => (
+                <button key={n} type="button"
+                  className={`chip ${warmupFrames === n ? 'chip-selected' : ''}`}
+                  onClick={() => set('warmupFrames', n)}>{n}</button>
+              ))}
+            </div>
+
             <span className="section-label">Grace Frames<TooltipIcon tooltipKey="grace_frames" /></span>
             <div className="chip-row">
               {[0, 1, 2, 3, 4, 5, 6].map(n => (
                 <button key={n} type="button"
                   className={`chip ${graceFrames === n ? 'chip-selected' : ''}`}
-                  onClick={() => { set('graceFrames', n); void invoke('cmd_tracker_set_advanced_params', { graceFrames: n, octaveCorrection, yinThreshold }); }}>{n}</button>
+                  onClick={() => { set('graceFrames', n); void invoke('cmd_tracker_set_advanced_params', { graceFrames: n, octaveCorrection, yinThreshold, pitchToleranceCents }); }}>{n}</button>
               ))}
             </div>
 
             <span className="section-label">Octave Correction<TooltipIcon tooltipKey="octave_correction" /></span>
             <label className="switch-row">
               <input type="checkbox" checked={octaveCorrection}
-                onChange={e => { set('octaveCorrection', e.target.checked); void invoke('cmd_tracker_set_advanced_params', { graceFrames, octaveCorrection: e.target.checked, yinThreshold }); }} />
+                onChange={e => { set('octaveCorrection', e.target.checked); void invoke('cmd_tracker_set_advanced_params', { graceFrames, octaveCorrection: e.target.checked, yinThreshold, pitchToleranceCents }); }} />
             </label>
 
             <span className="section-label">YIN Threshold<TooltipIcon tooltipKey="yin_threshold" /></span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <input type="range" min={0.05} max={0.30} step={0.01}
                 value={yinThreshold}
-                onChange={e => { const v = parseFloat(e.target.value); set('yinThreshold', v); void invoke('cmd_tracker_set_advanced_params', { graceFrames, octaveCorrection, yinThreshold: v }); }}
+                onChange={e => { const v = parseFloat(e.target.value); set('yinThreshold', v); void invoke('cmd_tracker_set_advanced_params', { graceFrames, octaveCorrection, yinThreshold: v, pitchToleranceCents }); }}
                 style={{ flex: 1 }} />
               <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{yinThreshold.toFixed(2)}</span>
+            </div>
+
+            <span className="section-label">Pitch Tolerance (cents)<TooltipIcon tooltipKey="pitch_tolerance_cents" /></span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <input type="range" min={50} max={150} step={5}
+                value={pitchToleranceCents}
+                onChange={e => { const v = parseFloat(e.target.value); set('pitchToleranceCents', v); void invoke('cmd_tracker_set_advanced_params', { graceFrames, octaveCorrection, yinThreshold, pitchToleranceCents: v }); }}
+                style={{ flex: 1 }} />
+              <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{pitchToleranceCents.toFixed(0)}</span>
             </div>
           </div>
         )}

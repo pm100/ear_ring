@@ -81,3 +81,11 @@ Snap detected pitches that are an octave off to the nearest note in your exercis
 ## yin_threshold
 
 How strict the pitch detector is about a note being clearly periodic. Lower catches quieter or noisier notes; higher rejects more false positives.
+
+## pitch_tolerance_cents
+
+How far (in cents) a note's pitch can wander before it's treated as a different note. Wider tolerance absorbs natural vibrato on voice or slide instruments; instruments with a fixed pitch mechanism (piano, fretted guitar, winds) don't need it widened.
+
+## meter_display
+
+Choose how live pitch is shown: Tuner shows a needle and cents deviation, useful for instruments with continuous pitch like voice or trombone. Classic shows just the note name, matching fixed-pitch instruments like piano or guitar.

@@ -34,6 +34,8 @@ const defaultSettings: ExerciseSettings = (() => {
     graceFrames: 3,
     octaveCorrection: false,
     yinThreshold: 0.15,
+    pitchToleranceCents: 50,
+    useTunerMeter: false,
     postChordGapMs: 800,
     wrongNotePauseMs: 3000,
     instrumentIndex: 0,
@@ -137,6 +139,7 @@ export default function App() {
       graceFrames: settings.graceFrames,
       octaveCorrection: settings.octaveCorrection,
       yinThreshold: settings.yinThreshold,
+      pitchToleranceCents: settings.pitchToleranceCents,
       postChordGapMs: settings.postChordGapMs,
       wrongNotePauseMs: settings.wrongNotePauseMs,
       instrumentIndex: settings.instrumentIndex,
@@ -237,6 +240,8 @@ export default function App() {
           graceFrames={settings.graceFrames}
           octaveCorrection={settings.octaveCorrection}
           yinThreshold={settings.yinThreshold}
+          pitchToleranceCents={settings.pitchToleranceCents}
+          useTunerMeter={settings.useTunerMeter}
         />
       )}
       {screen === 'progress' && (

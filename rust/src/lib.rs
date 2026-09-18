@@ -120,14 +120,15 @@ pub fn instrument_list_json() -> String {
     for (i, inst) in INSTRUMENTS.iter().enumerate() {
         if i > 0 { json.push(','); }
         json.push_str(&format!(
-            "{{\"id\":{},\"name\":{},\"semitones\":{},\"rangeStart\":{},\"rangeEnd\":{},\"graceFrames\":{},\"octaveCorrection\":{}}}",
+            "{{\"id\":{},\"name\":{},\"semitones\":{},\"rangeStart\":{},\"rangeEnd\":{},\"graceFrames\":{},\"octaveCorrection\":{},\"pitchToleranceCents\":{}}}",
             i,
             json_string(inst.name),
             inst.semitones,
             inst.range_start,
             inst.range_end,
             inst.grace_frames,
-            inst.octave_correction
+            inst.octave_correction,
+            inst.pitch_tolerance_cents
         ));
     }
     json.push(']');
@@ -909,22 +910,24 @@ pub extern "C" fn ear_ring_tracker_apply_instrument(tracker: *mut PitchTracker, 
 }
 
 /// Directly set the previously-hidden detection params (grace frames, octave
-/// correction, YIN threshold) that `apply_instrument`'s INSTRUMENTS table doesn't
-/// cover (YIN threshold) or that the user has manually overridden (grace frames,
-/// octave correction) via the Mic Setup Advanced controls. `octave_correction` is
-/// 0/1 (C has no bool type in this header).
+/// correction, YIN threshold, pitch tolerance) that `apply_instrument`'s INSTRUMENTS
+/// table doesn't cover (YIN threshold) or that the user has manually overridden
+/// (grace frames, octave correction, pitch tolerance) via the Mic Setup Advanced
+/// controls. `octave_correction` is 0/1 (C has no bool type in this header).
 #[no_mangle]
 pub extern "C" fn ear_ring_tracker_set_advanced_params(
     tracker: *mut PitchTracker,
     grace_frames: c_uint,
     octave_correction: c_int,
     yin_threshold: c_float,
+    pitch_tolerance_cents: c_float,
 ) {
     if !tracker.is_null() {
         unsafe {
             (*tracker).grace_frames = grace_frames;
             (*tracker).octave_correction = octave_correction != 0;
             (*tracker).yin_threshold = yin_threshold;
+            (*tracker).pitch_tolerance_cents = pitch_tolerance_cents;
         }
     }
 }
@@ -1569,7 +1572,8 @@ mod android_jni {
     }
 
     /// Directly set the previously-hidden detection params (grace frames, octave
-    /// correction, YIN threshold) — mirrors desktop's cmd_tracker_set_advanced_params.
+    /// correction, YIN threshold, pitch tolerance) — mirrors desktop's
+    /// cmd_tracker_set_advanced_params.
     #[no_mangle]
     pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeTrackerSetAdvancedParams(
         _env: JNIEnv,
@@ -1578,6 +1582,7 @@ mod android_jni {
         grace_frames: jint,
         octave_correction: jboolean,
         yin_threshold: jfloat,
+        pitch_tolerance_cents: jfloat,
     ) {
         if handle != 0 {
             unsafe {
@@ -1585,6 +1590,7 @@ mod android_jni {
                 tracker.grace_frames = grace_frames.max(0) as u32;
                 tracker.octave_correction = octave_correction != 0;
                 tracker.yin_threshold = yin_threshold;
+                tracker.pitch_tolerance_cents = pitch_tolerance_cents;
             }
         }
     }

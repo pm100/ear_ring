@@ -70,7 +70,7 @@ object EarRingCore {
     @JvmStatic external fun nativeTrackerResetWithWarmup(handle: Long, warmupFrames: Int)
     @JvmStatic external fun nativeTrackerSetParams(handle: Long, silenceThreshold: Float, requiredFrames: Int)
     @JvmStatic external fun nativeTrackerApplyInstrument(handle: Long, instrumentIndex: Int)
-    @JvmStatic external fun nativeTrackerSetAdvancedParams(handle: Long, graceFrames: Int, octaveCorrection: Boolean, yinThreshold: Float)
+    @JvmStatic external fun nativeTrackerSetAdvancedParams(handle: Long, graceFrames: Int, octaveCorrection: Boolean, yinThreshold: Float, pitchToleranceCents: Float)
     /** Returns FloatArray[3]: [live_hz, live_midi_f32, confirmed_midi_f32]. -1 means absent. */
     @JvmStatic external fun nativeTrackerProcess(handle: Long, samples: FloatArray, sampleRate: Int): FloatArray
 
@@ -94,9 +94,10 @@ object EarRingCore {
     }
 
     /** Directly set the previously-hidden detection params (grace frames, octave
-     *  correction, YIN threshold) — mirrors desktop's cmd_tracker_set_advanced_params. */
-    fun trackerSetAdvancedParams(handle: Long, graceFrames: Int, octaveCorrection: Boolean, yinThreshold: Float) {
-        if (loaded && handle != 0L) nativeTrackerSetAdvancedParams(handle, graceFrames, octaveCorrection, yinThreshold)
+     *  correction, YIN threshold, pitch tolerance) — mirrors desktop's
+     *  cmd_tracker_set_advanced_params. */
+    fun trackerSetAdvancedParams(handle: Long, graceFrames: Int, octaveCorrection: Boolean, yinThreshold: Float, pitchToleranceCents: Float) {
+        if (loaded && handle != 0L) nativeTrackerSetAdvancedParams(handle, graceFrames, octaveCorrection, yinThreshold, pitchToleranceCents)
     }
 
     /** Process one audio buffer via the Rust tracker. Returns a [PitchFrame]. */

@@ -41,6 +41,7 @@ fun rememberPitchDetector(
     graceFrames: Int = 3,
     octaveCorrection: Boolean = false,
     yinThreshold: Float = 0.15f,
+    pitchToleranceCents: Float = 50f,
     onConfirmed: (midi: Int, hz: Float) -> Unit
 ): Float {
     val audioCapture = remember { AudioCapture() }
@@ -48,13 +49,13 @@ fun rememberPitchDetector(
     val liveHzState = remember { mutableFloatStateOf(-1f) }
 
     // Apply per-instrument detection params (grace frames, octave correction) whenever the
-    // instrument changes, then push the caller's grace/octave/yin overrides on top — both
-    // JNI calls are synchronous, so this ordering can't race the way an async round-trip
-    // could. Also re-runs on a live edit to any of the 3 overrides, so a manual slider
-    // change takes effect immediately without waiting for an instrument switch.
-    LaunchedEffect(instrumentIndex, graceFrames, octaveCorrection, yinThreshold) {
+    // instrument changes, then push the caller's grace/octave/yin/tolerance overrides on
+    // top — both JNI calls are synchronous, so this ordering can't race the way an async
+    // round-trip could. Also re-runs on a live edit to any of the 4 overrides, so a manual
+    // slider change takes effect immediately without waiting for an instrument switch.
+    LaunchedEffect(instrumentIndex, graceFrames, octaveCorrection, yinThreshold, pitchToleranceCents) {
         EarRingCore.trackerApplyInstrument(trackerHandle, instrumentIndex)
-        EarRingCore.trackerSetAdvancedParams(trackerHandle, graceFrames, octaveCorrection, yinThreshold)
+        EarRingCore.trackerSetAdvancedParams(trackerHandle, graceFrames, octaveCorrection, yinThreshold, pitchToleranceCents)
     }
 
     // Tracker lifetime is tied to the composable, NOT to active — freeing on every

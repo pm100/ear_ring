@@ -35,6 +35,10 @@ export interface ExerciseSettings {
   graceFrames: number;        // default 3 (Piano) — previously hidden per-instrument constant
   octaveCorrection: boolean;  // default false (Piano) — previously hidden per-instrument constant
   yinThreshold: number;       // default 0.15 — previously hidden global constant
+  pitchToleranceCents: number; // default 50 (Piano) — previously hidden per-instrument constant
+  /** Mic Setup meter style: true = tuner-style needle meter, false = classic note-name
+   *  circle. Defaults per-instrument (pitchToleranceCents > 50) but user-overridable. */
+  useTunerMeter: boolean;      // default false (Piano)
   postChordGapMs: number;     // default 800
   wrongNotePauseMs: number;   // default 3000
   instrumentIndex: number;    // default 0 (Piano)
@@ -60,6 +64,7 @@ export interface ExerciseState {
   graceFrames: number;
   octaveCorrection: boolean;
   yinThreshold: number;
+  pitchToleranceCents: number;
   postChordGapMs: number;
   wrongNotePauseMs: number;
   instrumentIndex: number;

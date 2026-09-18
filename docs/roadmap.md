@@ -38,54 +38,68 @@ but currently hidden from the UI — `testType == 1` is force-reset to `0` on lo
 free: remove the reset-to-0 guard, gate the option's visibility on `isPremium`.
 
 ### Voice as an instrument (and other continuous-pitch instruments)
-Add singing voice as a selectable input alongside the existing instruments
-(`InstrumentInfo` / `instrumentIndex`) — i.e. exercises can be completed by singing the
-answer instead of playing it. This is the foundational feature the next one depends on.
+**Landed 2026-09-15.** Three voice types — **Soprano Voice**, **Alto Voice**, **Tenor
+Voice** (`INSTRUMENTS` in `rust/src/music_theory.rs`; named "___ Voice" rather than bare
+"Soprano"/"Alto"/"Tenor" to stay unambiguous next to the existing "Soprano Sax"/"Alto
+Sax"/"Tenor Sax" rows in the same dropdown) — are now selectable instruments. Exercises
+can be completed by singing the answer instead of playing it, on all three platforms,
+with no platform-side code changes needed at all (the instrument list, and its
+detection params, already flowed dynamically from the shared Rust core to every
+platform's picker via `instrument_list_json()`). The three differ only in their default
+range — one comfortably-central octave per voice type, sounding pitch (`semitones: 0`,
+like Piano/Guitar — no transposition, so the note shown is the note sung): Soprano
+C4–C5, Alto G3–G4, Tenor C3–C4. Everything else (`grace_frames`, `pitch_tolerance_cents`,
+below) is identical across all three, since vibrato and breathy onset are the same
+underlying detection challenge regardless of tessitura — only the range differs.
 
-**The tracker's stability check doesn't tolerate pitch wobble today, and that's not a
-voice-specific gap.** In `tracker.rs`, `PitchTracker::process()` only advances
-`stable_count` when the *rounded MIDI note* is bit-identical to the previous frame's
-(`effective_midi == self.stable_midi`) — any frame that rounds to a different semitone
-resets the count to 1. Natural vibrato (~±30–100 cents of swing) will routinely cross a
-semitone boundary frame-to-frame, so a wobbly note can reset its own stability
-indefinitely and never confirm. This affects every instrument that lacks a mechanical
-stop pinning the pitch to a fixed value, not just voice:
-- **Trombone** — slide has no fixed positions; landing/holding a pitch is a live
-  muscular judgment, same as singing.
-- **Fretless strings** (violin, cello, fretless bass/guitar) — finger position, not a
-  mechanical stop, defines pitch; vibrato is core idiomatic technique here.
-- **Voice**, plus the usual breathy/glide onset that's slower and messier than a
-  struck or blown attack.
+The tracker's stability check previously didn't tolerate pitch wobble, and that wasn't
+a voice-specific gap: `PitchTracker::process()` only advanced `stable_count` when the
+*rounded MIDI note* was bit-identical to the previous frame's — any frame that rounded
+to a different semitone reset the count to 1. Natural vibrato (~±30–100 cents of swing)
+routinely crosses a semitone boundary frame-to-frame, so a wobbly note could reset its
+own stability indefinitely and never confirm. Fixed with a generic capability rather
+than a voice-only special case: `InstrumentInfo` gained a `pitch_tolerance_cents: f32`
+field, and `PitchTracker` gained a matching field plus a cents-based hysteresis band in
+`process()` — a note now stays "stable" while cents drift stays within that tolerance of
+the *stable note's* exact frequency, even on a frame that rounds to the neighboring
+semitone, instead of requiring the rounded MIDI to be bit-identical every frame. Every
+pre-existing instrument keeps `pitch_tolerance_cents: 50.0` (a mathematical no-op —
+`freq_to_note` never rounds a frame more than 50 cents from its nearest semitone, so
+this exactly reproduces the old strict behavior); the three voice types are the first
+to set it wider (80.0). Trombone and fretless strings (violin, cello, fretless
+bass/guitar) — the other instruments called out during design as lacking a mechanical
+stop that pins pitch to an exact value — aren't in `INSTRUMENTS` at all yet, so weren't
+added; adding either later is now just a table row plus a tolerance value, no tracker
+changes needed.
 
-Sax/trumpet/clarinet are mechanically quantized (fingering picks a fixed pitch) so
-they're lower risk, but a player leaning into embouchure vibrato could still trip the
-same bug — it's just narrower and less likely than on a fully continuous instrument.
-And this is an *ear-training* app: the person producing the target pitch is often the
-one with the least reliable pitch control, so expect more hunting-for-pitch wobble in
-practice than a clean-tone assumption would suggest.
+Five new Rust tests in `tracker.rs` cover the mechanism specifically (`wobbled_wave()`,
+a sine wave offset by a cents amount from a target MIDI note) — confirming: the default
+50-cent tolerance still resets on a boundary-crossing wobble (regression guard for every
+non-voice instrument), an 80-cent tolerance absorbs that same wobble instead of
+resetting, a genuinely different note (200 cents away) still confirms separately even
+under the wide tolerance, and `apply_instrument()` wires all three voice types to the
+wider value while every other named instrument stays at 50.0.
 
-**Recommended shape:** don't build this as a one-off "Voice profile." Add a generic
-capability instead — e.g. a `pitch_tolerance_cents` (or `continuous_pitch: bool`) field
-on `InstrumentInfo`, with one shared hysteresis-band implementation in `tracker.rs`: a
-note stays "stable" while cents drift stays within a band around a running center,
-rather than requiring the rounded MIDI to be bit-identical every frame. Trombone,
-fretless strings, and voice would all set that flag/threshold; piano/fretted
-guitar/winds keep today's strict behavior. Per the Shared Logic Rule, this belongs in
-`rust/src/tracker.rs` / `pitch_detection.rs`, with platform code only handling which mic
-input mode is active (and, for voice specifically, that's the only new platform-side
-work — the tracker fix is instrument-agnostic core logic).
-
-Also worth noting before trusting any of this: the existing 47 Rust tracker/pitch tests
-all use synthesized pure sine waves (`sine_wave()` in `tracker.rs`'s test module) — none
-simulate vibrato, breathiness, or glide onset, so passing tests today give zero evidence
-about real sung or slid/fretless-played audio. Validate against real recordings before
-shipping any continuous-pitch instrument.
+**Still open before trusting this with real singers:** all tracker/pitch tests —
+including the five new ones — use synthesized sine waves (clean tones, or a fixed cents
+offset from one). None simulate real vibrato (which isn't a fixed offset — it's a
+periodic oscillation), breathiness, or a glide/portamento onset, so passing tests give
+no evidence yet about real sung audio. Validate against real voice recordings — ideally
+several singers of each voice type, different vibrato styles/amplitudes — before
+treating any of the three as production-ready rather than a first cut. `grace_frames: 5`
+(borrowed from Guitar's sustain rationale) and the 80-cent tolerance value itself are
+both estimates, not measured from real recordings, and may need tuning — potentially
+differently per voice type — once real audio is tested against them. Each voice type's
+default one-octave range (`rust/src/music_theory.rs`) is a similarly untested starting
+guess — freely adjustable via the range picker, but worth revisiting once real usage
+shows what's actually comfortable for each.
 
 ### "Sing then play" test mode
 New exercise mode: the user sings the prompted note/interval first, then confirms by
-playing the same thing on their instrument. **Depends on "Voice as an instrument"
-above** — needs voice pitch detection to exist before the sing step can be graded at
-all.
+playing the same thing on their instrument. Voice pitch detection now exists (above),
+so this is unblocked — but it's a distinct exercise-flow feature, not a side effect of
+that landing: needs a two-stage capture/grading UI (sing, then re-arm the mic and wait
+for the instrument confirmation) that doesn't exist yet on any platform.
 
 ### Cycle of fifths mode
 Instead of a fixed key for the whole session, cycle the root through the circle of

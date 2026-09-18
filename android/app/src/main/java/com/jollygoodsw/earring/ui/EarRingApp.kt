@@ -172,7 +172,9 @@ fun EarRingApp() {
                     instrumentIndex = state.instrumentIndex,
                     graceFrames = state.graceFrames,
                     octaveCorrection = state.octaveCorrection,
-                    yinThreshold = state.yinThreshold
+                    yinThreshold = state.yinThreshold,
+                    pitchToleranceCents = state.pitchToleranceCents,
+                    useTunerMeter = state.useTunerMeter
                 )
             }
             composable(Routes.PROGRESS) {
