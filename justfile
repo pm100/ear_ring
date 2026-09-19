@@ -27,6 +27,7 @@ android: _android-version
      if (-not $devices) { \
        Write-Host "No device found — starting emulator '{{avd}}'..."; \
        Start-Process -FilePath "{{emulator}}" -ArgumentList "-avd {{avd}} -no-snapshot-save" -WindowStyle Normal; \
+       & powershell.exe -NoLogo -File "{{justfile_directory()}}/scripts/fix_emulator_window.ps1"; \
        Write-Host "Waiting for emulator to boot (this takes ~60 s)..."; \
        & "{{adb}}" wait-for-device | Out-Null; \
        do { Start-Sleep 3; $booted = & "{{adb}}" shell getprop sys.boot_completed 2>$null } while ($booted.Trim() -ne '1'); \
@@ -37,6 +38,7 @@ android: _android-version
 
 # Build the Android debug APK and install + launch it on a connected USB device.
 # Ignores emulators — requires a physical device with USB debugging enabled.
+# See `android-sim` below for the opposite: emulator only, auto-started if needed.
 # If a Play Store (release-signed) build is on the device, it is uninstalled
 # automatically so the debug build can be installed (on-device app data is lost).
 # Uses `adb install -d` (allow version-code downgrade): debug builds are local,
@@ -76,6 +78,29 @@ android-device: _android-version
        & "{{adb}}" -s $serial install -d $apk; \
      } else { Write-Host $out.Trim() }; \
      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; \
+     & "{{adb}}" -s $serial shell am start -n com.jollygoodsw.earring/.MainActivity
+
+# Build and install the Android debug APK, then launch it on the emulator
+# specifically — starts the emulator automatically if none is already running,
+# and ignores any physical device that may also be connected (unlike `android`
+# above, which is happy to use whichever is already there). See `android-device`
+# for the opposite: real devices only, never the emulator.
+[doc("Build + install debug APK and launch on the emulator (auto-starts one if needed)")]
+android-sim: _android-version
+    @$emu = (& "{{adb}}" devices | Select-String -Pattern '^(emulator-\S+)\s+device$'); \
+     if (-not $emu) { \
+       Write-Host "No emulator running — starting '{{avd}}'..."; \
+       Start-Process -FilePath "{{emulator}}" -ArgumentList "-avd {{avd}} -no-snapshot-save" -WindowStyle Normal; \
+       & powershell.exe -NoLogo -File "{{justfile_directory()}}/scripts/fix_emulator_window.ps1"; \
+       Write-Host "Waiting for the emulator to appear..."; \
+       do { Start-Sleep 3; $emu = (& "{{adb}}" devices | Select-String -Pattern '^(emulator-\S+)\s+device$') } while (-not $emu); \
+     }; \
+     $serial = $emu[0].Matches[0].Groups[1].Value; \
+     Write-Host "Waiting for $serial to finish booting..."; \
+     do { Start-Sleep 3; $booted = & "{{adb}}" -s $serial shell getprop sys.boot_completed 2>$null } while ($booted.Trim() -ne '1'); \
+     Write-Host "Emulator ready — installing on $serial..."; \
+     $env:ANDROID_SERIAL = $serial; \
+     Push-Location android; .\gradlew installDebug; Pop-Location; \
      & "{{adb}}" -s $serial shell am start -n com.jollygoodsw.earring/.MainActivity
 
 # Compile-check Kotlin only (fast, no install)
@@ -132,6 +157,7 @@ android-test: _android-version
      if (-not $devices) { \
        Write-Host "No device found — starting emulator '{{avd}}'..."; \
        Start-Process -FilePath "{{emulator}}" -ArgumentList "-avd {{avd}} -no-snapshot-save" -WindowStyle Normal; \
+       & powershell.exe -NoLogo -File "{{justfile_directory()}}/scripts/fix_emulator_window.ps1"; \
        Write-Host "Waiting for emulator to boot (this takes ~60 s)..."; \
        & "{{adb}}" wait-for-device | Out-Null; \
        do { Start-Sleep 3; $booted = & "{{adb}}" shell getprop sys.boot_completed 2>$null } while ($booted.Trim() -ne '1'); \
