@@ -7,6 +7,7 @@ use ear_ring_core::{
     scale_notes, scale_type_from_id, shuffle_melody_indices, staff_position, test_score, note_retry_penalty, wrong_note_outcome, written_diatonic_chord_label, written_note_name, written_midi_label, written_scale_label,
     Note, PitchTracker, ScaleType,
 };
+use ear_ring_core::settings::{self, Platform};
 use std::sync::Mutex;
 use tauri::State;
 
@@ -300,6 +301,70 @@ fn cmd_sequence_timings(bpm: f32, durations: Vec<f32>) -> Vec<(u32, u32)> {
     durations.iter().map(|&d| note_timing(bpm, d)).collect()
 }
 
+// ── Settings (shared model in ear_ring_core::settings) ───────────────────────
+// All defaults and rules live in Rust; the webview only persists and renders the JSON.
+
+#[tauri::command]
+fn cmd_settings_defaults() -> String {
+    settings::defaults_json(Platform::Desktop)
+}
+
+/// Tolerant load of whatever localStorage held (nothing, garbage, an older blob).
+#[tauri::command]
+fn cmd_settings_normalize(input: String) -> String {
+    settings::normalize_json(&input, Platform::Desktop)
+}
+
+/// Applies one JSON action (see `ear_ring_core::settings::apply_json`) to the current settings.
+/// A panic here only fails this one IPC call (the webview's settings store reports it and
+/// carries on), so no extra guard is needed unlike the C/JNI bridges.
+#[tauri::command]
+fn cmd_settings_apply(current: String, action: String) -> String {
+    settings::apply_json(&current, &action, Platform::Desktop)
+}
+
+#[cfg(test)]
+mod settings_command_tests {
+    use super::*;
+
+    #[test]
+    fn defaults_are_the_desktop_defaults() {
+        let defaults = cmd_settings_defaults();
+        assert_eq!(defaults, ear_ring_core::settings::defaults_json(ear_ring_core::settings::Platform::Desktop));
+        assert!(defaults.contains(r#""framesToConfirm":3"#), "desktop keeps 3 (only iOS overrides to 2)");
+    }
+
+    #[test]
+    fn normalize_of_an_empty_or_garbage_value_returns_the_defaults() {
+        assert_eq!(cmd_settings_normalize(String::new()), cmd_settings_defaults());
+        assert_eq!(cmd_settings_normalize("garbage".to_string()), cmd_settings_defaults());
+    }
+
+    #[test]
+    fn normalize_repairs_a_stored_blob_from_the_old_desktop_format() {
+        // The pre-Rust desktop blob: a flat camelCase object, possibly with legacy test types.
+        let old = r#"{"tempoBpm":120,"testType":3,"sequenceLength":4,"instrumentIndex":1}"#;
+        let out = cmd_settings_normalize(old.to_string());
+        assert!(out.contains(r#""tempoBpm":120"#));
+        assert!(out.contains(r#""testType":2"#), "legacy testType 3 becomes 2");
+        assert!(out.contains(r#""sequenceLength":3"#), "diatonic mode forces 3 notes");
+        assert!(out.contains(r#""instrumentIndex":1"#));
+    }
+
+    #[test]
+    fn apply_runs_an_action_against_the_current_settings() {
+        let out = cmd_settings_apply(cmd_settings_defaults(), r#"{"type":"set","values":{"tempoBpm":140}}"#.to_string());
+        assert!(out.contains(r#""tempoBpm":140"#));
+    }
+
+    #[test]
+    fn apply_reset_returns_the_defaults() {
+        let custom = cmd_settings_apply(cmd_settings_defaults(), r#"{"type":"setInstrument","value":8}"#.to_string());
+        assert_ne!(custom, cmd_settings_defaults());
+        assert_eq!(cmd_settings_apply(custom, r#"{"type":"reset"}"#.to_string()), cmd_settings_defaults());
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(TrackerState(Mutex::new(PitchTracker::new(0.003, 3))))
@@ -345,6 +410,9 @@ fn main() {
             cmd_pick_melody_by_index,
             cmd_melody_range_midi,
             cmd_sequence_timings,
+            cmd_settings_defaults,
+            cmd_settings_normalize,
+            cmd_settings_apply,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

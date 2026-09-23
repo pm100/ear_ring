@@ -1,11 +1,12 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { ExerciseSettings } from '../types';
+import { SettingsAction } from '../settingsStore';
 import { TooltipIcon } from './Tooltip';
 
 interface Props {
   settings: ExerciseSettings;
-  onUpdateSettings: React.Dispatch<React.SetStateAction<ExerciseSettings>>;
+  onAction: (action: SettingsAction) => void;
   onStart: (rootNote: number, rangeStart: number, rangeEnd: number, scaleId: number, sequenceLength: number, tempoBpm: number, showTestNotes: boolean, keySignatureMode: number, testType: number) => void;
 }
 
@@ -57,16 +58,6 @@ function midiLabel(midi: number): string {
   const oct = Math.floor(midi / 12) - 1;
   return `${NOTE_NAMES[midi % 12]}${oct}`;
 }
-function defaultRangeForKey(rootNote: number): [number, number] {
-  const rn = Number.isFinite(rootNote) ? rootNote : 0;
-  let best = 60 + rn;
-  for (let oct = 2; oct <= 6; oct++) {
-    const c = (oct + 1) * 12 + rn;
-    if (Math.abs(c - 60) < Math.abs(best - 60)) best = c;
-  }
-  return [best, best + 12];
-}
-
 /** Return valid range, falling back to defaults if values are missing or NaN. */
 function safeRange(rs: number | undefined, re: number | undefined): [number, number] {
   const start = Number.isFinite(rs) ? rs! : 60;
@@ -320,7 +311,9 @@ const TEST_TYPE_OPTIONS = [
   { value: 2, label: 'Diatonic Arpeggios' },
 ];
 
-function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
+function HomeScreen({ settings, onAction, onStart }: Props) {
+  const set = <K extends keyof ExerciseSettings>(key: K, value: ExerciseSettings[K]) =>
+    onAction({ type: 'set', values: { [key]: value } });
   const isMelodyMode = settings.testType === 1;
   const isDiatonicMode = settings.testType === 2;
 
@@ -351,13 +344,8 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
     )).then(setScaleLabels).catch(() => {});
   }, [settings.rootNote, settings.instrumentIndex]);
 
-  const handleTestTypeChange = (newType: number) => {
-    onUpdateSettings(prev => {
-      // 4-note (7th chord) arpeggios are suppressed for now — always 3 in diatonic mode.
-      const newSeqLen = newType === 2 ? 3 : prev.sequenceLength;
-      return { ...prev, testType: newType, sequenceLength: newSeqLen };
-    });
-  };
+  // Rust enforces the diatonic rule (always a 3-note arpeggio).
+  const handleTestTypeChange = (newType: number) => onAction({ type: 'setTestType', value: newType });
 
   const handleStart = () => {
     onStart(settings.rootNote, settings.rangeStart, settings.rangeEnd, settings.scaleId, settings.sequenceLength, settings.tempoBpm, settings.showTestNotes, settings.keySignatureMode, settings.testType);
@@ -387,11 +375,7 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
           <span className="section-label">Key<TooltipIcon tooltipKey="key" /></span>
           <select
             value={settings.rootNote}
-            onChange={e => {
-              const concertChroma = Number(e.target.value);
-              const [rs, re] = defaultRangeForKey(concertChroma);
-              onUpdateSettings(prev => ({ ...prev, rootNote: concertChroma, rangeStart: rs, rangeEnd: re }));
-            }}
+            onChange={e => onAction({ type: 'setRootNote', value: Number(e.target.value) })}
             style={{ width: '100%', padding: '8px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #ccc', marginBottom: 4 }}
           >
             {Array.from({ length: 12 }, (_, wc) => {
@@ -408,7 +392,7 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
           <select
             value={settings.scaleId}
             disabled={isMelodyMode}
-            onChange={e => onUpdateSettings(prev => ({ ...prev, scaleId: Number(e.target.value) }))}
+            onChange={e => set('scaleId', Number(e.target.value))}
             style={{ width: '100%', padding: '8px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #ccc', marginBottom: 4 }}
           >
             {SELECTABLE_SCALE_IDS.map(i => (
@@ -424,7 +408,7 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
           rangeStart={settings.rangeStart}
           rangeEnd={settings.rangeEnd}
           disabled={isMelodyMode}
-          onChange={isMelodyMode ? () => {} : (s, e) => onUpdateSettings(prev => ({ ...prev, rangeStart: s, rangeEnd: e }))}
+          onChange={isMelodyMode ? () => {} : (s, e) => onAction({ type: 'setRange', start: s, end: e })}
         />
         <button
           type="button"
@@ -441,7 +425,7 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
           <PianoRangePicker
             rangeStart={settings.rangeStart}
             rangeEnd={settings.rangeEnd}
-            onChange={isMelodyMode ? () => {} : (s, e) => onUpdateSettings(prev => ({ ...prev, rangeStart: s, rangeEnd: e }))}
+            onChange={isMelodyMode ? () => {} : (s, e) => onAction({ type: 'setRange', start: s, end: e })}
           />
         </FullScreenModal>
       )}
@@ -462,7 +446,7 @@ function HomeScreen({ settings, onUpdateSettings, onStart }: Props) {
                 // show its current value highlighted, not gray it out too.
                 className={`chip ${settings.sequenceLength === len ? 'chip-selected' : ''}`}
                 style={{ opacity: chipEnabled ? 1 : 0.38 }}
-                onClick={() => chipEnabled && onUpdateSettings(prev => ({ ...prev, sequenceLength: len }))}
+                onClick={() => chipEnabled && set('sequenceLength', len)}
               >
                 {len}
               </button>

@@ -5,6 +5,7 @@ import PitchMeter from './PitchMeter';
 import MusicStaff from './MusicStaff';
 import { useAudioCapture, TrackerFrame } from '../hooks/useAudioCapture';
 import { ExerciseSettings } from '../types';
+import { SettingsAction } from '../settingsStore';
 import { TooltipIcon } from './Tooltip';
 
 const STABILITY_OPTIONS = [2, 3, 4, 5];
@@ -25,26 +26,26 @@ function effectiveKeyChroma(rootChroma: number, scaleId: number): number {
 
 interface Props {
   onBack: () => void;
-  onUpdateSettings: React.Dispatch<React.SetStateAction<ExerciseSettings>>;
+  onAction: (action: SettingsAction) => void;
   rangeStart: number;
   rangeEnd: number;
-  rootChroma?: number;
-  scaleId?: number;
-  keySignatureMode?: number;
-  silenceThreshold?: number;
-  framesToConfirm?: number;
-  warmupFrames?: number;
-  instrumentIndex?: number;
-  graceFrames?: number;
-  octaveCorrection?: boolean;
-  yinThreshold?: number;
-  pitchToleranceCents?: number;
-  useTunerMeter?: boolean;
+  rootChroma: number;
+  scaleId: number;
+  keySignatureMode: number;
+  silenceThreshold: number;
+  framesToConfirm: number;
+  warmupFrames: number;
+  instrumentIndex: number;
+  graceFrames: number;
+  octaveCorrection: boolean;
+  yinThreshold: number;
+  pitchToleranceCents: number;
+  useTunerMeter: boolean;
 }
 
-export default function SetupScreen({ onBack, onUpdateSettings, rangeStart, rangeEnd, rootChroma = 0, scaleId = 0, keySignatureMode = 0, silenceThreshold = 0.003, framesToConfirm = 3, warmupFrames = 4, instrumentIndex = 0, graceFrames = 3, octaveCorrection = false, yinThreshold = 0.15, pitchToleranceCents = 50, useTunerMeter = false }: Props) {
+export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, rootChroma, scaleId, keySignatureMode, silenceThreshold, framesToConfirm, warmupFrames, instrumentIndex, graceFrames, octaveCorrection, yinThreshold, pitchToleranceCents, useTunerMeter }: Props) {
   const set = <K extends keyof ExerciseSettings>(key: K, value: ExerciseSettings[K]) =>
-    onUpdateSettings(prev => ({ ...prev, [key]: value }));
+    onAction({ type: 'set', values: { [key]: value } });
 
   const [hz, setHz] = useState(0);
   const [advancedOpen, setAdvancedOpen] = useState(false);

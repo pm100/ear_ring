@@ -628,6 +628,8 @@ name = "ear_ring_core"
 version = "0.1.0"
 dependencies = [
  "jni 0.21.1",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

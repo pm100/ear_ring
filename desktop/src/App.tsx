@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { Screen, ExerciseSettings, ExerciseState } from './types';
 import HomeScreen from './components/HomeScreen';
@@ -8,87 +8,29 @@ import ProgressScreen from './components/ProgressScreen';
 import SettingsScreen from './components/SettingsScreen';
 import HelpScreen from './components/HelpScreen';
 import Sidebar from './components/Sidebar';
+import { useSettings, Dispatch } from './useSettings';
 
-const defaultSettings: ExerciseSettings = (() => {
-  const rootNote = 0;
-  let rangeStart = 60;
-  for (let oct = 2; oct <= 6; oct++) {
-    const c = (oct + 1) * 12 + rootNote;
-    if (Math.abs(c - 60) < Math.abs(rangeStart - 60)) rangeStart = c;
-  }
+/** Exercise state before any exercise has run: the live settings plus empty runtime fields. */
+function initialExercise(settings: ExerciseSettings): ExerciseState {
   return {
-    rootNote,
-    rangeStart,
-    rangeEnd: rangeStart + 12,
-    scaleId: 0,
-    sequenceLength: 1,
-    tempoBpm: 100,
-    showTestNotes: false,
-    keySignatureMode: 0,
-    introSoundMode: 1,
-    maxRetries: 5,
-    noteRetries: 2,
-    silenceThreshold: 0.003,
-    framesToConfirm: 3,
-    warmupFrames: 4,
-    graceFrames: 3,
-    octaveCorrection: false,
-    yinThreshold: 0.15,
-    pitchToleranceCents: 50,
-    useTunerMeter: false,
-    postChordGapMs: 800,
-    wrongNotePauseMs: 3000,
-    instrumentIndex: 0,
-    testType: 0,
-    playPassFailSounds: true,
+    ...settings,
+    sequence: [],
+    detected: [],
+    status: 'stopped',
+    currentNoteIndex: 0,
+    highlightIndex: -1,
+    currentAttempt: 1,
+    maxAttempts: settings.maxRetries,
+    noteRetryCount: 0,
+    testsCompleted: 0,
+    cumulativeScorePercent: 0,
+    sessionRunning: false,
+    sessionId: 0,
   };
-})();
-
-function defaultRangeForKey(rootNote: number): [number, number] {
-  let best = 60 + rootNote;
-  for (let oct = 2; oct <= 6; oct++) {
-    const candidate = (oct + 1) * 12 + rootNote;
-    if (Math.abs(candidate - 60) < Math.abs(best - 60)) best = candidate;
-  }
-  return [best, best + 12];
 }
 
-const defaultExercise: ExerciseState = {
-  ...defaultSettings,
-  sequence: [],
-  detected: [],
-  status: 'stopped',
-  currentNoteIndex: 0,
-  highlightIndex: -1,
-  currentAttempt: 1,
-  maxAttempts: defaultSettings.maxRetries,
-  noteRetryCount: 0,
-  testsCompleted: 0,
-  cumulativeScorePercent: 0,
-  sessionRunning: false,
-  sessionId: 0,
-};
-
-const SETTINGS_KEY = 'ear_ring_settings';
+// App state, not a setting: kept out of the Rust settings model so a settings reset never touches it.
 const HAS_LAUNCHED_KEY = 'ear_ring_has_launched';
-
-function loadSettings(): ExerciseSettings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) {
-      const parsed = { ...defaultSettings, ...JSON.parse(raw) };
-      // Reset melody mode (testType==1) which is no longer in the UI
-      if (parsed.testType === 1) parsed.testType = 0;
-      // Merged descending-arpeggio mode (testType==3) into 2 (issue #5)
-      if (parsed.testType === 3) parsed.testType = 2;
-      // 4-note (7th chord) arpeggios are suppressed for now — migrate a stored 4
-      // back to 3 for anyone who'd picked it in diatonic mode before this change.
-      if (parsed.testType === 2) parsed.sequenceLength = 3;
-      return parsed;
-    }
-  } catch {}
-  return defaultSettings;
-}
 
 function getInitialScreen(): Screen {
   if (!localStorage.getItem(HAS_LAUNCHED_KEY)) {
@@ -101,18 +43,19 @@ function getInitialScreen(): Screen {
 const TAB_SCREENS: Screen[] = ['home', 'setup', 'progress', 'settings', 'help'];
 
 export default function App() {
+  const { settings, dispatch } = useSettings();
+  // Rust normalizes whatever was stored first (a few ms); there is nothing to show before that.
+  if (!settings) return null;
+  return <AppContent settings={settings} dispatch={dispatch} />;
+}
+
+function AppContent({ settings, dispatch }: { settings: ExerciseSettings; dispatch: Dispatch }) {
   const [screen, setScreen] = useState<Screen>(getInitialScreen);
-  const [settings, setSettings] = useState<ExerciseSettings>(loadSettings);
-  const [exercise, setExercise] = useState<ExerciseState>({ ...defaultExercise, ...loadSettings() });
+  const [exercise, setExercise] = useState<ExerciseState>(() => initialExercise(settings));
 
-  useEffect(() => {
-    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
-  }, [settings]);
-
-  const resetSettings = useCallback(() => {
-    setSettings(defaultSettings);
-    localStorage.removeItem(HAS_LAUNCHED_KEY);
-  }, []);
+  // Reset leaves the first-launch flag alone: it's app state, not a setting, and clearing it
+  // on reset is what sent the next-tapped tab to Help on Android.
+  const resetSettings = useCallback(() => dispatch({ type: 'reset' }), [dispatch]);
 
   const clearProgress = useCallback(() => {
     localStorage.removeItem('ear_ring_sessions');
@@ -144,7 +87,7 @@ export default function App() {
       wrongNotePauseMs: settings.wrongNotePauseMs,
       instrumentIndex: settings.instrumentIndex,
       playPassFailSounds: settings.playPassFailSounds,
-      detected: [] as typeof defaultExercise.detected,
+      detected: [] as ExerciseState['detected'],
       status: 'playing' as const,
       currentNoteIndex: 0,
       highlightIndex: -1,
@@ -214,7 +157,7 @@ export default function App() {
       {screen === 'home' && (
         <HomeScreen
           settings={settings}
-          onUpdateSettings={setSettings}
+          onAction={dispatch}
           onStart={startExercise}
         />
       )}
@@ -227,7 +170,7 @@ export default function App() {
       {screen === 'setup' && (
         <SetupScreen
           onBack={() => setScreen('home')}
-          onUpdateSettings={setSettings}
+          onAction={dispatch}
           rangeStart={settings.rangeStart}
           rangeEnd={settings.rangeEnd}
           rootChroma={settings.rootNote}
@@ -254,7 +197,7 @@ export default function App() {
       {screen === 'settings' && (
         <SettingsScreen
           settings={settings}
-          onUpdateSettings={setSettings}
+          onAction={dispatch}
           onResetSettings={resetSettings}
           onBack={() => setScreen('home')}
         />

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { ExerciseSettings } from '../types';
+import { SettingsAction } from '../settingsStore';
 import { TooltipIcon } from './Tooltip';
 
 interface Props {
   settings: ExerciseSettings;
-  onUpdateSettings: React.Dispatch<React.SetStateAction<ExerciseSettings>>;
+  onAction: (action: SettingsAction) => void;
   onResetSettings: () => void;
   onBack: () => void;
 }
@@ -43,18 +44,9 @@ function CollapsibleSection({ title, children }: { title: string; children: Reac
 
 interface InstrumentInfo { id: number; name: string; semitones: number; rangeStart: number; rangeEnd: number; graceFrames: number; octaveCorrection: boolean; pitchToleranceCents: number; }
 
-function defaultRangeForKey(rootNote: number): [number, number] {
-  let best = 60 + rootNote;
-  for (let oct = 2; oct <= 6; oct++) {
-    const c = (oct + 1) * 12 + rootNote;
-    if (Math.abs(c - 60) < Math.abs(best - 60)) best = c;
-  }
-  return [best, best + 12];
-}
-
-export default function SettingsScreen({ settings, onUpdateSettings, onResetSettings, onBack }: Props) {
+export default function SettingsScreen({ settings, onAction, onResetSettings, onBack }: Props) {
   const set = <K extends keyof ExerciseSettings>(key: K, value: ExerciseSettings[K]) =>
-    onUpdateSettings(prev => ({ ...prev, [key]: value }));
+    onAction({ type: 'set', values: { [key]: value } });
 
   const [instruments, setInstruments] = useState<InstrumentInfo[]>([]);
   useEffect(() => {
@@ -80,26 +72,9 @@ export default function SettingsScreen({ settings, onUpdateSettings, onResetSett
         <span className="section-label" style={{ marginTop: 0 }}>Instrument<TooltipIcon tooltipKey="instrument" /></span>
         <select
           value={settings.instrumentIndex}
-          onChange={e => {
-            const idx = parseInt(e.target.value);
-            const inst = instruments[idx];
-            onUpdateSettings(prev => {
-              const [rangeStart, rangeEnd] = inst ? [inst.rangeStart, inst.rangeEnd] : defaultRangeForKey(prev.rootNote);
-              // Snap grace/octave/tolerance to the new instrument's own table values too —
-              // otherwise these Advanced overrides stay stuck at whatever the previous
-              // instrument left them at (e.g. selecting a Voice instrument would silently
-              // keep Piano's strict 50-cent pitch tolerance instead of picking up Voice's
-              // wider 80, defeating the vibrato-tolerance feature entirely).
-              const graceFrames = inst ? inst.graceFrames : prev.graceFrames;
-              const octaveCorrection = inst ? inst.octaveCorrection : prev.octaveCorrection;
-              const pitchToleranceCents = inst ? inst.pitchToleranceCents : prev.pitchToleranceCents;
-              // Tuner-meter default reuses the same pitchToleranceCents > 50 signal that
-              // already marks an instrument as lacking a mechanical pitch stop — no
-              // separate "continuous pitch" flag needed on the Rust side.
-              const useTunerMeter = inst ? inst.pitchToleranceCents > 50 : prev.useTunerMeter;
-              return { ...prev, instrumentIndex: idx, rangeStart, rangeEnd, graceFrames, octaveCorrection, pitchToleranceCents, useTunerMeter };
-            });
-          }}
+          // Rust snaps range, grace frames, octave correction, tolerance and the tuner-meter
+          // default to the instrument's table (setInstrument).
+          onChange={e => onAction({ type: 'setInstrument', value: parseInt(e.target.value) })}
           style={{ width: '100%', padding: '8px 12px', fontSize: 14, borderRadius: 4, border: '1px solid #bdbdbd', marginBottom: 4 }}
         >
           {instruments.map(inst => (
