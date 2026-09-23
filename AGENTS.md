@@ -69,6 +69,40 @@ runs `wasm-pack`, no platform (desktop/Tauri included, which talks to the Rust c
 directly via native Tauri commands) imports it. Left in place for now for a possible
 future web target — don't wire it up or delete it without asking first.
 
+### Settings: defaults and rules live in Rust
+
+`rust/src/settings.rs` is the Shared Logic Rule applied to the ~24 exercise settings
+(root note, range, scale, tempo, retries, detection tuning, instrument, test type, ...).
+Three stateless functions, string JSON in and out:
+- `defaults_json(platform)` — the default settings. Per-platform overrides are the
+  exception, not the rule — currently just iOS's `framesToConfirm` (2 vs. 3 elsewhere),
+  tuned together with its mic gain boost.
+- `normalize_json(input, platform)` — tolerant load: fills missing/invalid fields with
+  defaults, clamps numbers, drops unknown fields, migrates legacy `testType` values.
+  Never fails, so it's also how each platform upgrades whatever it already had stored.
+- `apply_json(current, action, platform)` — applies one action (`set`, `setRootNote`,
+  `setRange`, `setInstrument`, `setTestType`, `reset`) and returns the new settings.
+  This is where instrument-snapping, range-snapping and the diatonic sequence-length
+  rule live now — not duplicated per platform.
+
+Exposed via C FFI (`ear_ring_settings_defaults/normalize/apply` + `ear_ring_free_string`)
+and Android JNI, and as three Tauri commands on desktop.
+
+**Android and desktop are switched over** (one JSON blob persisted per platform;
+screens dispatch actions instead of computing the next settings themselves).
+
+**iOS is NOT yet switched over — this is pending work.** `ExerciseModel.swift` still
+has its own 24 self-persisting `@Published` properties, its own defaults, and its own
+copies of the instrument-snapping / range-snapping / diatonic-length rules. To finish:
+1. Add three wrappers in `EarRingCore.swift` calling `ear_ring_settings_defaults/
+   normalize/apply`, releasing the returned string via `ear_ring_free_string`.
+2. Replace the 24 `@Published` properties in `ExerciseModel.swift` with one
+   `@Published var settings` (Codable) backed by that JSON, keeping the old property
+   names as computed proxies so views don't need to change.
+3. Delete the duplicated defaults and the instrument/root-note snapping logic.
+4. Can't be built or tested on Windows — verify on a Mac: build, defaults decode,
+   reset, instrument change, relaunch persistence.
+
 ---
 
 ## UI Consistency Rule
@@ -968,11 +1002,15 @@ The JSON from `instrument_list_json()` includes `rangeStart`/`rangeEnd` fields f
 ## First Launch Behaviour
 
 On the very first launch of the app (detected via a persistent flag), the app navigates
-to the **Help** screen instead of Home. After that, it always starts on Home.
+to the **Help** screen instead of Home. After that, it always starts on Home. This flag
+is app state, not a setting — it lives outside the settings model (see above) on every
+platform, specifically so a settings reset never touches it (issue: on Android, clearing
+it on reset used to send the next-tapped tab to Help instead, since Android's first-launch
+check runs on every navigation, not just at startup).
 
 | Platform | Flag key | Storage |
 |----------|----------|---------|
-| Android  | `"hasLaunched"` | SharedPreferences (`PREFS_NAME`) |
+| Android  | `"hasLaunched"` | SharedPreferences (`PREFS_NAME`); settings themselves are the separate `"settings"` key, one JSON blob |
 | iOS      | `"hasLaunched"` | UserDefaults |
 | Desktop  | `"ear_ring_has_launched"` | localStorage |
 
