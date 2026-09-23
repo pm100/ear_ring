@@ -75,21 +75,13 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                "Mic Setup",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.Center)
-            )
-            // Clears only the rolling staff history — the live meter is untouched and
-            // keeps tracking whatever the mic hears next.
-            TextButton(
-                onClick = { concertHistory.clear() },
-                modifier = Modifier.align(Alignment.CenterEnd)
-            ) {
-                Text("Clear")
-            }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Spacer(Modifier.weight(1f))
+            Text("Mic Setup", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
         }
 
         Spacer(Modifier.height(16.dp))
@@ -122,7 +114,13 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
             rootChroma = rootChroma,
             keySignatureMode = keySignatureMode
         )
-        Spacer(Modifier.height(12.dp))
+        // Clears only the rolling staff history above — the live meter is untouched
+        // and keeps tracking whatever the mic hears next.
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = { concertHistory.clear() }) {
+                Text("Clear")
+            }
+        }
 
         // Display style: Tuner needle (TunerMeter) or the classic note-name circle
         // (PitchMeter) — defaults per-instrument (see ExerciseViewModel.setInstrumentIndex)

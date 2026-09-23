@@ -104,9 +104,6 @@ export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, ro
       <div className="screen-header">
         <button className="btn-back" onClick={onBack}>{'←'} Back</button>
         <span className="screen-title">Mic Setup</span>
-        {/* Clears only the rolling staff history — the live meter is untouched and
-            keeps tracking whatever the mic hears next. */}
-        <button className="btn-back" onClick={() => setNoteHistory([])}>Clear</button>
       </div>
 
       <p className="setup-instruction">Play a note to test your microphone.</p>
@@ -125,6 +122,11 @@ export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, ro
         rootChroma={effChroma}
         keySignatureMode={keySignatureMode}
       />
+      {/* Clears only the rolling staff history above — the live meter is untouched
+          and keeps tracking whatever the mic hears next. */}
+      <div style={{ textAlign: 'right' }}>
+        <button className="btn-back" onClick={() => setNoteHistory([])}>Clear</button>
+      </div>
 
       {/* Display style: Tuner needle (TunerMeter) or the classic note-name circle
           (PitchMeter) — defaults per-instrument (see SettingsScreen's instrument

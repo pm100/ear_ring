@@ -429,13 +429,8 @@ element on this screen was sized/chosen deliberately to fit in the viewport at o
 below need to stay visible alongside the staff/meter while the user is actively testing.
 
 ```
-                        [Mic Setup]  [Clear]    (title centred; Clear trails it —
-                                                 top-right on Android/iOS, end of
-                                                 the header row next to "← Back" on
-                                                 desktop. Clears only the rolling
-                                                 staff history below, not the live
-                                                 meter — tab has no back button on
-                                                 iOS/Android, Mic tab on all platforms)
+                        [Mic Setup]        (tab — no back button on iOS/Android;
+                                            Mic tab on all platforms)
 
 [16dp space]
 "Play a note to test your microphone."   — bodyMedium, centred
@@ -459,6 +454,10 @@ MusicStaff            — 130dp tall on phones (160dp on iPad/desktop — trimme
                         Previous notes: EXPECTED colour (filled dark)
                         Empty staff when nothing detected yet, or after tapping Clear
                         Same note repeated after silence is always appended again
+
+Right below the staff, right-aligned: a plain-text `Clear` button — clears only the
+staff history above (not the live meter, which keeps tracking whatever the mic hears
+next). Associated with the staff by position, not placed in the title row.
 
 [10dp space]
 PitchMeter            — 80dp circle on phones (90dp before this trim; 130-150dp on
