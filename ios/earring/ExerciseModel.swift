@@ -683,16 +683,17 @@ class ExerciseModel: ObservableObject {
         sessionPersisted = true
     }
 
-    /** Resets all settings to their defaults. Does NOT affect progress history or the
-     *  isPremium entitlement (that's a purchase, not a preference — left untouched).
-     *  Also clears the first-launch flag so Help screen shows on next launch. */
+    /** Resets all settings to their defaults. Does NOT affect progress history, the
+     *  isPremium entitlement (that's a purchase, not a preference — left untouched), or
+     *  the first-launch flag (app state, not a setting; kept in step with Android, where
+     *  clearing it sent the next-tapped tab to Help). */
     func resetSettings() {
         let ud = UserDefaults.standard
         let keys = ["rootNote","rangeStart","rangeEnd","scaleId","sequenceLength","tempoBpm",
                     "showTestNotes","keySignatureMode","introSoundMode","maxRetries","noteRetries","silenceThreshold",
                     "framesToConfirm","warmupFrames","graceFrames","octaveCorrection","yinThreshold","pitchToleranceCents","useTunerMeter",
                     "postChordGapNs","wrongNotePauseNs",
-                    "instrumentIndex","testType","playPassFailSounds","hasLaunched"]
+                    "instrumentIndex","testType","playPassFailSounds"]
         keys.forEach { ud.removeObject(forKey: $0) }
         rootNote = 0
         rangeStart = 60
