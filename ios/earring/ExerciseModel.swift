@@ -15,142 +15,189 @@ enum ExerciseStatus {
     case stopped
 }
 
+/// The persisted settings — schema, defaults, and every rule that changes them are owned by
+/// `rust/src/settings.rs` (see `EarRingCore.settingsDefaults/Normalize/Apply`). This struct only
+/// decodes the JSON that crosses the FFI boundary; field names must match its camelCase JSON
+/// keys exactly so Codable's default synthesis works with no explicit CodingKeys.
+private struct Settings: Codable {
+    var rootNote: Int
+    var rangeStart: Int
+    var rangeEnd: Int
+    var scaleId: Int
+    var sequenceLength: Int
+    var tempoBpm: Int
+    var showTestNotes: Bool
+    var playPassFailSounds: Bool
+    var keySignatureMode: Int
+    var introSoundMode: Int
+    var maxRetries: Int
+    var noteRetries: Int
+    var silenceThreshold: Float
+    var framesToConfirm: Int
+    var warmupFrames: Int
+    var graceFrames: Int
+    var octaveCorrection: Bool
+    var yinThreshold: Float
+    var pitchToleranceCents: Float
+    var useTunerMeter: Bool
+    var postChordGapMs: Int
+    var wrongNotePauseMs: Int
+    var instrumentIndex: Int
+    var testType: Int
+}
+
 @MainActor
 class ExerciseModel: ObservableObject {
     private static let ud = UserDefaults.standard
+    private static let settingsKey = "settings"
 
-    @Published var rootNote: Int = ud.object(forKey: "rootNote") != nil ? ud.integer(forKey: "rootNote") : 0 {
-        didSet { UserDefaults.standard.set(rootNote, forKey: "rootNote") }
+    /// The persisted settings, as ONE JSON string owned by `rust/src/settings.rs` — it owns the
+    /// schema, every default, and every rule that changes them (instrument-snapping,
+    /// range-snapping, the diatonic sequence-length rule, ...). This class only persists the
+    /// string Rust returns and republishes it. Every property below named after an
+    /// individually-stored setting (rootNote, tempoBpm, ...) is a computed proxy decoding or
+    /// dispatching against this one blob, so existing views don't need to change — with 2
+    /// exceptions: SettingsView's Instrument/Intro Sound pickers use `$model.x`, which needs a
+    /// real `@Published` property (not a computed one), so those two call sites were switched
+    /// to a manual `Binding(get:set:)` instead.
+    @Published private var settingsJson: String = {
+        let json = EarRingCore.settingsNormalize(ud.string(forKey: settingsKey))
+        ud.set(json, forKey: settingsKey)
+        return json
+    }()
+
+    /// Decoded view of `settingsJson`. Rust guarantees valid JSON for every string it returns
+    /// (`rust/src/settings.rs`'s 3 functions are documented as "never fail"), so this trusts it
+    /// the same way Android's `JSONObject(json)` does.
+    private var settings: Settings {
+        try! JSONDecoder().decode(Settings.self, from: Data(settingsJson.utf8))
     }
-    @Published var rangeStart: Int = ud.object(forKey: "rangeStart") != nil ? ud.integer(forKey: "rangeStart") : 60 {
-        didSet { UserDefaults.standard.set(rangeStart, forKey: "rangeStart") }
+
+    /// Sends one action to the Rust settings model, persists the result, and republishes it.
+    private func dispatch(_ action: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: action),
+              let actionJson = String(data: data, encoding: .utf8) else { return }
+        settingsJson = EarRingCore.settingsApply(settingsJson, actionJson)
+        Self.ud.set(settingsJson, forKey: Self.settingsKey)
     }
-    @Published var rangeEnd: Int = ud.object(forKey: "rangeEnd") != nil ? ud.integer(forKey: "rangeEnd") : 72 {
-        didSet { UserDefaults.standard.set(rangeEnd, forKey: "rangeEnd") }
+
+    /// A plain-field change: Rust merges it and clamps it to valid bounds.
+    private func set(_ field: String, _ value: Any) {
+        dispatch(["type": "set", "values": [field: value]])
     }
-    @Published var scaleId: Int = ud.object(forKey: "scaleId") != nil ? ud.integer(forKey: "scaleId") : 0 {
-        didSet { UserDefaults.standard.set(scaleId, forKey: "scaleId") }
+
+    /// Re-derives the default range for the key (Rust does this as part of `setRootNote`).
+    var rootNote: Int {
+        get { settings.rootNote }
+        set { dispatch(["type": "setRootNote", "value": newValue]) }
     }
-    // 4-note (7th chord) arpeggios are suppressed for now — migrate a stored 4 back to
-    // 3 for anyone who'd picked it in diatonic mode before this change.
-    @Published var sequenceLength: Int = {
-        let stored = ud.object(forKey: "sequenceLength") != nil ? ud.integer(forKey: "sequenceLength") : 1
-        let testType = ud.object(forKey: "testType") != nil ? ud.integer(forKey: "testType") : 0
-        return (testType == 2 || testType == 3) ? 3 : stored  // 3 = old descending-arpeggio mode, merged into 2
-    }() {
-        didSet { UserDefaults.standard.set(sequenceLength, forKey: "sequenceLength") }
+    var rangeStart: Int { settings.rangeStart }
+    var rangeEnd: Int { settings.rangeEnd }
+    var scaleId: Int {
+        get { settings.scaleId }
+        set { set("scaleId", newValue) }
     }
-    @Published var tempoBpm: Int = ud.object(forKey: "tempoBpm") != nil ? ud.integer(forKey: "tempoBpm") : 100 {
-        didSet { UserDefaults.standard.set(tempoBpm, forKey: "tempoBpm") }
+    var sequenceLength: Int {
+        get { settings.sequenceLength }
+        set { set("sequenceLength", newValue) }
     }
-    @Published var showTestNotes: Bool = ud.object(forKey: "showTestNotes") != nil ? ud.bool(forKey: "showTestNotes") : false {
-        didSet { UserDefaults.standard.set(showTestNotes, forKey: "showTestNotes") }
+    var tempoBpm: Int {
+        get { settings.tempoBpm }
+        set { set("tempoBpm", newValue) }
     }
-    @Published var keySignatureMode: Int = ud.object(forKey: "keySignatureMode") != nil ? ud.integer(forKey: "keySignatureMode") : 0 {
-        didSet { UserDefaults.standard.set(keySignatureMode, forKey: "keySignatureMode") }
+    var showTestNotes: Bool {
+        get { settings.showTestNotes }
+        set { set("showTestNotes", newValue) }
+    }
+    var keySignatureMode: Int {
+        get { settings.keySignatureMode }
+        set { set("keySignatureMode", newValue) }
     }
     /// What plays before each test: 0=root note, 1=chord (default), 2=arpeggiated chord, 3=scale, 4=none.
-    @Published var introSoundMode: Int = ud.object(forKey: "introSoundMode") != nil ? ud.integer(forKey: "introSoundMode") : 1 {
-        didSet { UserDefaults.standard.set(introSoundMode, forKey: "introSoundMode") }
+    var introSoundMode: Int {
+        get { settings.introSoundMode }
+        set { set("introSoundMode", newValue) }
     }
-    @Published var maxRetries: Int = ud.object(forKey: "maxRetries") != nil ? ud.integer(forKey: "maxRetries") : 5 {
-        didSet { UserDefaults.standard.set(maxRetries, forKey: "maxRetries") }
+    var maxRetries: Int {
+        get { settings.maxRetries }
+        set { set("maxRetries", newValue) }
     }
     /// Issue #9 "note correction": consecutive wrong tries allowed at the same note
     /// position before the whole test restarts. 0 = always restart (old behavior).
-    @Published var noteRetries: Int = ud.object(forKey: "noteRetries") != nil ? ud.integer(forKey: "noteRetries") : 2 {
-        didSet { UserDefaults.standard.set(noteRetries, forKey: "noteRetries") }
+    var noteRetries: Int {
+        get { settings.noteRetries }
+        set { set("noteRetries", newValue) }
     }
-    @Published var silenceThreshold: Float = ud.object(forKey: "silenceThreshold") != nil ? Float(ud.double(forKey: "silenceThreshold")) : 0.003 {
-        didSet { UserDefaults.standard.set(Double(silenceThreshold), forKey: "silenceThreshold") }
+    var silenceThreshold: Float {
+        get { settings.silenceThreshold }
+        set { set("silenceThreshold", newValue) }
     }
-    @Published var framesToConfirm: Int = ud.object(forKey: "framesToConfirm") != nil ? ud.integer(forKey: "framesToConfirm") : 2 {
-        didSet { UserDefaults.standard.set(framesToConfirm, forKey: "framesToConfirm") }
+    var framesToConfirm: Int {
+        get { settings.framesToConfirm }
+        set { set("framesToConfirm", newValue) }
     }
-    @Published var warmupFrames: Int = ud.object(forKey: "warmupFrames") != nil ? ud.integer(forKey: "warmupFrames") : 4 {
-        didSet { UserDefaults.standard.set(warmupFrames, forKey: "warmupFrames") }
+    var warmupFrames: Int {
+        get { settings.warmupFrames }
+        set { set("warmupFrames", newValue) }
     }
     /// Previously hidden per-instrument constant (grace_frames in the Rust INSTRUMENTS
-    /// table). Live-pushed to the tracker on every edit (see didSet) rather than only at
-    /// the next startLivePitchDetection() call — mirrors Android/desktop's Advanced
+    /// table). Live-pushed to the tracker on every edit (see pushAdvancedParams) rather than
+    /// only at the next startLivePitchDetection() call — mirrors Android/desktop's Advanced
     /// controls, where a manual slider change takes effect immediately.
-    @Published var graceFrames: Int = ud.object(forKey: "graceFrames") != nil ? ud.integer(forKey: "graceFrames") : 3 {
-        didSet {
-            UserDefaults.standard.set(graceFrames, forKey: "graceFrames")
-            pushAdvancedParams()
-        }
+    var graceFrames: Int {
+        get { settings.graceFrames }
+        set { set("graceFrames", newValue); pushAdvancedParams() }
     }
     /// Previously hidden per-instrument constant (octave_correction in the Rust
     /// INSTRUMENTS table).
-    @Published var octaveCorrection: Bool = ud.object(forKey: "octaveCorrection") != nil ? ud.bool(forKey: "octaveCorrection") : false {
-        didSet {
-            UserDefaults.standard.set(octaveCorrection, forKey: "octaveCorrection")
-            pushAdvancedParams()
-        }
+    var octaveCorrection: Bool {
+        get { settings.octaveCorrection }
+        set { set("octaveCorrection", newValue); pushAdvancedParams() }
     }
     /// Previously hidden global constant (DEFAULT_YIN_THRESHOLD in pitch_detection.rs).
-    @Published var yinThreshold: Float = ud.object(forKey: "yinThreshold") != nil ? Float(ud.double(forKey: "yinThreshold")) : 0.15 {
-        didSet {
-            UserDefaults.standard.set(Double(yinThreshold), forKey: "yinThreshold")
-            pushAdvancedParams()
-        }
+    var yinThreshold: Float {
+        get { settings.yinThreshold }
+        set { set("yinThreshold", newValue); pushAdvancedParams() }
     }
     /// Previously hidden per-instrument constant (pitch_tolerance_cents in the Rust
     /// INSTRUMENTS table).
-    @Published var pitchToleranceCents: Float = ud.object(forKey: "pitchToleranceCents") != nil ? Float(ud.double(forKey: "pitchToleranceCents")) : 50 {
-        didSet {
-            UserDefaults.standard.set(Double(pitchToleranceCents), forKey: "pitchToleranceCents")
-            pushAdvancedParams()
-        }
+    var pitchToleranceCents: Float {
+        get { settings.pitchToleranceCents }
+        set { set("pitchToleranceCents", newValue); pushAdvancedParams() }
     }
-    /// Mic Setup meter style: true = tuner-style needle meter, false = classic
-    /// note-name circle. Defaults per-instrument (see instrumentIndex's didSet below)
-    /// but user-overridable — not pushed to the tracker, purely a display preference.
-    @Published var useTunerMeter: Bool = ud.object(forKey: "useTunerMeter") != nil ? ud.bool(forKey: "useTunerMeter") : false {
-        didSet { UserDefaults.standard.set(useTunerMeter, forKey: "useTunerMeter") }
+    /// Mic Setup meter style: true = tuner-style needle meter, false = classic note-name
+    /// circle. Defaults per-instrument (Rust `setInstrument`) but user-overridable — not
+    /// pushed to the tracker, purely a display preference.
+    var useTunerMeter: Bool {
+        get { settings.useTunerMeter }
+        set { set("useTunerMeter", newValue) }
     }
-    @Published var postChordGapNanoseconds: UInt64 = ud.object(forKey: "postChordGapNs") != nil ? UInt64(ud.integer(forKey: "postChordGapNs")) : 800_000_000 {
-        didSet { UserDefaults.standard.set(Int(postChordGapNanoseconds), forKey: "postChordGapNs") }
+    var postChordGapNanoseconds: UInt64 {
+        get { UInt64(settings.postChordGapMs) * 1_000_000 }
+        set { set("postChordGapMs", Int(newValue / 1_000_000)) }
     }
-    @Published var wrongNotePauseNanoseconds: UInt64 = ud.object(forKey: "wrongNotePauseNs") != nil ? UInt64(ud.integer(forKey: "wrongNotePauseNs")) : 3_000_000_000 {
-        didSet { UserDefaults.standard.set(Int(wrongNotePauseNanoseconds), forKey: "wrongNotePauseNs") }
+    var wrongNotePauseNanoseconds: UInt64 {
+        get { UInt64(settings.wrongNotePauseMs) * 1_000_000 }
+        set { set("wrongNotePauseMs", Int(newValue / 1_000_000)) }
     }
-    @Published var instrumentIndex: Int = ud.object(forKey: "instrumentIndex") != nil ? ud.integer(forKey: "instrumentIndex") : 0 {
-        didSet {
-            UserDefaults.standard.set(instrumentIndex, forKey: "instrumentIndex")
-            let (s, e) = ExerciseModel.instrumentRange(index: instrumentIndex, rootNote: rootNote)
-            rangeStart = s
-            rangeEnd = e
-            // Snap grace/octave/tolerance/meter-style to the new instrument's own table
-            // values — otherwise these Advanced overrides stay stuck at whatever the
-            // previous instrument left them at (e.g. selecting a Voice instrument would
-            // silently keep Piano's strict 50-cent pitch tolerance instead of picking up
-            // Voice's wider 80, defeating the vibrato-tolerance feature entirely).
-            // Tuner-meter default reuses the same pitchToleranceCents > 50 signal that
-            // already marks an instrument as lacking a mechanical pitch stop — no
-            // separate "continuous pitch" flag needed on the Rust side.
-            if let params = ExerciseModel.instrumentAdvancedParams(index: instrumentIndex) {
-                graceFrames = params.graceFrames
-                octaveCorrection = params.octaveCorrection
-                pitchToleranceCents = params.pitchToleranceCents
-                useTunerMeter = params.pitchToleranceCents > 50
-            }
-        }
+    /// Rust snaps range, grace/octave/tolerance and the tuner-meter default to the instrument's table.
+    var instrumentIndex: Int {
+        get { settings.instrumentIndex }
+        set { dispatch(["type": "setInstrument", "value": newValue]) }
     }
-    @Published var testType: Int = {
-        let stored = ud.object(forKey: "testType") != nil ? ud.integer(forKey: "testType") : 0
-        if stored == 1 { return 0 }  // Reset melody mode (no longer in UI)
-        if stored == 3 { return 2 }  // Merged descending-arpeggio mode into 2 (issue #5)
-        return stored
-    }() {
-        didSet { UserDefaults.standard.set(testType, forKey: "testType") }
+    /// Rust enforces the diatonic rule (always a 3-note arpeggio).
+    var testType: Int {
+        get { settings.testType }
+        set { dispatch(["type": "setTestType", "value": newValue]) }
     }
     /// Chime on test pass/fail.
-    @Published var playPassFailSounds: Bool = ud.object(forKey: "playPassFailSounds") != nil ? ud.bool(forKey: "playPassFailSounds") : true {
-        didSet { UserDefaults.standard.set(playPassFailSounds, forKey: "playPassFailSounds") }
+    var playPassFailSounds: Bool {
+        get { settings.playPassFailSounds }
+        set { set("playPassFailSounds", newValue) }
     }
-    /// Ad-free / paid entitlement. Not a user "setting" — deliberately excluded from
-    /// resetSettings()'s key list below. Until real billing lands, nothing sets this true.
+    /// Ad-free / paid entitlement. Not a user "setting" — deliberately kept outside the
+    /// settings blob (and outside resetSettings()'s reach), same as Android's separate
+    /// PREF_IS_PREMIUM. Until real billing lands, nothing sets this true.
     @Published var isPremium: Bool = ud.object(forKey: "isPremium") != nil ? ud.bool(forKey: "isPremium") : false {
         didSet { UserDefaults.standard.set(isPremium, forKey: "isPremium") }
     }
@@ -195,56 +242,14 @@ class ExerciseModel: ObservableObject {
 
     var rangeLabel: String { "\(MusicTheory.midiToLabel(rangeStart))–\(MusicTheory.midiToLabel(rangeEnd))" }
 
-    /// Set rootNote and reset the range to one octave closest to middle C.
-    func updateRangeForKey() {
-        let (s, e) = ExerciseModel.defaultRange(rootNote: rootNote)
-        rangeStart = s
-        rangeEnd = e
-    }
+    /// No longer needed: `rootNote`'s setter already re-derives the range via Rust's
+    /// `setRootNote` action. Kept as a no-op so HomeView's existing call site (paired with
+    /// `model.rootNote = $0`) doesn't need to change.
+    func updateRangeForKey() {}
 
-    /// Apply a user-edited range, clamped to at least one octave.
+    /// Apply a user-edited range; Rust clamps it to at least one octave.
     func setRange(start: Int, end: Int) {
-        let (s, e) = EarRingCore.enforceMinRangeSpan(newStart: start, newEnd: end, oldStart: rangeStart, oldEnd: rangeEnd)
-        rangeStart = s
-        rangeEnd = e
-    }
-
-    /// The selected instrument's own registered range (from the Rust `INSTRUMENTS`
-    /// table, via `instrumentList()`), falling back to the generic root-based
-    /// default if the instrument list can't be parsed or `index` is out of range.
-    static func instrumentRange(index: Int, rootNote: Int) -> (Int, Int) {
-        guard let json = try? JSONSerialization.jsonObject(with: Data(EarRingCore.instrumentList().utf8)) as? [[String: Any]],
-              index >= 0, index < json.count,
-              let start = json[index]["rangeStart"] as? Int,
-              let end = json[index]["rangeEnd"] as? Int else {
-            return defaultRange(rootNote: rootNote)
-        }
-        return (start, end)
-    }
-
-    /// The selected instrument's own registered grace frames / octave correction / pitch
-    /// tolerance (from the Rust `INSTRUMENTS` table, via `instrumentList()`). Returns nil
-    /// (leave the caller's current values alone) if the instrument list can't be parsed
-    /// or `index` is out of range.
-    static func instrumentAdvancedParams(index: Int) -> (graceFrames: Int, octaveCorrection: Bool, pitchToleranceCents: Float)? {
-        guard let json = try? JSONSerialization.jsonObject(with: Data(EarRingCore.instrumentList().utf8)) as? [[String: Any]],
-              index >= 0, index < json.count,
-              let grace = json[index]["graceFrames"] as? Int,
-              let octave = json[index]["octaveCorrection"] as? Bool,
-              // NSNumber, not `as? Double` directly: the Rust side emits whole-number
-              // cents (e.g. "50", not "50.0"), which JSONSerialization boxes as an
-              // integer-typed NSNumber — `as? Double` fails to bridge that and silently
-              // returns nil, so this must go through .doubleValue instead.
-              let toleranceNumber = json[index]["pitchToleranceCents"] as? NSNumber else {
-            return nil
-        }
-        return (grace, octave, Float(toleranceNumber.doubleValue))
-    }
-
-    static func defaultRange(rootNote: Int) -> (Int, Int) {
-        let candidates = (2...6).map { oct -> Int in (oct + 1) * 12 + rootNote }
-        let best = candidates.min(by: { abs($0 - 60) < abs($1 - 60) }) ?? 60
-        return (best, best + 12)
+        dispatch(["type": "setRange", "start": start, "end": end])
     }
 
     let audioCapture = AudioCapture()
@@ -368,7 +373,9 @@ class ExerciseModel: ObservableObject {
         audioPlayback.prepareForPlayback()
 
         if testType == 1 {
-            // Melody mode
+            // Melody mode — no longer reachable from the UI (Rust's settings model remaps
+            // any stored testType 1 back to 0), kept only as vestigial dead code, same as
+            // Android's ExerciseViewModel.
             if melodyDeckCursor >= melodyDeck.count {
                 melodyDeck = EarRingCore.shuffleMelodyIndices(seed: UInt64(Date().timeIntervalSince1970 * 1000))
                 melodyDeckCursor = 0
@@ -379,11 +386,12 @@ class ExerciseModel: ObservableObject {
                 await startFreshTest(); return
             }
             melodyDurations = durations
-            // Auto-set range ±6 semitones
+            // Auto-set range ±6 semitones. Goes through setRange (not a raw property
+            // assignment) since rangeStart/rangeEnd are read-only proxies now — Rust owns
+            // every write path to the persisted range.
             let minMidi = (midiNotes.min() ?? 60) - 6
             let maxMidi = (midiNotes.max() ?? 72) + 6
-            rangeStart = max(21, minMidi)
-            rangeEnd = min(108, maxMidi)
+            setRange(start: max(21, minMidi), end: min(108, maxMidi))
             sequence = midiNotes
         } else if testType == 2 {
             // Diatonic arpeggio mode — direction (ascending/descending) is randomized
@@ -685,39 +693,10 @@ class ExerciseModel: ObservableObject {
 
     /** Resets all settings to their defaults. Does NOT affect progress history, the
      *  isPremium entitlement (that's a purchase, not a preference — left untouched), or
-     *  the first-launch flag (app state, not a setting; kept in step with Android, where
-     *  clearing it sent the next-tapped tab to Help). */
+     *  the first-launch flag (app state, not a setting; it isn't part of the settings blob
+     *  at all, so it's untouched automatically — kept in step with Android, where clearing
+     *  it used to send the next-tapped tab to Help). */
     func resetSettings() {
-        let ud = UserDefaults.standard
-        let keys = ["rootNote","rangeStart","rangeEnd","scaleId","sequenceLength","tempoBpm",
-                    "showTestNotes","keySignatureMode","introSoundMode","maxRetries","noteRetries","silenceThreshold",
-                    "framesToConfirm","warmupFrames","graceFrames","octaveCorrection","yinThreshold","pitchToleranceCents","useTunerMeter",
-                    "postChordGapNs","wrongNotePauseNs",
-                    "instrumentIndex","testType","playPassFailSounds"]
-        keys.forEach { ud.removeObject(forKey: $0) }
-        rootNote = 0
-        rangeStart = 60
-        rangeEnd = 72
-        scaleId = 0
-        sequenceLength = 1
-        tempoBpm = 100
-        showTestNotes = false
-        keySignatureMode = 0
-        introSoundMode = 1
-        maxRetries = 5
-        noteRetries = 2
-        silenceThreshold = 0.003
-        framesToConfirm = 2
-        warmupFrames = 4
-        graceFrames = 3
-        octaveCorrection = false
-        yinThreshold = 0.15
-        pitchToleranceCents = 50
-        useTunerMeter = false
-        postChordGapNanoseconds = 800_000_000
-        wrongNotePauseNanoseconds = 3_000_000_000
-        instrumentIndex = 0
-        testType = 0
-        playPassFailSounds = true
+        dispatch(["type": "reset"])
     }
 }

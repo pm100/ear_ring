@@ -47,7 +47,14 @@ struct SettingsView: View {
                             // "Instrument   Piano ⌄"), so a label above it just
                             // repeated the word.
                             HStack(spacing: 4) {
-                                Picker("Instrument", selection: $model.instrumentIndex) {
+                                // Binding(get:set:) rather than $model.instrumentIndex — that
+                                // sugar needs a real @Published property, but instrumentIndex is
+                                // now a computed proxy onto the Rust-owned settings blob (see
+                                // ExerciseModel.swift).
+                                Picker("Instrument", selection: Binding(
+                                    get: { model.instrumentIndex },
+                                    set: { model.instrumentIndex = $0 }
+                                )) {
                                     ForEach(instruments) { inst in
                                         Text(inst.name).tag(inst.id)
                                     }
@@ -100,7 +107,11 @@ struct SettingsView: View {
                             }
 
                             HStack(spacing: 4) {
-                                Picker("Intro Sound", selection: $model.introSoundMode) {
+                                // Same Binding(get:set:) reasoning as the Instrument picker above.
+                                Picker("Intro Sound", selection: Binding(
+                                    get: { model.introSoundMode },
+                                    set: { model.introSoundMode = $0 }
+                                )) {
                                     ForEach(introSoundOptions.indices, id: \.self) { idx in
                                         Text(introSoundOptions[idx]).tag(idx)
                                     }

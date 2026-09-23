@@ -288,6 +288,38 @@ struct EarRingCore {
         return (Int(outStart), Int(outEnd))
     }
 
+    // MARK: - Shared settings model (rust/src/settings.rs)
+    // All defaults and rules live in Rust; ExerciseModel only persists and decodes the JSON
+    // these 3 functions return. Bridge-friendly platform id: 0=Android, 1=iOS, 2=Desktop.
+    private static let settingsPlatform: UInt8 = 1
+
+    /// Default settings JSON.
+    static func settingsDefaults() -> String {
+        guard let ptr = ear_ring_settings_defaults(settingsPlatform) else { return "{}" }
+        defer { ear_ring_free_string(ptr) }
+        return String(cString: ptr)
+    }
+
+    /// Turns stored settings JSON (nil/empty/garbage/old/partial) into valid settings JSON.
+    static func settingsNormalize(_ stored: String?) -> String {
+        let ptr = (stored ?? "").withCString { ear_ring_settings_normalize($0, settingsPlatform) }
+        guard let ptr else { return "{}" }
+        defer { ear_ring_free_string(ptr) }
+        return String(cString: ptr)
+    }
+
+    /// Applies one action (e.g. `{"type":"setInstrument","value":8}`) and returns the new settings JSON.
+    static func settingsApply(_ current: String, _ action: String) -> String {
+        let ptr = current.withCString { currentPtr in
+            action.withCString { actionPtr in
+                ear_ring_settings_apply(currentPtr, actionPtr, settingsPlatform)
+            }
+        }
+        guard let ptr else { return current }
+        defer { ear_ring_free_string(ptr) }
+        return String(cString: ptr)
+    }
+
     /// Result from processing one audio buffer through the Rust pitch tracker.
     struct TrackerFrame {
         /// Detected frequency in Hz. 0 when silent or no confident pitch.

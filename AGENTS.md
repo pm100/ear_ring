@@ -88,20 +88,14 @@ Three stateless functions, string JSON in and out:
 Exposed via C FFI (`ear_ring_settings_defaults/normalize/apply` + `ear_ring_free_string`)
 and Android JNI, and as three Tauri commands on desktop.
 
-**Android and desktop are switched over** (one JSON blob persisted per platform;
-screens dispatch actions instead of computing the next settings themselves).
-
-**iOS is NOT yet switched over — this is pending work.** `ExerciseModel.swift` still
-has its own 24 self-persisting `@Published` properties, its own defaults, and its own
-copies of the instrument-snapping / range-snapping / diatonic-length rules. To finish:
-1. Add three wrappers in `EarRingCore.swift` calling `ear_ring_settings_defaults/
-   normalize/apply`, releasing the returned string via `ear_ring_free_string`.
-2. Replace the 24 `@Published` properties in `ExerciseModel.swift` with one
-   `@Published var settings` (Codable) backed by that JSON, keeping the old property
-   names as computed proxies so views don't need to change.
-3. Delete the duplicated defaults and the instrument/root-note snapping logic.
-4. Can't be built or tested on Windows — verify on a Mac: build, defaults decode,
-   reset, instrument change, relaunch persistence.
+**All three platforms are switched over** (one JSON blob persisted per platform; screens
+dispatch actions instead of computing the next settings themselves). iOS's
+`ExerciseModel.swift` exposes the old 24 property names as computed proxies over a single
+`@Published private var settingsJson: String` — reads decode it, writes dispatch a JSON
+action through `EarRingCore.settingsApply`. Two call sites in `SettingsView.swift`
+(the Instrument and Intro Sound pickers) use SwiftUI's `$model.x` binding sugar, which
+needs a real `@Published` property; since those two are now computed, they use a manual
+`Binding(get:set:)` instead — the only view-level change the port required.
 
 ---
 
