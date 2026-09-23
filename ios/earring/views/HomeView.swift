@@ -40,6 +40,12 @@ struct ChipButtonStyle: ButtonStyle {
                     .opacity(selected ? 0 : 1)
             )
             .foregroundColor(selected ? .white : .erPrimary)
+            // Unselected chips fill with Color.clear, so without this, SwiftUI only
+            // hit-tests the opaque bits (the label's text and the thin stroke border)
+            // rather than the whole frame(maxWidth: .infinity) box — leaving most of a
+            // short label's chip (e.g. "Tuner" next to the wider "Classic") dead to taps.
+            // Same fix as OutlinedDropdown/PianoRangePickerView/ProgressScreen.
+            .contentShape(Rectangle())
             .scaleEffect(configuration.isPressed ? 0.95 : 1)
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
