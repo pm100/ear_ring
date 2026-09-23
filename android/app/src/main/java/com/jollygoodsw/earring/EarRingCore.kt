@@ -63,6 +63,12 @@ object EarRingCore {
     // Packed as (start << 8 | end) — see Java_..._nativeEnforceMinRangeSpan in lib.rs.
     @JvmStatic external fun nativeEnforceMinRangeSpan(newStart: Int, newEnd: Int, oldStart: Int, oldEnd: Int): Long
 
+    // Shared settings model (rust/src/settings.rs): all defaults and rules live in Rust;
+    // this side only persists and renders the JSON.
+    @JvmStatic external fun nativeSettingsDefaults(platform: Int): String
+    @JvmStatic external fun nativeSettingsNormalize(input: String, platform: Int): String
+    @JvmStatic external fun nativeSettingsApply(current: String, action: String, platform: Int): String
+
     // ── PitchTracker JNI ─────────────────────────────────────────────────────────
     @JvmStatic external fun nativeTrackerNew(silenceThreshold: Float, requiredFrames: Int): Long
     @JvmStatic external fun nativeTrackerFree(handle: Long)
@@ -349,4 +355,19 @@ object EarRingCore {
         val packed = nativeEnforceMinRangeSpan(newStart, newEnd, oldStart, oldEnd)
         return Pair(((packed shr 8) and 0xFF).toInt(), (packed and 0xFF).toInt())
     }
+
+    /** Platform id understood by the Rust settings functions (0 = Android). */
+    private const val SETTINGS_PLATFORM = 0
+
+    /** Default settings JSON. */
+    fun settingsDefaults(): String =
+        if (loaded) nativeSettingsDefaults(SETTINGS_PLATFORM) else "{}"
+
+    /** Turns stored settings JSON (null/empty/garbage/old/partial) into valid settings JSON. */
+    fun settingsNormalize(stored: String?): String =
+        if (loaded) nativeSettingsNormalize(stored ?: "", SETTINGS_PLATFORM) else (stored ?: "{}")
+
+    /** Applies one action (e.g. `{"type":"setInstrument","value":8}`) and returns the new settings JSON. */
+    fun settingsApply(current: String, action: String): String =
+        if (loaded) nativeSettingsApply(current, action, SETTINGS_PLATFORM) else current
 }

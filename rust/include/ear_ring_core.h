@@ -326,6 +326,21 @@ int32_t ear_ring_tracker_process(
     int32_t *out_live_midi
 );
 
+/// Default settings JSON for `platform` (0 = Android, 1 = iOS, 2 = desktop).
+/// Returns a newly allocated string; release it with `ear_ring_free_string`.
+char *ear_ring_settings_defaults(unsigned char platform);
+
+/// Tolerant load: turns stored settings (null/empty/garbage/partial) into valid settings JSON.
+/// Returns a newly allocated string; release it with `ear_ring_free_string`.
+char *ear_ring_settings_normalize(const char *input, unsigned char platform);
+
+/// Applies a JSON action (see `settings::apply_json`) to the current settings JSON.
+/// Returns a newly allocated string; release it with `ear_ring_free_string`.
+char *ear_ring_settings_apply(const char *current, const char *action, unsigned char platform);
+
+/// Releases a string returned by any `ear_ring_settings_*` function. Null is ignored.
+void ear_ring_free_string(char *s);
+
 #ifdef __cplusplus
 }
 #endif

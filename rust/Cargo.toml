@@ -7,6 +7,10 @@ edition = "2021"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
+# Used only by settings.rs: parsing untrusted persisted settings JSON tolerantly and
+# emitting it. Pure Rust, so it cross-compiles for Android/iOS/desktop like the rest.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = { version = "0.21", default-features = false }

@@ -13,46 +13,51 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.json.JSONArray
+import org.json.JSONObject
 
 
 data class DetectedNote(val midi: Int, val cents: Int, val correct: Boolean)
 
 enum class ExerciseStatus { PLAYING, LISTENING, RETRY_DELAY, STOPPED }
 
+/**
+ * The persisted settings (the first block of fields, no defaults on purpose) come from the
+ * Rust-owned settings JSON — see [fromSettings]/[withSettings] and rust/src/settings.rs, which
+ * owns every default and rule. Everything after `playPassFailSounds` is runtime exercise state.
+ */
 data class ExerciseState(
-    val rootNote: Int = 0,
-    val rangeStart: Int = 60,   // MIDI of range low bound (default C4)
-    val rangeEnd: Int = 72,     // MIDI of range high bound (default C5)
-    val scaleId: Int = 0,
-    val sequenceLength: Int = 1,
-    val tempoBpm: Int = 100,
-    val showTestNotes: Boolean = false,
-    val keySignatureMode: Int = 0,  // 0=inline accidentals, 1=key signature
-    val introSoundMode: Int = 1,  // 0=root note, 1=chord (default), 2=arpeggiated chord, 3=scale, 4=none
-    val maxRetries: Int = DEFAULT_MAX_ATTEMPTS,
+    val rootNote: Int,
+    val rangeStart: Int,   // MIDI of range low bound
+    val rangeEnd: Int,     // MIDI of range high bound
+    val scaleId: Int,
+    val sequenceLength: Int,
+    val tempoBpm: Int,
+    val showTestNotes: Boolean,
+    val keySignatureMode: Int,  // 0=inline accidentals, 1=key signature
+    val introSoundMode: Int,  // 0=root note, 1=chord (default), 2=arpeggiated chord, 3=scale, 4=none
+    val maxRetries: Int,
     /** Issue #9 "note correction": consecutive wrong tries allowed at the same note
      *  position before the whole test restarts. 0 = always restart (old behavior). */
-    val noteRetries: Int = DEFAULT_NOTE_RETRIES,
-    val silenceThreshold: Float = DEFAULT_SILENCE_THRESHOLD,
-    val framesToConfirm: Int = DEFAULT_FRAMES_TO_CONFIRM,
-    val warmupFrames: Int = DEFAULT_WARMUP_FRAMES,
+    val noteRetries: Int,
+    val silenceThreshold: Float,
+    val framesToConfirm: Int,
+    val warmupFrames: Int,
     /** Previously hidden per-instrument constant (grace_frames in the Rust INSTRUMENTS table). */
-    val graceFrames: Int = DEFAULT_GRACE_FRAMES,
+    val graceFrames: Int,
     /** Previously hidden per-instrument constant (octave_correction in the Rust INSTRUMENTS table). */
-    val octaveCorrection: Boolean = DEFAULT_OCTAVE_CORRECTION,
+    val octaveCorrection: Boolean,
     /** Previously hidden global constant (DEFAULT_YIN_THRESHOLD in pitch_detection.rs). */
-    val yinThreshold: Float = DEFAULT_YIN_THRESHOLD,
+    val yinThreshold: Float,
     /** Previously hidden per-instrument constant (pitch_tolerance_cents in the Rust INSTRUMENTS table). */
-    val pitchToleranceCents: Float = DEFAULT_PITCH_TOLERANCE_CENTS,
+    val pitchToleranceCents: Float,
     /** Mic Setup meter style: true = tuner-style needle meter, false = classic note-name
-     *  circle. Defaults per-instrument (see [setInstrumentIndex]) but user-overridable. */
-    val useTunerMeter: Boolean = DEFAULT_USE_TUNER_METER,
-    val postChordGapMs: Long = DEFAULT_POST_CHORD_GAP_MS,
-    val wrongNotePauseMs: Long = DEFAULT_WRONG_NOTE_PAUSE_MS,
-    val instrumentIndex: Int = 0,
-    val testType: Int = 0,               // 0=Random, 1=Melody, 2=DiatonicTriads(stub)
-    val playPassFailSounds: Boolean = true,  // chime on test pass/fail
+     *  circle. Defaults per-instrument (Rust `setInstrument`) but user-overridable. */
+    val useTunerMeter: Boolean,
+    val postChordGapMs: Long,
+    val wrongNotePauseMs: Long,
+    val instrumentIndex: Int,
+    val testType: Int,               // 0=Random, 2=DiatonicTriads (1 and 3 are legacy, remapped by Rust)
+    val playPassFailSounds: Boolean,  // chime on test pass/fail
     val sequence: List<Int> = emptyList(),
     val detected: List<DetectedNote> = emptyList(),
     val status: ExerciseStatus = ExerciseStatus.STOPPED,
@@ -60,7 +65,7 @@ data class ExerciseState(
     val seed: Long = System.currentTimeMillis(),
     val highlightIndex: Int = -1,
     val currentAttempt: Int = 1,
-    val maxAttempts: Int = DEFAULT_MAX_ATTEMPTS,
+    val maxAttempts: Int,   // seeded from maxRetries; re-seeded at each startExercise()
     /** Consecutive wrong tries at the current note position — not persisted; reset on a
      *  correct note or whenever the sequence restarts (see [EarRingCore.wrongNoteOutcome]). */
     val noteRetryCount: Int = 0,
@@ -87,58 +92,68 @@ data class ExerciseState(
     val rangeLabel: String get() =
         "${MusicTheory.midiToLabel(rangeStart)}–${MusicTheory.midiToLabel(rangeEnd)}"
 
+    /** This state with its persisted-settings fields replaced from Rust's settings [json];
+     *  runtime exercise state is left alone. */
+    fun withSettings(json: String): ExerciseState {
+        val s = fromSettings(json, isPremium)
+        return copy(
+            rootNote = s.rootNote, rangeStart = s.rangeStart, rangeEnd = s.rangeEnd, scaleId = s.scaleId,
+            sequenceLength = s.sequenceLength, tempoBpm = s.tempoBpm, showTestNotes = s.showTestNotes,
+            keySignatureMode = s.keySignatureMode, introSoundMode = s.introSoundMode,
+            maxRetries = s.maxRetries, noteRetries = s.noteRetries, silenceThreshold = s.silenceThreshold,
+            framesToConfirm = s.framesToConfirm, warmupFrames = s.warmupFrames, graceFrames = s.graceFrames,
+            octaveCorrection = s.octaveCorrection, yinThreshold = s.yinThreshold,
+            pitchToleranceCents = s.pitchToleranceCents, useTunerMeter = s.useTunerMeter,
+            postChordGapMs = s.postChordGapMs, wrongNotePauseMs = s.wrongNotePauseMs,
+            instrumentIndex = s.instrumentIndex, testType = s.testType, playPassFailSounds = s.playPassFailSounds,
+        )
+    }
+
     companion object {
-        /** One octave from the instance of rootNote closest to middle C (MIDI 60). */
-        fun defaultRange(rootNote: Int): Pair<Int, Int> {
-            val best = (2..6).map { oct -> (oct + 1) * 12 + rootNote }
-                .minByOrNull { kotlin.math.abs(it - 60) }!!
-            return Pair(best, best + 12)
+        /** A fresh state from Rust's (already normalized) settings [json]. */
+        fun fromSettings(json: String, isPremium: Boolean): ExerciseState {
+            val s = JSONObject(json)
+            return ExerciseState(
+                rootNote = s.getInt("rootNote"),
+                rangeStart = s.getInt("rangeStart"),
+                rangeEnd = s.getInt("rangeEnd"),
+                scaleId = s.getInt("scaleId"),
+                sequenceLength = s.getInt("sequenceLength"),
+                tempoBpm = s.getInt("tempoBpm"),
+                showTestNotes = s.getBoolean("showTestNotes"),
+                keySignatureMode = s.getInt("keySignatureMode"),
+                introSoundMode = s.getInt("introSoundMode"),
+                maxRetries = s.getInt("maxRetries"),
+                noteRetries = s.getInt("noteRetries"),
+                silenceThreshold = s.getDouble("silenceThreshold").toFloat(),
+                framesToConfirm = s.getInt("framesToConfirm"),
+                warmupFrames = s.getInt("warmupFrames"),
+                graceFrames = s.getInt("graceFrames"),
+                octaveCorrection = s.getBoolean("octaveCorrection"),
+                yinThreshold = s.getDouble("yinThreshold").toFloat(),
+                pitchToleranceCents = s.getDouble("pitchToleranceCents").toFloat(),
+                useTunerMeter = s.getBoolean("useTunerMeter"),
+                postChordGapMs = s.getLong("postChordGapMs"),
+                wrongNotePauseMs = s.getLong("wrongNotePauseMs"),
+                instrumentIndex = s.getInt("instrumentIndex"),
+                testType = s.getInt("testType"),
+                playPassFailSounds = s.getBoolean("playPassFailSounds"),
+                maxAttempts = s.getInt("maxRetries"),
+                isPremium = isPremium,
+            )
         }
     }
 }
 
-private const val DEFAULT_MAX_ATTEMPTS = 5
-private const val DEFAULT_NOTE_RETRIES = 2
-private const val DEFAULT_SILENCE_THRESHOLD = 0.003f
-private const val DEFAULT_FRAMES_TO_CONFIRM = 3
-private const val DEFAULT_WARMUP_FRAMES = 4
-private const val DEFAULT_GRACE_FRAMES = 3          // Piano's INSTRUMENTS-table value
-private const val DEFAULT_OCTAVE_CORRECTION = false // Piano's INSTRUMENTS-table value
-private const val DEFAULT_YIN_THRESHOLD = 0.15f
-private const val DEFAULT_PITCH_TOLERANCE_CENTS = 50f // Piano's INSTRUMENTS-table value
-private const val DEFAULT_USE_TUNER_METER = false      // Piano's implied default (fixed-pitch)
-private const val DEFAULT_POST_CHORD_GAP_MS = 800L
-private const val DEFAULT_WRONG_NOTE_PAUSE_MS = 3000L
 // Gap between the last note of the sequence ending and mic start.
 // Piano sustain continues after `onDone` fires; this silence lets it fade so
 // the mic doesn't immediately pick up speaker resonance as a "played" note.
 private const val POST_SEQUENCE_GAP_MS = 700L
 
 private const val PREFS_NAME = "ear_ring_settings"
-private const val PREF_ROOT_NOTE = "rootNote"
-private const val PREF_RANGE_START = "rangeStart"
-private const val PREF_RANGE_END = "rangeEnd"
-private const val PREF_SCALE_ID = "scaleId"
-private const val PREF_SEQUENCE_LENGTH = "sequenceLength"
-private const val PREF_TEMPO_BPM = "tempoBpm"
-private const val PREF_SHOW_TEST_NOTES = "showTestNotes"
-private const val PREF_PLAY_PASS_FAIL_SOUNDS = "playPassFailSounds"
-private const val PREF_KEY_SIG_MODE = "keySignatureMode"
-private const val PREF_INTRO_SOUND_MODE = "introSoundMode"
-private const val PREF_MAX_RETRIES = "maxRetries"
-private const val PREF_NOTE_RETRIES = "noteRetries"
-private const val PREF_SILENCE_THRESHOLD = "silenceThreshold"
-private const val PREF_FRAMES_TO_CONFIRM = "framesToConfirm"
-private const val PREF_WARMUP_FRAMES = "warmupFrames"
-private const val PREF_GRACE_FRAMES = "graceFrames"
-private const val PREF_OCTAVE_CORRECTION = "octaveCorrection"
-private const val PREF_YIN_THRESHOLD = "yinThreshold"
-private const val PREF_PITCH_TOLERANCE_CENTS = "pitchToleranceCents"
-private const val PREF_USE_TUNER_METER = "useTunerMeter"
-private const val PREF_POST_CHORD_GAP_MS = "postChordGapMs"
-private const val PREF_WRONG_NOTE_PAUSE_MS = "wrongNotePauseMs"
-private const val PREF_INSTRUMENT_INDEX = "instrumentIndex"
-private const val PREF_TEST_TYPE = "testType"
+// All settings live in ONE JSON string owned by the Rust core (rust/src/settings.rs).
+private const val PREF_SETTINGS = "settings"
+// App state, not settings: deliberately outside the settings blob so a settings reset never touches them.
 private const val PREF_HAS_LAUNCHED = "hasLaunched"
 private const val PREF_IS_PREMIUM = "isPremium"
 
@@ -153,115 +168,37 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         return true
     }
 
-    private fun loadInitialState(): ExerciseState {
-        val rootNote = prefs.getInt(PREF_ROOT_NOTE, 0)
-        val defaultRange = ExerciseState.defaultRange(rootNote)
-        val testType = prefs.getInt(PREF_TEST_TYPE, 0).let {
-            when (it) {
-                1 -> 0  // Melody mode reset (no longer in UI)
-                3 -> 2  // Merged descending-arpeggio mode into 2 (issue #5)
-                else -> it
-            }
+    /**
+     * The settings as ONE JSON string. Rust owns the schema, the defaults and every rule that
+     * changes them (rust/src/settings.rs); this class only persists the string and publishes it
+     * as [ExerciseState]. Normalizing at load also upgrades or repairs whatever was stored.
+     */
+    private var settingsJson: String =
+        EarRingCore.settingsNormalize(prefs.getString(PREF_SETTINGS, null)).also {
+            prefs.edit().putString(PREF_SETTINGS, it).apply()
         }
-        // 4-note (7th chord) arpeggios are suppressed for now — migrate a stored 4
-        // back to 3 for anyone who'd picked it before this change.
-        val storedSeqLen = prefs.getInt(PREF_SEQUENCE_LENGTH, 1)
-        val sequenceLength = if (testType == 2) 3 else storedSeqLen
-        return ExerciseState(
-            rootNote = rootNote,
-            rangeStart = prefs.getInt(PREF_RANGE_START, defaultRange.first),
-            rangeEnd = prefs.getInt(PREF_RANGE_END, defaultRange.second),
-            scaleId = prefs.getInt(PREF_SCALE_ID, 0),
-            sequenceLength = sequenceLength,
-            tempoBpm = prefs.getInt(PREF_TEMPO_BPM, 100),
-            showTestNotes = prefs.getBoolean(PREF_SHOW_TEST_NOTES, false),
-            playPassFailSounds = prefs.getBoolean(PREF_PLAY_PASS_FAIL_SOUNDS, true),
-            keySignatureMode = prefs.getInt(PREF_KEY_SIG_MODE, 0),
-            introSoundMode = prefs.getInt(PREF_INTRO_SOUND_MODE, 1),
-            maxRetries = prefs.getInt(PREF_MAX_RETRIES, DEFAULT_MAX_ATTEMPTS),
-            noteRetries = prefs.getInt(PREF_NOTE_RETRIES, DEFAULT_NOTE_RETRIES),
-            silenceThreshold = prefs.getFloat(PREF_SILENCE_THRESHOLD, DEFAULT_SILENCE_THRESHOLD),
-            framesToConfirm = prefs.getInt(PREF_FRAMES_TO_CONFIRM, DEFAULT_FRAMES_TO_CONFIRM),
-            warmupFrames = prefs.getInt(PREF_WARMUP_FRAMES, DEFAULT_WARMUP_FRAMES),
-            graceFrames = prefs.getInt(PREF_GRACE_FRAMES, DEFAULT_GRACE_FRAMES),
-            octaveCorrection = prefs.getBoolean(PREF_OCTAVE_CORRECTION, DEFAULT_OCTAVE_CORRECTION),
-            yinThreshold = prefs.getFloat(PREF_YIN_THRESHOLD, DEFAULT_YIN_THRESHOLD),
-            pitchToleranceCents = prefs.getFloat(PREF_PITCH_TOLERANCE_CENTS, DEFAULT_PITCH_TOLERANCE_CENTS),
-            useTunerMeter = prefs.getBoolean(PREF_USE_TUNER_METER, DEFAULT_USE_TUNER_METER),
-            postChordGapMs = prefs.getLong(PREF_POST_CHORD_GAP_MS, DEFAULT_POST_CHORD_GAP_MS),
-            wrongNotePauseMs = prefs.getLong(PREF_WRONG_NOTE_PAUSE_MS, DEFAULT_WRONG_NOTE_PAUSE_MS),
-            instrumentIndex = prefs.getInt(PREF_INSTRUMENT_INDEX, 0),
-            testType = testType,
-            isPremium = prefs.getBoolean(PREF_IS_PREMIUM, false),
-        )
+
+    /** Sends one action to the Rust settings model, persists the result, and publishes it. */
+    private fun dispatch(action: JSONObject) {
+        settingsJson = EarRingCore.settingsApply(settingsJson, action.toString())
+        prefs.edit().putString(PREF_SETTINGS, settingsJson).apply()
+        _state.value = _state.value.withSettings(settingsJson)
     }
 
-    private fun saveSettings(state: ExerciseState) {
-        prefs.edit()
-            .putInt(PREF_ROOT_NOTE, state.rootNote)
-            .putInt(PREF_RANGE_START, state.rangeStart)
-            .putInt(PREF_RANGE_END, state.rangeEnd)
-            .putInt(PREF_SCALE_ID, state.scaleId)
-            .putInt(PREF_SEQUENCE_LENGTH, state.sequenceLength)
-            .putInt(PREF_TEMPO_BPM, state.tempoBpm)
-            .putBoolean(PREF_SHOW_TEST_NOTES, state.showTestNotes)
-            .putBoolean(PREF_PLAY_PASS_FAIL_SOUNDS, state.playPassFailSounds)
-            .putInt(PREF_KEY_SIG_MODE, state.keySignatureMode)
-            .putInt(PREF_INTRO_SOUND_MODE, state.introSoundMode)
-            .putInt(PREF_MAX_RETRIES, state.maxRetries)
-            .putInt(PREF_NOTE_RETRIES, state.noteRetries)
-            .putFloat(PREF_SILENCE_THRESHOLD, state.silenceThreshold)
-            .putInt(PREF_FRAMES_TO_CONFIRM, state.framesToConfirm)
-            .putInt(PREF_WARMUP_FRAMES, state.warmupFrames)
-            .putInt(PREF_GRACE_FRAMES, state.graceFrames)
-            .putBoolean(PREF_OCTAVE_CORRECTION, state.octaveCorrection)
-            .putFloat(PREF_YIN_THRESHOLD, state.yinThreshold)
-            .putFloat(PREF_PITCH_TOLERANCE_CENTS, state.pitchToleranceCents)
-            .putBoolean(PREF_USE_TUNER_METER, state.useTunerMeter)
-            .putLong(PREF_POST_CHORD_GAP_MS, state.postChordGapMs)
-            .putLong(PREF_WRONG_NOTE_PAUSE_MS, state.wrongNotePauseMs)
-            .putInt(PREF_INSTRUMENT_INDEX, state.instrumentIndex)
-            .putInt(PREF_TEST_TYPE, state.testType)
-            .putBoolean(PREF_IS_PREMIUM, state.isPremium)
-            .apply()
-    }
+    /** A plain-field change: Rust merges it and clamps it to valid bounds. */
+    private fun set(field: String, value: Any) =
+        dispatch(JSONObject().put("type", "set").put("values", JSONObject().put(field, value)))
 
-    /** Resets all settings to their defaults. Does NOT affect progress data or the
-     *  isPremium entitlement (that's a purchase, not a preference — left untouched).
-     *  Also clears the first-launch flag so Help screen shows on next launch. */
-    fun resetSettings() {
-        val defaults = ExerciseState()
-        prefs.edit()
-            .putInt(PREF_ROOT_NOTE, defaults.rootNote)
-            .putInt(PREF_RANGE_START, defaults.rangeStart)
-            .putInt(PREF_RANGE_END, defaults.rangeEnd)
-            .putInt(PREF_SCALE_ID, defaults.scaleId)
-            .putInt(PREF_SEQUENCE_LENGTH, defaults.sequenceLength)
-            .putInt(PREF_TEMPO_BPM, defaults.tempoBpm)
-            .putBoolean(PREF_SHOW_TEST_NOTES, defaults.showTestNotes)
-            .putBoolean(PREF_PLAY_PASS_FAIL_SOUNDS, defaults.playPassFailSounds)
-            .putInt(PREF_KEY_SIG_MODE, defaults.keySignatureMode)
-            .putInt(PREF_INTRO_SOUND_MODE, defaults.introSoundMode)
-            .putInt(PREF_MAX_RETRIES, defaults.maxRetries)
-            .putInt(PREF_NOTE_RETRIES, defaults.noteRetries)
-            .putFloat(PREF_SILENCE_THRESHOLD, defaults.silenceThreshold)
-            .putInt(PREF_FRAMES_TO_CONFIRM, defaults.framesToConfirm)
-            .putInt(PREF_WARMUP_FRAMES, defaults.warmupFrames)
-            .putInt(PREF_GRACE_FRAMES, defaults.graceFrames)
-            .putBoolean(PREF_OCTAVE_CORRECTION, defaults.octaveCorrection)
-            .putFloat(PREF_YIN_THRESHOLD, defaults.yinThreshold)
-            .putFloat(PREF_PITCH_TOLERANCE_CENTS, defaults.pitchToleranceCents)
-            .putBoolean(PREF_USE_TUNER_METER, defaults.useTunerMeter)
-            .putLong(PREF_POST_CHORD_GAP_MS, defaults.postChordGapMs)
-            .putLong(PREF_WRONG_NOTE_PAUSE_MS, defaults.wrongNotePauseMs)
-            .putInt(PREF_INSTRUMENT_INDEX, defaults.instrumentIndex)
-            .putInt(PREF_TEST_TYPE, defaults.testType)
-            .remove(PREF_HAS_LAUNCHED)
-            .apply()
-        _state.value = defaults.copy(isPremium = _state.value.isPremium)
-    }
+    /** Resets all settings to their defaults. Does NOT affect progress data, the isPremium
+     *  entitlement (a purchase, not a preference), or the first-launch flag (app state, not a
+     *  setting): none of them live in the settings blob. Clearing that flag here used to make
+     *  EarRingApp's first-launch effect fire on the *next navigation* after a reset, so
+     *  whichever tab the user tapped landed on Help instead. */
+    fun resetSettings() = dispatch(JSONObject().put("type", "reset"))
 
-    private val _state = MutableStateFlow(loadInitialState())
+    private val _state = MutableStateFlow(
+        ExerciseState.fromSettings(settingsJson, isPremium = prefs.getBoolean(PREF_IS_PREMIUM, false))
+    )
     val state: StateFlow<ExerciseState> = _state.asStateFlow()
 
     val audioPlayback = AudioPlayback(application)
@@ -276,70 +213,38 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun setRootNote(note: Int) {
-        val (start, end) = ExerciseState.defaultRange(note)
-        _state.value = _state.value.copy(rootNote = note, rangeStart = start, rangeEnd = end)
-        saveSettings(_state.value)
-    }
-    fun setRange(start: Int, end: Int) {
-        val old = _state.value
-        val (clampedStart, clampedEnd) = EarRingCore.enforceMinRangeSpan(start, end, old.rangeStart, old.rangeEnd)
-        _state.value = old.copy(rangeStart = clampedStart, rangeEnd = clampedEnd)
-        saveSettings(_state.value)
-    }
-    fun setScaleId(id: Int) { _state.value = _state.value.copy(scaleId = id); saveSettings(_state.value) }
-    fun setSequenceLength(len: Int) { _state.value = _state.value.copy(sequenceLength = len); saveSettings(_state.value) }
-    fun setTempoBpm(bpm: Int) { _state.value = _state.value.copy(tempoBpm = bpm); saveSettings(_state.value) }
-    fun setShowTestNotes(show: Boolean) { _state.value = _state.value.copy(showTestNotes = show); saveSettings(_state.value) }
-    fun setPlayPassFailSounds(play: Boolean) { _state.value = _state.value.copy(playPassFailSounds = play); saveSettings(_state.value) }
-    fun setKeySignatureMode(mode: Int) { _state.value = _state.value.copy(keySignatureMode = mode); saveSettings(_state.value) }
-    fun setIntroSoundMode(mode: Int) { _state.value = _state.value.copy(introSoundMode = mode); saveSettings(_state.value) }
-    fun setMaxRetries(n: Int) { _state.value = _state.value.copy(maxRetries = n); saveSettings(_state.value) }
-    fun setNoteRetries(n: Int) { _state.value = _state.value.copy(noteRetries = n); saveSettings(_state.value) }
-    fun setSilenceThreshold(v: Float) { _state.value = _state.value.copy(silenceThreshold = v); saveSettings(_state.value) }
-    fun setFramesToConfirm(n: Int) { _state.value = _state.value.copy(framesToConfirm = n); saveSettings(_state.value) }
-    fun setWarmupFrames(n: Int) { _state.value = _state.value.copy(warmupFrames = n); saveSettings(_state.value) }
-    fun setGraceFrames(n: Int) { _state.value = _state.value.copy(graceFrames = n); saveSettings(_state.value) }
-    fun setOctaveCorrection(v: Boolean) { _state.value = _state.value.copy(octaveCorrection = v); saveSettings(_state.value) }
-    fun setYinThreshold(v: Float) { _state.value = _state.value.copy(yinThreshold = v); saveSettings(_state.value) }
-    fun setPitchToleranceCents(v: Float) { _state.value = _state.value.copy(pitchToleranceCents = v); saveSettings(_state.value) }
-    fun setUseTunerMeter(v: Boolean) { _state.value = _state.value.copy(useTunerMeter = v); saveSettings(_state.value) }
-    fun setPostChordGapMs(ms: Long) { _state.value = _state.value.copy(postChordGapMs = ms); saveSettings(_state.value) }
-    fun setWrongNotePauseMs(ms: Long) { _state.value = _state.value.copy(wrongNotePauseMs = ms); saveSettings(_state.value) }
-    fun setInstrumentIndex(idx: Int) {
-        val current = _state.value
-        // Snap grace/octave/tolerance/meter-style to the new instrument's own table
-        // values, same as range just below — otherwise these Advanced overrides stay
-        // stuck at whatever the previous instrument left them at (e.g. selecting a Voice
-        // instrument would silently keep Piano's strict 50-cent pitch tolerance instead
-        // of picking up Voice's wider 80, defeating the vibrato-tolerance feature
-        // entirely). Tuner-meter default reuses the same pitchToleranceCents > 50 signal
-        // that already marks an instrument as lacking a mechanical pitch stop — no
-        // separate "continuous pitch" flag needed on the Rust side.
-        val obj = try { JSONArray(EarRingCore.instrumentList()).getJSONObject(idx) } catch (_: Exception) { null }
-        val (defStart, defEnd) = ExerciseState.defaultRange(current.rootNote)
-        val tolerance = obj?.optDouble("pitchToleranceCents", current.pitchToleranceCents.toDouble())?.toFloat() ?: current.pitchToleranceCents
-        _state.value = current.copy(
-            instrumentIndex = idx,
-            rangeStart = obj?.optInt("rangeStart", defStart) ?: defStart,
-            rangeEnd = obj?.optInt("rangeEnd", defEnd) ?: defEnd,
-            graceFrames = obj?.optInt("graceFrames", current.graceFrames) ?: current.graceFrames,
-            octaveCorrection = obj?.optBoolean("octaveCorrection", current.octaveCorrection) ?: current.octaveCorrection,
-            pitchToleranceCents = tolerance,
-            useTunerMeter = if (obj != null) tolerance > 50f else current.useTunerMeter
-        )
-        saveSettings(_state.value)
-    }
+    fun setRootNote(note: Int) = dispatch(JSONObject().put("type", "setRootNote").put("value", note))
+    fun setRange(start: Int, end: Int) =
+        dispatch(JSONObject().put("type", "setRange").put("start", start).put("end", end))
+    fun setScaleId(id: Int) = set("scaleId", id)
+    fun setSequenceLength(len: Int) = set("sequenceLength", len)
+    fun setTempoBpm(bpm: Int) = set("tempoBpm", bpm)
+    fun setShowTestNotes(show: Boolean) = set("showTestNotes", show)
+    fun setPlayPassFailSounds(play: Boolean) = set("playPassFailSounds", play)
+    fun setKeySignatureMode(mode: Int) = set("keySignatureMode", mode)
+    fun setIntroSoundMode(mode: Int) = set("introSoundMode", mode)
+    fun setMaxRetries(n: Int) = set("maxRetries", n)
+    fun setNoteRetries(n: Int) = set("noteRetries", n)
+    fun setSilenceThreshold(v: Float) = set("silenceThreshold", v)
+    fun setFramesToConfirm(n: Int) = set("framesToConfirm", n)
+    fun setWarmupFrames(n: Int) = set("warmupFrames", n)
+    fun setGraceFrames(n: Int) = set("graceFrames", n)
+    fun setOctaveCorrection(v: Boolean) = set("octaveCorrection", v)
+    fun setYinThreshold(v: Float) = set("yinThreshold", v)
+    fun setPitchToleranceCents(v: Float) = set("pitchToleranceCents", v)
+    fun setUseTunerMeter(v: Boolean) = set("useTunerMeter", v)
+    fun setPostChordGapMs(ms: Long) = set("postChordGapMs", ms)
+    fun setWrongNotePauseMs(ms: Long) = set("wrongNotePauseMs", ms)
+    /** Rust snaps range, grace/octave/tolerance and the tuner-meter default to the instrument's table. */
+    fun setInstrumentIndex(idx: Int) = dispatch(JSONObject().put("type", "setInstrument").put("value", idx))
     /** Ad-free / paid entitlement. Called once purchase state is confirmed (e.g. from
      *  Play Billing); until real billing lands, nothing sets this to true. */
-    fun setPremium(premium: Boolean) { _state.value = _state.value.copy(isPremium = premium); saveSettings(_state.value) }
-    fun setTestType(type: Int) {
-        val current = _state.value
-        // 4-note (7th chord) arpeggios are suppressed for now — always 3 in diatonic mode.
-        val newSeqLen = if (type == 2) 3 else current.sequenceLength
-        _state.value = current.copy(testType = type, sequenceLength = newSeqLen)
-        saveSettings(_state.value)
+    fun setPremium(premium: Boolean) {
+        prefs.edit().putBoolean(PREF_IS_PREMIUM, premium).apply()
+        _state.value = _state.value.copy(isPremium = premium)
     }
+    /** Rust enforces the diatonic rule (always a 3-note arpeggio). */
+    fun setTestType(type: Int) = dispatch(JSONObject().put("type", "setTestType").put("value", type))
 
     fun startExercise() {
         audioPlayback.cancelPlayback()

@@ -96,4 +96,22 @@ class NavigationTest {
         composeRule.onNodeWithText("Help").performClick()
         composeRule.onAllNodesWithText("Getting Started", substring = true).onFirst().assertIsDisplayed()
     }
+
+    /** Resets settings through the real Settings UI (button, then the confirm dialog). */
+    private fun resetSettingsViaUi() {
+        composeRule.onNodeWithText("Settings").performClick()
+        composeRule.onNodeWithText("Reset to Defaults").performScrollTo().performClick()
+        composeRule.onNodeWithText("Reset").performClick()
+    }
+
+    // Regression: Reset used to clear the first-launch flag, so EarRingApp's first-launch
+    // effect fired on the next navigation and sent the user to Help whichever tab they
+    // tapped. Reset must leave the flag alone, so the tab tapped afterwards is the tab shown.
+    @Test
+    fun afterResetSettings_homeTabStillGoesHome() {
+        goHome()
+        resetSettingsViaUi()
+        composeRule.onNodeWithText("Home").performClick()
+        composeRule.onNodeWithText("▶ Start Exercise").assertIsDisplayed()
+    }
 }

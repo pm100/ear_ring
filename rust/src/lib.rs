@@ -1,5 +1,6 @@
 pub mod music_theory;
 pub mod pitch_detection;
+pub mod settings;
 pub mod tracker;
 
 pub use music_theory::{
@@ -961,6 +962,68 @@ pub extern "C" fn ear_ring_tracker_process(
     result.confirmed_midi
 }
 
+// ── Settings (C FFI) ──────────────────────────────────────────────────────────
+// Thin wrappers over the tested `settings` module. Unlike the static strings above,
+// these return a freshly allocated string the caller must release with
+// `ear_ring_free_string`.
+
+/// Reads a caller-supplied C string; null is treated as empty and invalid UTF-8 is repaired.
+fn settings_c_arg(ptr: *const c_char) -> String {
+    if ptr.is_null() {
+        return String::new();
+    }
+    unsafe { std::ffi::CStr::from_ptr(ptr) }.to_string_lossy().into_owned()
+}
+
+fn settings_into_c(json: String) -> *mut c_char {
+    std::ffi::CString::new(json)
+        .unwrap_or_else(|_| std::ffi::CString::new("{}").expect("no interior NUL"))
+        .into_raw()
+}
+
+/// Runs `f`, returning `fallback` if it panics: a panic must never unwind into Swift/the JVM.
+fn settings_guarded(fallback: String, f: impl FnOnce() -> String) -> *mut c_char {
+    let json = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).unwrap_or(fallback);
+    settings_into_c(json)
+}
+
+/// Default settings JSON for `platform` (0 = Android, 1 = iOS, 2 = desktop).
+/// Returns a newly allocated string; release it with `ear_ring_free_string`.
+#[no_mangle]
+pub extern "C" fn ear_ring_settings_defaults(platform: c_uchar) -> *mut c_char {
+    settings_guarded("{}".to_string(), || settings::defaults_json(settings::Platform::from_id(platform)))
+}
+
+/// Tolerant load: turns stored settings (null/empty/garbage/partial) into valid settings JSON.
+/// Returns a newly allocated string; release it with `ear_ring_free_string`.
+#[no_mangle]
+pub extern "C" fn ear_ring_settings_normalize(input: *const c_char, platform: c_uchar) -> *mut c_char {
+    let input = settings_c_arg(input);
+    settings_guarded(input.clone(), || settings::normalize_json(&input, settings::Platform::from_id(platform)))
+}
+
+/// Applies a JSON action (see `settings::apply_json`) to the current settings JSON.
+/// Returns a newly allocated string; release it with `ear_ring_free_string`.
+#[no_mangle]
+pub extern "C" fn ear_ring_settings_apply(
+    current: *const c_char,
+    action: *const c_char,
+    platform: c_uchar,
+) -> *mut c_char {
+    let (current, action) = (settings_c_arg(current), settings_c_arg(action));
+    settings_guarded(current.clone(), || {
+        settings::apply_json(&current, &action, settings::Platform::from_id(platform))
+    })
+}
+
+/// Releases a string returned by any `ear_ring_settings_*` function. Null is ignored.
+#[no_mangle]
+pub extern "C" fn ear_ring_free_string(s: *mut c_char) {
+    if !s.is_null() {
+        unsafe { drop(std::ffi::CString::from_raw(s)) };
+    }
+}
+
 // ── Android JNI exports ───────────────────────────────────────────────────────
 #[cfg(target_os = "android")]
 mod android_jni {
@@ -1451,6 +1514,62 @@ mod android_jni {
             .unwrap_or(std::ptr::null_mut())
     }
 
+    // ── Settings (shared model in settings.rs) ─────────────────────────────────
+    // A panic must never unwind into the JVM, so each call falls back to its input.
+
+    fn settings_jstring(env: &JNIEnv, json: String) -> jstring {
+        env.new_string(json).map(|s| s.into_raw()).unwrap_or(std::ptr::null_mut())
+    }
+
+    fn settings_arg(env: &mut JNIEnv, s: &JString) -> String {
+        env.get_string(s).map(|s| s.into()).unwrap_or_default()
+    }
+
+    fn settings_platform(id: jint) -> super::settings::Platform {
+        super::settings::Platform::from_id(id.clamp(0, 255) as u8)
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeSettingsDefaults(
+        env: JNIEnv,
+        _class: JClass,
+        platform: jint,
+    ) -> jstring {
+        let json = std::panic::catch_unwind(|| super::settings::defaults_json(settings_platform(platform)))
+            .unwrap_or_else(|_| "{}".to_string());
+        settings_jstring(&env, json)
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeSettingsNormalize(
+        mut env: JNIEnv,
+        _class: JClass,
+        input: JString,
+        platform: jint,
+    ) -> jstring {
+        let input = settings_arg(&mut env, &input);
+        let json = std::panic::catch_unwind(|| super::settings::normalize_json(&input, settings_platform(platform)))
+            .unwrap_or_else(|_| input.clone());
+        settings_jstring(&env, json)
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeSettingsApply(
+        mut env: JNIEnv,
+        _class: JClass,
+        current: JString,
+        action: JString,
+        platform: jint,
+    ) -> jstring {
+        let current = settings_arg(&mut env, &current);
+        let action = settings_arg(&mut env, &action);
+        let json = std::panic::catch_unwind(|| {
+            super::settings::apply_json(&current, &action, settings_platform(platform))
+        })
+        .unwrap_or_else(|_| current.clone());
+        settings_jstring(&env, json)
+    }
+
     #[no_mangle]
     pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeGitHash(
         env: JNIEnv,
@@ -1696,6 +1815,70 @@ mod android_jni {
 #[cfg(test)]
 mod ffi_tests {
     use super::*;
+    use std::ffi::{CStr, CString};
+
+    /// Copies a returned settings string and releases it the way a real caller must.
+    fn take(ptr: *mut c_char) -> String {
+        assert!(!ptr.is_null(), "settings FFI must never return null");
+        let text = unsafe { CStr::from_ptr(ptr) }.to_str().expect("UTF-8").to_owned();
+        ear_ring_free_string(ptr);
+        text
+    }
+
+    fn c(s: &str) -> CString {
+        CString::new(s).unwrap()
+    }
+
+    #[test]
+    fn settings_defaults_ffi_returns_the_platform_defaults() {
+        assert_eq!(take(ear_ring_settings_defaults(0)), settings::defaults_json(settings::Platform::Android));
+        assert_eq!(take(ear_ring_settings_defaults(1)), settings::defaults_json(settings::Platform::Ios));
+        assert_eq!(take(ear_ring_settings_defaults(2)), settings::defaults_json(settings::Platform::Desktop));
+    }
+
+    #[test]
+    fn settings_normalize_ffi_repairs_input() {
+        let out = take(ear_ring_settings_normalize(c(r#"{"tempoBpm":99999}"#).as_ptr(), 0));
+        assert_eq!(out, settings::normalize_json(r#"{"tempoBpm":99999}"#, settings::Platform::Android));
+        assert!(out.contains(r#""tempoBpm":300"#));
+    }
+
+    #[test]
+    fn settings_apply_ffi_applies_an_action() {
+        let current = take(ear_ring_settings_defaults(0));
+        let out = take(ear_ring_settings_apply(
+            c(&current).as_ptr(),
+            c(r#"{"type":"set","values":{"tempoBpm":140}}"#).as_ptr(),
+            0,
+        ));
+        assert!(out.contains(r#""tempoBpm":140"#));
+    }
+
+    #[test]
+    fn settings_ffi_treats_null_pointers_as_empty_strings() {
+        assert_eq!(
+            take(ear_ring_settings_normalize(std::ptr::null(), 0)),
+            settings::defaults_json(settings::Platform::Android)
+        );
+        assert_eq!(
+            take(ear_ring_settings_apply(std::ptr::null(), std::ptr::null(), 0)),
+            settings::defaults_json(settings::Platform::Android)
+        );
+    }
+
+    #[test]
+    fn settings_ffi_survives_invalid_utf8() {
+        let bad = CString::new(vec![0xff, 0xfe, b'{']).unwrap();
+        assert_eq!(
+            take(ear_ring_settings_normalize(bad.as_ptr(), 0)),
+            settings::defaults_json(settings::Platform::Android)
+        );
+    }
+
+    #[test]
+    fn free_string_ignores_null() {
+        ear_ring_free_string(std::ptr::null_mut()); // must not crash
+    }
 
     // Issue #24: ear_ring_pick_melody_by_index used to write midi_notes.len()
     // elements into the caller's buffer with no regard for how large that
