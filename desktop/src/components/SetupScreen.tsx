@@ -104,6 +104,9 @@ export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, ro
       <div className="screen-header">
         <button className="btn-back" onClick={onBack}>{'←'} Back</button>
         <span className="screen-title">Mic Setup</span>
+        {/* Clears only the rolling staff history — the live meter is untouched and
+            keeps tracking whatever the mic hears next. */}
+        <button className="btn-back" onClick={() => setNoteHistory([])}>Clear</button>
       </div>
 
       <p className="setup-instruction">Play a note to test your microphone.</p>

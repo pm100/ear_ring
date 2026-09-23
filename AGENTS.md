@@ -429,8 +429,13 @@ element on this screen was sized/chosen deliberately to fit in the viewport at o
 below need to stay visible alongside the staff/meter while the user is actively testing.
 
 ```
-                        [Mic Setup]        (tab — no back button on iOS/Android;
-                                            Mic tab on all platforms)
+                        [Mic Setup]  [Clear]    (title centred; Clear trails it —
+                                                 top-right on Android/iOS, end of
+                                                 the header row next to "← Back" on
+                                                 desktop. Clears only the rolling
+                                                 staff history below, not the live
+                                                 meter — tab has no back button on
+                                                 iOS/Android, Mic tab on all platforms)
 
 [16dp space]
 "Play a note to test your microphone."   — bodyMedium, centred
@@ -452,7 +457,7 @@ MusicStaff            — 130dp tall on phones (160dp on iPad/desktop — trimme
                         Max 8 notes visible; history capped at 8
                         Most recent note: ACTIVE colour (blue)
                         Previous notes: EXPECTED colour (filled dark)
-                        Empty staff when nothing detected yet
+                        Empty staff when nothing detected yet, or after tapping Clear
                         Same note repeated after silence is always appended again
 
 [10dp space]

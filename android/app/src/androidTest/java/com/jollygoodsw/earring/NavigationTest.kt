@@ -61,6 +61,13 @@ class NavigationTest {
     }
 
     @Test
+    fun micTab_clearButton_isDisplayedAndTappable() {
+        goHome()
+        composeRule.onNodeWithText("Mic").performClick()
+        composeRule.onNodeWithText("Clear").assertIsDisplayed().performClick()
+    }
+
+    @Test
     fun micTab_advancedPitchDetectionControls_areVisibleWhenOpened() {
         goHome()
         composeRule.onNodeWithText("Mic").performClick()

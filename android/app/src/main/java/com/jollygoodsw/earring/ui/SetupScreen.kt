@@ -75,13 +75,21 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Spacer(Modifier.weight(1f))
-            Text("Mic Setup", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.weight(1f))
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                "Mic Setup",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.Center)
+            )
+            // Clears only the rolling staff history — the live meter is untouched and
+            // keeps tracking whatever the mic hears next.
+            TextButton(
+                onClick = { concertHistory.clear() },
+                modifier = Modifier.align(Alignment.CenterEnd)
+            ) {
+                Text("Clear")
+            }
         }
 
         Spacer(Modifier.height(16.dp))
