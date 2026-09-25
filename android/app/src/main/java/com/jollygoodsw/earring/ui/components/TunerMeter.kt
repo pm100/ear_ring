@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -129,19 +130,25 @@ fun TunerMeter(
             drawCircle(color = zoneColor, radius = 5.dp.toPx(), center = pivot)
         }
 
+        // Fixed height regardless of font size — the label shrinks to 15sp for longer
+        // dual "written (concert)" labels (e.g. "D (C4)"), and without a reserved
+        // height that alone shifts the rest of the screen up/down whenever detection
+        // starts/stops, separately from the cents caption below.
         Text(
             text = label,
             fontSize = if (label.length > 5) 15.sp else 20.sp,
             fontWeight = FontWeight.Bold,
-            color = if (isDetecting) COLOR_TEXT else COLOR_MUTED
+            color = if (isDetecting) COLOR_TEXT else COLOR_MUTED,
+            modifier = Modifier.height(26.dp).wrapContentHeight(Alignment.CenterVertically)
         )
-        if (isDetecting) {
-            Text(
-                text = if (kotlin.math.abs(cents) <= GREEN_BAND) "in tune" else "%+d¢".format(cents),
-                fontSize = 12.sp,
-                color = zoneColor,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-        }
+        // Always rendered (never conditional) so this line's height is reserved
+        // whether or not a pitch is detected — otherwise the rest of the screen
+        // shifts up/down every time detection starts or stops.
+        Text(
+            text = if (!isDetecting) " " else if (kotlin.math.abs(cents) <= GREEN_BAND) "in tune" else "%+d¢".format(cents),
+            fontSize = 12.sp,
+            color = zoneColor,
+            modifier = Modifier.padding(top = 2.dp)
+        )
     }
 }

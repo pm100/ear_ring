@@ -100,16 +100,22 @@ struct TunerMeterView: View {
             .frame(width: width, height: height)
             .animation(.easeInOut(duration: 0.1), value: cents)
 
+            // Fixed height regardless of font size — the label shrinks to 15pt for
+            // longer dual "written (concert)" labels (e.g. "D (C4)"), and without a
+            // reserved height that alone shifts the rest of the screen up/down
+            // whenever detection starts/stops, separately from the cents caption below.
             Text(label)
                 .font(.system(size: label.count > 5 ? 15 : 20, weight: .bold))
                 .foregroundColor(isDetecting ? .erDark : .erMuted)
                 .animation(.easeInOut(duration: 0.15), value: label)
+                .frame(height: 26)
 
-            if isDetecting {
-                Text(abs(cents) <= Self.greenBand ? "in tune" : String(format: "%+d¢", cents))
-                    .font(.caption)
-                    .foregroundColor(zoneColor)
-            }
+            // Always rendered (never conditional) so this line's height is reserved
+            // whether or not a pitch is detected — otherwise the rest of the screen
+            // shifts up/down every time detection starts or stops.
+            Text(isDetecting ? (abs(cents) <= Self.greenBand ? "in tune" : String(format: "%+d¢", cents)) : " ")
+                .font(.caption)
+                .foregroundColor(zoneColor)
         }
     }
 }

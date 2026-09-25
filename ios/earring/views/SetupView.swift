@@ -26,7 +26,6 @@ struct SetupView: View {
     private var staffHeight: CGFloat { isIPad ? 220 : 130 }
     private var meterWidth: CGFloat { isIPad ? 300 : 200 }
     private var meterHeight: CGFloat { isIPad ? 165 : 110 }
-    private var classicMeterSize: CGFloat { isIPad ? 130 : 80 }
 
     private var displayHistory: [Int] {
         concertHistory.map { min(127, max(0, $0 + transpSemitones)) }
@@ -86,19 +85,11 @@ struct SetupView: View {
                     .font(.subheadline)
             }
 
-            // ── Display style ────────────────────────────────────────────
-            // Tuner needle (TunerMeterView) or the classic note-name circle
-            // (PitchMeterView) — defaults per-instrument (see instrumentIndex's
-            // didSet in ExerciseModel) but user-overridable here, since it's a
-            // display preference rather than a detection-tuning parameter, so it
-            // sits inline rather than in Advanced.
-            Spacer().frame(height: 10)
-            sectionLabel("Display", tooltipKey: "meter_display")
-            chipGrid(options: ["Tuner", "Classic"], selected: model.useTunerMeter ? 0 : 1, count: 2) { idx in
-                model.useTunerMeter = idx == 0
-            }
-
             // ── Meter ─────────────────────────────────────────────────────
+            // Always the tuner needle (TunerMeterView) — the classic note-name
+            // circle (PitchMeterView) is still used by the Exercise screen and kept
+            // around here too (unused) in case this ever needs to be user-choosable
+            // again, but Mic Setup no longer offers a Display toggle for it.
             // The only detected-note readout below the staff — the large
             // note-name/Hz text that used to sit here was removed to make room
             // for the always-visible Pitch Detection controls, without this
@@ -108,21 +99,12 @@ struct SetupView: View {
             Spacer().frame(height: 10)
             HStack {
                 Spacer()
-                if model.useTunerMeter {
-                    TunerMeterView(
-                        midi: model.liveMidi, cents: model.liveCents,
-                        instrumentIndex: model.instrumentIndex,
-                        rootChroma: EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId),
-                        width: meterWidth, height: meterHeight
-                    )
-                } else {
-                    PitchMeterView(
-                        midi: model.liveMidi, isActive: model.isCapturing,
-                        instrumentIndex: model.instrumentIndex,
-                        rootChroma: EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId)
-                    )
-                    .frame(width: classicMeterSize, height: classicMeterSize)
-                }
+                TunerMeterView(
+                    midi: model.liveMidi, cents: model.liveCents,
+                    instrumentIndex: model.instrumentIndex,
+                    rootChroma: EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId),
+                    width: meterWidth, height: meterHeight
+                )
                 Spacer()
             }
 

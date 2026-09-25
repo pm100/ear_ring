@@ -96,14 +96,21 @@ export default function TunerMeter({ hz, transposeSemitones = 0, keyChroma = 0 }
         <line x1={cx} y1={cy} x2={needleTip.x} y2={needleTip.y} stroke={zoneColor} strokeWidth={4} />
         <circle cx={cx} cy={cy} r={5} fill={zoneColor} />
       </svg>
-      <span style={{ fontSize: label.length > 5 ? 15 : 20, fontWeight: 'bold', color: isDetecting ? COLOR_TEXT : COLOR_MUTED }}>
-        {label}
-      </span>
-      {isDetecting && (
-        <span style={{ fontSize: 12, color: zoneColor, marginTop: 2 }}>
-          {Math.abs(cents) <= GREEN_BAND ? 'in tune' : `${cents > 0 ? '+' : ''}${cents}¢`}
+      {/* Fixed height regardless of font size — the label shrinks to 15px for longer
+          dual "written (concert)" labels (e.g. "D (C4)"), and without a reserved
+          height that alone shifts the rest of the screen up/down whenever detection
+          starts/stops, separately from the cents caption below. */}
+      <div style={{ height: 26, display: 'flex', alignItems: 'center' }}>
+        <span style={{ fontSize: label.length > 5 ? 15 : 20, fontWeight: 'bold', color: isDetecting ? COLOR_TEXT : COLOR_MUTED }}>
+          {label}
         </span>
-      )}
+      </div>
+      {/* Always rendered (never conditional) so this line's height is reserved
+          whether or not a pitch is detected — otherwise the rest of the screen
+          shifts up/down every time detection starts or stops. */}
+      <span style={{ fontSize: 12, color: zoneColor, marginTop: 2 }}>
+        {!isDetecting ? ' ' : Math.abs(cents) <= GREEN_BAND ? 'in tune' : `${cents > 0 ? '+' : ''}${cents}¢`}
+      </span>
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import TunerMeter from './TunerMeter';
-import PitchMeter from './PitchMeter';
 import MusicStaff from './MusicStaff';
 import { useAudioCapture, TrackerFrame } from '../hooks/useAudioCapture';
 import { ExerciseSettings } from '../types';
@@ -128,31 +127,17 @@ export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, ro
         <button className="btn-back" onClick={() => setNoteHistory([])}>Clear</button>
       </div>
 
-      {/* Display style: Tuner needle (TunerMeter) or the classic note-name circle
-          (PitchMeter) — defaults per-instrument (see SettingsScreen's instrument
-          selector) but user-overridable here, since it's a display preference rather
-          than a detection-tuning parameter, so it sits inline rather than in Advanced. */}
-      <div style={{ marginTop: 16 }}>
-        <span className="section-label" style={{ marginTop: 0 }}>Display<TooltipIcon tooltipKey="meter_display" /></span>
-        <div className="chip-row">
-          <button type="button" className={`chip ${useTunerMeter ? 'chip-selected' : ''}`}
-            onClick={() => set('useTunerMeter', true)}>Tuner</button>
-          <button type="button" className={`chip ${!useTunerMeter ? 'chip-selected' : ''}`}
-            onClick={() => set('useTunerMeter', false)}>Classic</button>
-        </div>
-      </div>
-
-      {/* The meter is the only detected-note readout below the staff — the large
+      {/* Always the tuner needle (TunerMeter) — the classic note-name circle
+          (PitchMeter) is still used by the Exercise screen and kept around here too
+          (unused) in case this ever needs to be user-choosable again, but Mic Setup
+          no longer offers a Display toggle for it.
+          The meter is the only detected-note readout below the staff — the large
           note-name/Hz text that used to sit here was removed to make room for the
           always-visible Pitch Detection controls, without this screen needing to
           scroll. TunerMeter reads hz directly (not gated on note confirmation) so it
           behaves like a real tuner — see TunerMeter's doc. */}
       <div className="pitch-meter-circle">
-        {useTunerMeter ? (
-          <TunerMeter hz={hz} transposeSemitones={transpSemitones} keyChroma={effectiveKeyChroma(rootChroma, scaleId)} />
-        ) : (
-          <PitchMeter hz={hz} transposeSemitones={transpSemitones} keyChroma={effectiveKeyChroma(rootChroma, scaleId)} />
-        )}
+        <TunerMeter hz={hz} transposeSemitones={transpSemitones} keyChroma={effectiveKeyChroma(rootChroma, scaleId)} />
       </div>
 
       <div style={{ marginTop: 16 }}>

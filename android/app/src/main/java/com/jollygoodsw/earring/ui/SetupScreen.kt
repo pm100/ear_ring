@@ -15,7 +15,6 @@ import com.jollygoodsw.earring.EarRingCore
 import com.jollygoodsw.earring.ExerciseViewModel
 import com.jollygoodsw.earring.ui.components.MusicStaff
 import com.jollygoodsw.earring.ui.components.NoteState
-import com.jollygoodsw.earring.ui.components.PitchMeter
 import com.jollygoodsw.earring.ui.components.StaffNote
 import com.jollygoodsw.earring.ui.components.TunerMeter
 import kotlin.math.roundToInt
@@ -33,9 +32,6 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
     val midiMax = 127
     val maxHistory = 8
 
-    // Only needed for the classic PitchMeter (confirm-gated); TunerMeter reads liveHz
-    // directly instead.
-    var concertMidi by remember { mutableIntStateOf(-1) }
     val concertHistory = remember { mutableStateListOf<Int>() }
 
     // Shared pitch detection — identical pipeline to ExerciseScreen.
@@ -52,16 +48,12 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
         yinThreshold = yinThreshold,
         pitchToleranceCents = pitchToleranceCents,
         onConfirmed = { midi, _ ->
-            concertMidi = midi
             if (midi in rangeStart..rangeEnd) {
                 concertHistory.add(midi)
                 if (concertHistory.size > maxHistory) concertHistory.removeAt(0)
             }
         }
     )
-
-    // Clear the classic meter's display when silence detected.
-    if (liveHz <= 0f) concertMidi = -1
 
     // Apply instrument transposition for display
     val displayHistory = concertHistory.map { EarRingCore.transposeDisplayMidi(it, instrumentIndex) }
@@ -122,28 +114,16 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
             }
         }
 
-        // Display style: Tuner needle (TunerMeter) or the classic note-name circle
-        // (PitchMeter) — defaults per-instrument (see ExerciseViewModel.setInstrumentIndex)
-        // but user-overridable here, since it's a display preference rather than a
-        // detection-tuning parameter, so it sits inline rather than in Advanced.
-        SectionLabel("Display", tooltipKey = "meter_display")
-        ChipRow(
-            items = listOf("Tuner", "Classic"),
-            selected = if (useTunerMeter) 0 else 1,
-            onSelect = { viewModel.setUseTunerMeter(it == 0) }
-        )
-        Spacer(Modifier.height(8.dp))
-
+        // Always the tuner needle (TunerMeter) — the classic note-name circle
+        // (PitchMeter) is still used by the Exercise screen and kept around here too
+        // (unused) in case this ever needs to be user-choosable again, but Mic Setup
+        // no longer offers a Display toggle for it.
         // The meter is the only detected-note readout below the staff — the large
         // note-name/Hz text that used to sit here was removed to make room for the
         // always-visible Pitch Detection controls, without this screen needing to
         // scroll. TunerMeter reads liveHz directly (not gated on note confirmation) so
         // it behaves like a real tuner — see TunerMeter's doc.
-        if (useTunerMeter) {
-            TunerMeter(hz = liveHz, instrumentIndex = instrumentIndex, rootChroma = concertKeyChroma)
-        } else {
-            PitchMeter(detectedMidi = concertMidi, detectedHz = liveHz, instrumentIndex = instrumentIndex, rootChroma = concertKeyChroma)
-        }
+        TunerMeter(hz = liveHz, instrumentIndex = instrumentIndex, rootChroma = concertKeyChroma)
         Spacer(Modifier.height(16.dp))
 
         // Mic Sensitivity lives here rather than in Settings — this screen already
