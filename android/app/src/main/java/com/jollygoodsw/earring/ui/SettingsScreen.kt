@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jollygoodsw.earring.BuildConfig
 import com.jollygoodsw.earring.EarRingCore
 import com.jollygoodsw.earring.ExerciseViewModel
 import org.json.JSONArray
@@ -89,13 +90,21 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
     val wrongPauseOptions = listOf(1000L to "1s", 2000L to "2s", 3000L to "3s", 5000L to "5s")
     val introSoundOptions = listOf("Root Note", "Chord", "Arpeggio", "Scale", "None")
 
-    // Parse instrument list from Rust core once
-    val instrumentNames = remember {
+    // Parse instrument list from Rust core once. Kept as (id, name) pairs, not a plain
+    // List<String>, so the dropdown can filter out premium instruments for a non-premium
+    // user without the remaining entries' positions drifting out of sync with their real
+    // Rust instrumentIndex.
+    val allInstruments = remember {
         try {
             val arr = JSONArray(EarRingCore.instrumentList())
-            List(arr.length()) { arr.getJSONObject(it).getString("name") }
-        } catch (_: Exception) { listOf("Piano") }
+            List(arr.length()) { i ->
+                val inst = arr.getJSONObject(i)
+                Triple(inst.getInt("id"), inst.getString("name"), inst.optBoolean("premium", false))
+            }
+        } catch (_: Exception) { listOf(Triple(0, "Piano", false)) }
     }
+    val selectableInstruments = allInstruments.filter { (_, _, premium) -> !premium || state.isPremium }
+    val currentInstrumentName = allInstruments.firstOrNull { it.first == state.instrumentIndex }?.second ?: "Piano"
     var instrumentExpanded by remember { mutableStateOf(false) }
 
     Column(
@@ -124,7 +133,7 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
                 onExpandedChange = { instrumentExpanded = !instrumentExpanded }
             ) {
                 OutlinedTextField(
-                    value = instrumentNames.getOrElse(state.instrumentIndex) { "Piano" },
+                    value = currentInstrumentName,
                     onValueChange = {},
                     readOnly = true,
                     singleLine = true,
@@ -135,10 +144,10 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
                     expanded = instrumentExpanded,
                     onDismissRequest = { instrumentExpanded = false }
                 ) {
-                    instrumentNames.forEachIndexed { idx, name ->
+                    selectableInstruments.forEach { (id, name, _) ->
                         DropdownMenuItem(
                             text = { Text(name) },
-                            onClick = { viewModel.setInstrumentIndex(idx); instrumentExpanded = false }
+                            onClick = { viewModel.setInstrumentIndex(id); instrumentExpanded = false }
                         )
                     }
                 }
@@ -236,6 +245,14 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
                 selected = wrongPauseOptions.indexOfFirst { it.first == state.wrongNotePauseMs }.coerceAtLeast(0),
                 onSelect = { viewModel.setWrongNotePauseMs(wrongPauseOptions[it].first) }
             )
+        }
+
+        if (BuildConfig.DEBUG) {
+            // Debug-build-only: excluded from release/Play Store builds. Nothing else can
+            // set isPremium true yet (no billing/gifting wired up), so this is the only way
+            // to test the premium gate before that lands.
+            Spacer(Modifier.height(16.dp))
+            SettingSwitchRow("Debug: Premium", state.isPremium) { viewModel.setPremium(it) }
         }
 
         Spacer(Modifier.height(32.dp))

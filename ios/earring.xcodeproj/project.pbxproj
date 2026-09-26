@@ -385,6 +385,9 @@
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				// GCC_PREPROCESSOR_DEFINITIONS above sets DEBUG for Obj-C/C++ (#ifdef DEBUG) —
+				// Swift's #if DEBUG reads this setting instead, and needs its own entry.
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 			};
 			name = Debug;
 		};

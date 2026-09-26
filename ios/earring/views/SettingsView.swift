@@ -15,6 +15,7 @@ struct SettingsView: View {
         let id: Int
         let name: String
         let semitones: Int
+        let premium: Bool
     }
 
     @State private var instruments: [InstrumentInfo] = []
@@ -165,6 +166,17 @@ struct SettingsView: View {
                     } label: { sectionHeader("Exercise & Timing") }
                 }
 
+                #if DEBUG
+                // Debug-only: excluded from Release/TestFlight/App Store builds. Nothing
+                // else can set isPremium true yet (no billing/gifting wired up), so this
+                // is the only way to test the premium gate before that lands.
+                Section {
+                    Toggle("Debug: Premium", isOn: $model.isPremium)
+                } footer: {
+                    Text("Testing only — not shown in release builds.")
+                }
+                #endif
+
                 Section {
                     Button(action: { showResetConfirm = true }) {
                         Text("Reset to Defaults")
@@ -194,19 +206,27 @@ struct SettingsView: View {
         .onAppear {
             loadInstruments()
         }
+        .onChange(of: model.isPremium) { _ in
+            loadInstruments()
+        }
     }
 
     private func loadInstruments() {
         guard let json = try? JSONSerialization.jsonObject(with: Data(EarRingCore.instrumentList().utf8)),
               let arr = json as? [[String: Any]] else {
-            instruments = [InstrumentInfo(id: 0, name: "Piano", semitones: 0)]
+            instruments = [InstrumentInfo(id: 0, name: "Piano", semitones: 0, premium: false)]
             return
         }
+        // Premium instruments (Voice) are left out of the picker entirely for a
+        // non-premium user — model.instrumentIndex is kept off them by
+        // ExerciseModel's own safety net, so there's nothing to fall back to here.
         instruments = arr.compactMap { obj in
             guard let id = obj["id"] as? Int,
                   let name = obj["name"] as? String,
                   let semitones = obj["semitones"] as? Int else { return nil }
-            return InstrumentInfo(id: id, name: name, semitones: semitones)
+            let premium = obj["premium"] as? Bool ?? false
+            guard !premium || model.isPremium else { return nil }
+            return InstrumentInfo(id: id, name: name, semitones: semitones, premium: premium)
         }
     }
 

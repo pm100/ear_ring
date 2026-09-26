@@ -39,7 +39,7 @@ android {
             keyPassword System.getenv('KEY_PASSWORD') ?: System.getenv('KEYSTORE_PASSWORD') ?: ''
         }
     }
-    buildFeatures { compose true }
+    buildFeatures { compose true; buildConfig true }
     composeOptions { kotlinCompilerExtensionVersion '1.5.14' }
     buildTypes {
         debug {

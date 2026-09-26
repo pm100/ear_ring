@@ -10,7 +10,7 @@ import { TooltipIcon } from './Tooltip';
 const STABILITY_OPTIONS = [2, 3, 4, 5];
 const WARMUP_OPTIONS = [0, 1, 2, 3, 4, 5, 6];
 
-interface InstrumentInfo { id: number; name: string; semitones: number; }
+interface InstrumentInfo { id: number; name: string; semitones: number; premium: boolean; }
 
 // Semitones to add to root chroma to get the implied major key (the major key sharing
 // the scale's pitch classes) — mirrors ScaleType::implied_major_offset in music_theory.rs.
@@ -69,11 +69,15 @@ export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, ro
 
   // Load instrument transposition semitones and apply instrument-specific tracker params.
   const [transpSemitones, setTranspSemitones] = useState(0);
+  // Pitch Tolerance is only meaningful for Voice (see pitch_tolerance_cents's doc in
+  // rust/src/music_theory.rs) — hidden below for every other instrument.
+  const [currentInstrumentIsPremium, setCurrentInstrumentIsPremium] = useState(false);
   useEffect(() => {
     invoke<string>('cmd_instrument_list')
       .then(json => {
         const list = JSON.parse(json) as InstrumentInfo[];
         setTranspSemitones(list[instrumentIndex]?.semitones ?? 0);
+        setCurrentInstrumentIsPremium(list[instrumentIndex]?.premium ?? false);
         void invoke('cmd_tracker_apply_instrument', { instrumentIndex });
       })
       .catch(() => {});
@@ -197,14 +201,18 @@ export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, ro
               <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{yinThreshold.toFixed(2)}</span>
             </div>
 
-            <span className="section-label">Pitch Tolerance (cents)<TooltipIcon tooltipKey="pitch_tolerance_cents" /></span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <input type="range" min={50} max={150} step={5}
-                value={pitchToleranceCents}
-                onChange={e => { const v = parseFloat(e.target.value); set('pitchToleranceCents', v); void invoke('cmd_tracker_set_advanced_params', { graceFrames, octaveCorrection, yinThreshold, pitchToleranceCents: v }); }}
-                style={{ flex: 1 }} />
-              <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{pitchToleranceCents.toFixed(0)}</span>
-            </div>
+            {currentInstrumentIsPremium && (
+              <>
+                <span className="section-label">Pitch Tolerance (cents)<TooltipIcon tooltipKey="pitch_tolerance_cents" /></span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <input type="range" min={50} max={150} step={5}
+                    value={pitchToleranceCents}
+                    onChange={e => { const v = parseFloat(e.target.value); set('pitchToleranceCents', v); void invoke('cmd_tracker_set_advanced_params', { graceFrames, octaveCorrection, yinThreshold, pitchToleranceCents: v }); }}
+                    style={{ flex: 1 }} />
+                  <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{pitchToleranceCents.toFixed(0)}</span>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>

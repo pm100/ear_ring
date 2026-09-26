@@ -215,14 +215,18 @@ struct SetupView: View {
                             ), in: 0.05...0.30, step: 0.01)
                         }
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            sectionLabel("Pitch Tolerance (cents)", tooltipKey: "pitch_tolerance_cents")
-                            Text(String(format: "%.0f", model.pitchToleranceCents))
-                                .font(.caption).foregroundColor(.erCaption)
-                            Slider(value: Binding(
-                                get: { Double(model.pitchToleranceCents) },
-                                set: { model.pitchToleranceCents = Float(max(50, min(150, $0))) }
-                            ), in: 50...150, step: 5)
+                        // Only meaningful for Voice (see pitch_tolerance_cents's doc in
+                        // rust/src/music_theory.rs) — hidden for every other instrument.
+                        if model.currentInstrumentIsPremium {
+                            VStack(alignment: .leading, spacing: 4) {
+                                sectionLabel("Pitch Tolerance (cents)", tooltipKey: "pitch_tolerance_cents")
+                                Text(String(format: "%.0f", model.pitchToleranceCents))
+                                    .font(.caption).foregroundColor(.erCaption)
+                                Slider(value: Binding(
+                                    get: { Double(model.pitchToleranceCents) },
+                                    set: { model.pitchToleranceCents = Float(max(50, min(150, $0))) }
+                                ), in: 50...150, step: 5)
+                            }
                         }
                     }
                     .padding(.vertical, 6)

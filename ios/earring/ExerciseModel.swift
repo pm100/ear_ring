@@ -73,6 +73,13 @@ class ExerciseModel: ObservableObject {
         try! JSONDecoder().decode(Settings.self, from: Data(settingsJson.utf8))
     }
 
+    init() {
+        // Covers a stored instrumentIndex left pointing at a premium instrument from
+        // before this device's isPremium was last set false (e.g. a debug toggle
+        // flipped back off between launches) — didSet only catches it while running.
+        clampInstrumentIfLocked()
+    }
+
     /// Sends one action to the Rust settings model, persists the result, and republishes it.
     private func dispatch(_ action: [String: Any]) {
         guard let data = try? JSONSerialization.data(withJSONObject: action),
@@ -185,6 +192,25 @@ class ExerciseModel: ObservableObject {
         get { settings.instrumentIndex }
         set { dispatch(["type": "setInstrument", "value": newValue]) }
     }
+    /// True for Soprano/Alto/Tenor Voice — the only instruments with no mechanical stop
+    /// pinning pitch to an exact value, which is what Pitch Tolerance (Advanced) exists to
+    /// tune; SetupView uses this to hide that control for every other instrument.
+    var currentInstrumentIsPremium: Bool { isPremiumInstrument(instrumentIndex) }
+
+    private func isPremiumInstrument(_ index: Int) -> Bool {
+        guard let json = try? JSONSerialization.jsonObject(with: Data(EarRingCore.instrumentList().utf8)) as? [[String: Any]],
+              let inst = json.first(where: { ($0["id"] as? Int) == index }) else { return false }
+        return (inst["premium"] as? Bool) == true
+    }
+
+    /// If the current instrument is premium-gated (Voice) and isPremium is false — e.g. it
+    /// was selected before a debug/gift/purchase change revoked premium — snaps back to
+    /// Piano rather than leaving the picker pointed at something it no longer offers.
+    /// Called on init and whenever isPremium changes.
+    private func clampInstrumentIfLocked() {
+        guard !isPremium, isPremiumInstrument(instrumentIndex) else { return }
+        dispatch(["type": "setInstrument", "value": 0])
+    }
     /// Rust enforces the diatonic rule (always a 3-note arpeggio).
     var testType: Int {
         get { settings.testType }
@@ -197,9 +223,13 @@ class ExerciseModel: ObservableObject {
     }
     /// Ad-free / paid entitlement. Not a user "setting" — deliberately kept outside the
     /// settings blob (and outside resetSettings()'s reach), same as Android's separate
-    /// PREF_IS_PREMIUM. Until real billing lands, nothing sets this true.
+    /// PREF_IS_PREMIUM. Until real billing/gifting lands, only the DEBUG-only toggle in
+    /// SettingsView sets this true.
     @Published var isPremium: Bool = ud.object(forKey: "isPremium") != nil ? ud.bool(forKey: "isPremium") : false {
-        didSet { UserDefaults.standard.set(isPremium, forKey: "isPremium") }
+        didSet {
+            UserDefaults.standard.set(isPremium, forKey: "isPremium")
+            clampInstrumentIfLocked()
+        }
     }
     @Published var sequence: [Int] = []
     @Published var detectedNotes: [DetectedNote] = []

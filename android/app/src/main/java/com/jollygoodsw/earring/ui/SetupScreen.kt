@@ -18,6 +18,7 @@ import com.jollygoodsw.earring.ui.components.NoteState
 import com.jollygoodsw.earring.ui.components.StaffNote
 import com.jollygoodsw.earring.ui.components.TunerMeter
 import kotlin.math.roundToInt
+import org.json.JSONArray
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,6 +58,18 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
 
     // Apply instrument transposition for display
     val displayHistory = concertHistory.map { EarRingCore.transposeDisplayMidi(it, instrumentIndex) }
+
+    // Pitch Tolerance is only meaningful for Voice (see pitch_tolerance_cents's doc in
+    // rust/src/music_theory.rs) — hidden below for every other instrument.
+    val currentInstrumentIsPremium = remember(instrumentIndex) {
+        try {
+            val arr = JSONArray(EarRingCore.instrumentList())
+            (0 until arr.length()).any { i ->
+                val inst = arr.getJSONObject(i)
+                inst.getInt("id") == instrumentIndex && inst.optBoolean("premium", false)
+            }
+        } catch (_: Exception) { false }
+    }
 
     BackHandler { onBack() }
 
@@ -217,18 +230,20 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(Modifier.height(8.dp))
-            SectionLabel("Pitch Tolerance (cents)", tooltipKey = "pitch_tolerance_cents")
-            Text("%.0f".format(pitchToleranceCents),
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 4.dp))
-            Slider(
-                value = pitchToleranceCents,
-                onValueChange = { viewModel.setPitchToleranceCents(it.coerceIn(50f, 150f)) },
-                valueRange = 50f..150f,
-                steps = 19,
-                modifier = Modifier.fillMaxWidth()
-            )
+            if (currentInstrumentIsPremium) {
+                Spacer(Modifier.height(8.dp))
+                SectionLabel("Pitch Tolerance (cents)", tooltipKey = "pitch_tolerance_cents")
+                Text("%.0f".format(pitchToleranceCents),
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 4.dp))
+                Slider(
+                    value = pitchToleranceCents,
+                    onValueChange = { viewModel.setPitchToleranceCents(it.coerceIn(50f, 150f)) },
+                    valueRange = 50f..150f,
+                    steps = 19,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             }
         }
     }

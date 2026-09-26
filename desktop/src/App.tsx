@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { Screen, ExerciseSettings, ExerciseState } from './types';
 import HomeScreen from './components/HomeScreen';
@@ -31,6 +31,11 @@ function initialExercise(settings: ExerciseSettings): ExerciseState {
 
 // App state, not a setting: kept out of the Rust settings model so a settings reset never touches it.
 const HAS_LAUNCHED_KEY = 'ear_ring_has_launched';
+// Ad-free / paid entitlement. Not a user "setting" — deliberately kept out of the Rust
+// settings blob (and outside a settings reset's reach), same as iOS/Android's separate
+// isPremium storage. Until real billing/gifting lands, only the DEBUG-only toggle in
+// SettingsScreen sets this true.
+const IS_PREMIUM_KEY = 'ear_ring_is_premium';
 
 function getInitialScreen(): Screen {
   if (!localStorage.getItem(HAS_LAUNCHED_KEY)) {
@@ -52,6 +57,23 @@ export default function App() {
 function AppContent({ settings, dispatch }: { settings: ExerciseSettings; dispatch: Dispatch }) {
   const [screen, setScreen] = useState<Screen>(getInitialScreen);
   const [exercise, setExercise] = useState<ExerciseState>(() => initialExercise(settings));
+  const [isPremium, setIsPremiumState] = useState(() => localStorage.getItem(IS_PREMIUM_KEY) === '1');
+  const setIsPremium = useCallback((value: boolean) => {
+    localStorage.setItem(IS_PREMIUM_KEY, value ? '1' : '0');
+    setIsPremiumState(value);
+  }, []);
+
+  // If the current instrument is premium-gated (Voice) and isPremium is false — e.g. it was
+  // selected before a debug/gift/purchase change revoked premium — snaps back to Piano
+  // rather than leaving Settings' picker pointed at something it no longer offers.
+  useEffect(() => {
+    if (isPremium) return;
+    invoke<string>('cmd_instrument_list').then(json => {
+      const inst = (JSON.parse(json) as { id: number; premium: boolean }[])
+        .find(i => i.id === settings.instrumentIndex);
+      if (inst?.premium) dispatch({ type: 'setInstrument', value: 0 });
+    }).catch(() => {});
+  }, [isPremium, settings.instrumentIndex, dispatch]);
 
   // Reset leaves the first-launch flag alone: it's app state, not a setting, and clearing it
   // on reset is what sent the next-tapped tab to Help on Android.
@@ -200,6 +222,8 @@ function AppContent({ settings, dispatch }: { settings: ExerciseSettings; dispat
           onAction={dispatch}
           onResetSettings={resetSettings}
           onBack={() => setScreen('home')}
+          isPremium={isPremium}
+          onSetPremium={setIsPremium}
         />
       )}
       {screen === 'help' && (

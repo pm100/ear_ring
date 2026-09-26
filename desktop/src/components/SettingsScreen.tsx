@@ -9,6 +9,8 @@ interface Props {
   onAction: (action: SettingsAction) => void;
   onResetSettings: () => void;
   onBack: () => void;
+  isPremium: boolean;
+  onSetPremium: (value: boolean) => void;
 }
 
 const BPM_OPTIONS = [60, 80, 100, 120, 140];
@@ -42,9 +44,9 @@ function CollapsibleSection({ title, children }: { title: string; children: Reac
   );
 }
 
-interface InstrumentInfo { id: number; name: string; semitones: number; rangeStart: number; rangeEnd: number; graceFrames: number; octaveCorrection: boolean; pitchToleranceCents: number; }
+interface InstrumentInfo { id: number; name: string; semitones: number; rangeStart: number; rangeEnd: number; graceFrames: number; octaveCorrection: boolean; pitchToleranceCents: number; premium: boolean; }
 
-export default function SettingsScreen({ settings, onAction, onResetSettings, onBack }: Props) {
+export default function SettingsScreen({ settings, onAction, onResetSettings, onBack, isPremium, onSetPremium }: Props) {
   const set = <K extends keyof ExerciseSettings>(key: K, value: ExerciseSettings[K]) =>
     onAction({ type: 'set', values: { [key]: value } });
 
@@ -52,8 +54,12 @@ export default function SettingsScreen({ settings, onAction, onResetSettings, on
   useEffect(() => {
     invoke<string>('cmd_instrument_list')
       .then(json => setInstruments(JSON.parse(json) as InstrumentInfo[]))
-      .catch(() => setInstruments([{ id: 0, name: 'Piano', semitones: 0, rangeStart: 60, rangeEnd: 72, graceFrames: 3, octaveCorrection: false, pitchToleranceCents: 50 }]));
+      .catch(() => setInstruments([{ id: 0, name: 'Piano', semitones: 0, rangeStart: 60, rangeEnd: 72, graceFrames: 3, octaveCorrection: false, pitchToleranceCents: 50, premium: false }]));
   }, []);
+  // Voice instruments are left out of the picker entirely for a non-premium user — App's
+  // own safety net keeps settings.instrumentIndex off them, so there's nothing to fall
+  // back to here.
+  const selectableInstruments = instruments.filter(inst => !inst.premium || isPremium);
 
   const [gitHash, setGitHash] = useState('unknown');
   useEffect(() => {
@@ -77,7 +83,7 @@ export default function SettingsScreen({ settings, onAction, onResetSettings, on
           onChange={e => onAction({ type: 'setInstrument', value: parseInt(e.target.value) })}
           style={{ width: '100%', padding: '8px 12px', fontSize: 14, borderRadius: 4, border: '1px solid #bdbdbd', marginBottom: 4 }}
         >
-          {instruments.map(inst => (
+          {selectableInstruments.map(inst => (
             <option key={inst.id} value={inst.id}>{inst.name}</option>
           ))}
         </select>
@@ -184,6 +190,23 @@ export default function SettingsScreen({ settings, onAction, onResetSettings, on
           ))}
         </div>
       </CollapsibleSection>
+
+      {import.meta.env.DEV && (
+        // Dev-server-only (`npm run dev`/`cargo tauri dev`): excluded from production
+        // builds. Nothing else can set isPremium true yet (no billing/gifting wired up),
+        // so this is the only way to test the premium gate before that lands.
+        <div style={{ marginTop: 16 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={isPremium}
+              onChange={e => onSetPremium(e.target.checked)}
+              style={{ width: 18, height: 18, cursor: 'pointer' }}
+            />
+            <span className="section-label" style={{ margin: 0 }}>Debug: Premium</span>
+          </label>
+        </div>
+      )}
 
       <div style={{ marginTop: 32, paddingBottom: 16 }}>
         <ResetButton onReset={onResetSettings} />

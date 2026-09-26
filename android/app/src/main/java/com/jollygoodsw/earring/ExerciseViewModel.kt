@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.json.JSONObject
 
 
@@ -201,6 +202,14 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     )
     val state: StateFlow<ExerciseState> = _state.asStateFlow()
 
+    init {
+        // Covers a stored instrumentIndex left pointing at a premium instrument from
+        // before this device's isPremium was last set false (e.g. a debug toggle
+        // flipped back off between launches) — the check in setPremium only catches
+        // it while running.
+        clampInstrumentIfLocked()
+    }
+
     val audioPlayback = AudioPlayback(application)
     private var sessionPersisted = false
 
@@ -238,10 +247,30 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     /** Rust snaps range, grace/octave/tolerance and the tuner-meter default to the instrument's table. */
     fun setInstrumentIndex(idx: Int) = dispatch(JSONObject().put("type", "setInstrument").put("value", idx))
     /** Ad-free / paid entitlement. Called once purchase state is confirmed (e.g. from
-     *  Play Billing); until real billing lands, nothing sets this to true. */
+     *  Play Billing/gifting); until that lands, only the DEBUG-only toggle in
+     *  SettingsScreen sets this to true. */
     fun setPremium(premium: Boolean) {
         prefs.edit().putBoolean(PREF_IS_PREMIUM, premium).apply()
         _state.value = _state.value.copy(isPremium = premium)
+        clampInstrumentIfLocked()
+    }
+
+    /** If the current instrument is premium-gated (Voice) and isPremium is false — e.g. it
+     *  was selected before a debug/gift/purchase change revoked premium — snaps back to
+     *  Piano rather than leaving the picker pointed at something it no longer offers. */
+    private fun clampInstrumentIfLocked() {
+        val s = _state.value
+        if (s.isPremium) return
+        try {
+            val arr = JSONArray(EarRingCore.instrumentList())
+            for (i in 0 until arr.length()) {
+                val inst = arr.getJSONObject(i)
+                if (inst.getInt("id") == s.instrumentIndex && inst.optBoolean("premium", false)) {
+                    setInstrumentIndex(0)
+                    return
+                }
+            }
+        } catch (_: Exception) {}
     }
     /** Rust enforces the diatonic rule (always a 3-note arpeggio). */
     fun setTestType(type: Int) = dispatch(JSONObject().put("type", "setTestType").put("value", type))
