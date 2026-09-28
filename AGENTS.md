@@ -190,20 +190,28 @@ Layout: vertically scrollable column, 16dp/px padding, centred.
 
 [16dp space]
 Section label: "Test Type"
-Dropdown (outlined, full width): Random Notes | Diatonic Arpeggios (ascend) | Diatonic Arpeggios (desc)
-  — testType IDs: 0=Random Notes, 2=Diatonic Arpeggios (ascend), 3=Diatonic Arpeggios (desc)
-  — testType 1 (Melody Snippets) code is preserved but not shown in the dropdown
-  — In Diatonic Arpeggios mode: Scale dropdown and Sequence Length chips (2, 5–8) are disabled (opacity 0.38); only 3 and 4 are enabled (triad vs seventh chord)
-  — In Diatonic Arpeggios mode: Piano range picker is fully interactive (range controls chord placement)
-  — In Diatonic Arpeggios mode: chord label (root note + quality + inversion) is shown on the Exercise screen only when "Display Test Notes" is checked
-  — In Melody Snippets mode: Scale dropdown and Sequence Length chips are disabled (opacity 0.38)
-  — In Melody Snippets mode: Piano range picker is read-only (taps/drags are no-ops)
-  — In Melody Snippets mode: range is auto-set by ExerciseScreen to snippet MIDI ± 6 semitones
+Dropdown (outlined, full width): Random Notes | Diatonic Arpeggios
+  — testType IDs: 0=Random Notes, 2=Diatonic Arpeggios. Legacy stored values 1 (removed
+    Melody Snippets mode) and 3 (removed separate descending-arpeggio mode) are still
+    accepted on load and silently remapped — 1→0, 3→2 (`normalize_json` in
+    `rust/src/settings.rs`) — but neither is selectable in the UI any more.
+  — In Diatonic Arpeggios mode: ascending vs. descending is randomized per test, not a
+    user choice (issue #16) — each triad's direction is picked fresh every attempt.
+  — In Diatonic Arpeggios mode: Sequence Length is fully locked — the Rust core forces
+    it to 3 (`DIATONIC_SEQUENCE_LENGTH`) and every chip is disabled (opacity 0.38),
+    including the "3" chip itself, since there is no user choice to make.
+  — In Diatonic Arpeggios mode: the Scale dropdown stays enabled — it still determines
+    the triad's quality (major/minor/diminished follows the scale).
+  — In Diatonic Arpeggios mode: the Range picker stays fully interactive (range controls
+    chord placement).
+  — In Diatonic Arpeggios mode: a chord label (root note + quality — root position only,
+    no inversions yet, see `docs/roadmap.md`) is shown on the Exercise screen's title
+    area only when "Display Test Notes" is checked.
 
 [12dp space]
 Row (equal width, 8dp gap):
   Left half — Section label: "Key"
-              Dropdown (outlined, full width of column): C  C#  D  D#  E  F  F#  G  G#  A  A#  B
+              Dropdown (outlined, full width of column): C  Db  D  Eb  E  F  Gb  G  Ab  A  Bb  B
                 — Selecting a new key auto-resets the range to one octave from the new key closest to middle C
   Right half — Section label: "Scale"
                Dropdown (outlined, full width of column): Major | Natural Minor | Dorian | Mixolydian
@@ -219,7 +227,8 @@ Row (equal width, 8dp gap):
                    Minor's notes are exactly Eb major's notes), "Dorian (of Bb)", "Mixolydian (of F)". This
                    implied key also drives the staff key signature and note spelling. The label updates
                    dynamically as the Key dropdown changes.
-                 — **Disabled (opacity 0.38)** when Test Type = Melody Snippets or Diatonic Arpeggios
+                 — Stays enabled in every Test Type, including Diatonic Arpeggios (it still selects
+                   the triad's quality there — see above).
 
 [16dp space]
 Section label: "Range" (plain — does not embed the current range values; those live
@@ -237,7 +246,6 @@ Row (full width, left-aligned like every other Home block — this was previousl
      instead of typing it.
   — Typed value must be a valid note name and keep the range at least 12 semitones
     wide, or the edit reverts to the last valid value on commit (Enter/blur)
-  — Disabled when Test Type = Melody Snippets
 
 [16dp space]
 PianoRangePicker (full-screen, opened via the 🎹 button above)
@@ -255,8 +263,9 @@ PianoRangePicker (full-screen, opened via the 🎹 button above)
 Section label: "Sequence Length"
 Chip row: 1  2  3  4  5  6  7  8   (single row, equal width)
   — "1" plays/tests a single random note (no repeat-rejection applies, since there's only one note)
-  — **Disabled (opacity 0.38)** when Test Type = Melody Snippets
-  — In Diatonic Arpeggios mode: only chips 3 and 4 are enabled (3=triad, 4=seventh chord); 1, 2, 5–8 are disabled
+  — **Fully locked (opacity 0.38, all 8 chips disabled)** when Test Type = Diatonic Arpeggios —
+    sequence length is forced to 3 (a triad) with no user choice; the chip still shows "3"
+    highlighted so the locked value is visible, just not tappable
 
 [32dp space]
 [▶ Start Exercise]    — full-width filled primary button, 52dp tall, 18sp
@@ -460,39 +469,49 @@ staff history above (not the live meter, which keeps tracking whatever the mic h
 next). Associated with the staff by position, not placed in the title row.
 
 [10dp space]
-PitchMeter            — 80dp circle on phones (90dp before this trim; 130-150dp on
-                        iPad/desktop, unchanged). The large note-name/Hz text that
-                        used to sit between the staff and the meter was removed
-                        (UI review, issue #30) — it duplicated what the staff and
-                        Exercise screen already show, and freed room for the
-                        always-visible Pitch Detection controls below without
-                        needing this screen to scroll.
+TunerMeter             — semicircular guitar-tuner-style dial (replaced the old
+                        PitchMeter circle here — PitchMeter is still what the
+                        Exercise screen uses; see the Pitch Meter Specification
+                        section below for both). A needle sweeps continuously with
+                        the live pitch: green/amber/red bands at ±5¢/±20¢/±50¢ from
+                        dead-on, note name + optional written/concert dual label
+                        below the dial, and a cents readout ("in tune" or "+n¢"/"-n¢")
+                        below that. Unlike the rest of the detection pipeline it
+                        reads every frame's raw Hz directly — not gated behind the
+                        note-stability confirmation used everywhere else — so it
+                        responds instantly like a real clip-on tuner. There is no
+                        user-facing toggle between this and PitchMeter; which
+                        widget appears is fixed per screen.
 
 [12dp space]
-Mic Sensitivity, Note Stability, Mic Warmup Frames — always visible, NOT collapsible
-                        (no chevron, no tap-to-expand, and NO section heading above
-                        them either — just each control's own label) since adjusting
-                        these live against the staff/meter's feedback is this
-                        screen's whole purpose. Slider "Mic Sensitivity": 1–10
+Mic Sensitivity — the only detection control always visible (no chevron, no
+                        section heading — just its own label), since it's the one
+                        control most people ever need to touch. Slider, 1–10
                         integer steps, default 8; internally maps to silence
-                        threshold via threshold = 0.011 − sensitivity × 0.001. Chip
-                        row "Note Stability (frames to confirm)": 2 3 4 5, default 3.
-                        Chip row "Mic Warmup Frames": 0 1 2 3 4 5 6, default 4. The
-                        explanatory captions these controls have in other contexts
-                        are omitted here — vertical space is at a premium on this
-                        no-scroll screen, and each control's own label already says
-                        enough.
+                        threshold via threshold = 0.011 − sensitivity × 0.001.
+
+`Advanced` button/disclosure — Android via a modal bottom sheet, iOS via a sheet,
+                        Desktop via a collapsible section below Mic Sensitivity.
+                        Everything else detection-related lives here, not always-on:
+                        Chip row "Note Stability (frames to confirm)": 2 3 4 5, default 3.
+                        Chip row "Mic Warmup Frames": 0 1 2 3 4 5 6, default 4.
+                        Chip row "Grace Frames": 0–6, default from the instrument table (Piano=3).
+                        Toggle "Octave Correction": default from the instrument table (Piano=false).
+                        Slider "YIN Threshold": 0.05–0.30, default 0.15.
+                        Slider "Pitch Tolerance (cents)": 50–150, default from the instrument
+                          table — **only shown for the currently-selected instrument if it's
+                          premium** (currently just the three Voice instruments; see
+                          Instrument Transposition below). Hidden entirely for every
+                          non-premium instrument, since a fixed pitch tolerance is meaningless
+                          for them.
+                        On Android/iOS the base Mic Setup screen must remain non-scrolling,
+                        with Mic Sensitivity and the Advanced trigger staying above the
+                        bottom navigation.
 
 Mic Setup **starts listening automatically on entry** — there is NO Start Listening button
 and NO Stop button. The user exits by tapping another tab.
 
 NO test note buttons.
-
-Optional advanced pitch-detection controls (Grace Frames, Octave Correction, and YIN
-Threshold) open from an `Advanced` button rather than expanding inline: Android via a
-modal bottom sheet, iOS via a sheet, Desktop via a collapsible section below the
-always-visible controls. On Android/iOS the base Mic Setup screen must remain
-non-scrolling, with its primary controls staying above the bottom navigation.
 ```
 
 The staff visual style, horizontal spacing, and note-detection pipeline are
@@ -532,7 +551,7 @@ Recorded tests summary:
 
 Session history:
   If empty:
-    "No sessions yet. Complete an exercise to see your progress!"
+    "No sessions yet. Complete an exercise to see history!"
     [▶ Start your first exercise]  — full-width filled PRIMARY button below the
                                      message, routes to Home (fixed during the UI
                                      review, issue #30 — previously there was no
@@ -589,11 +608,16 @@ doesn't fragment into a dozen near-empty entries:
 
 - **Instrument & Playback** — outlined dropdown, full width: Piano | Guitar |
   Transposed Guitar | Soprano Sax | Alto Sax | Tenor Sax | Trumpet | Clarinet
-  (default: Piano, index 0). Selecting a transposing instrument causes Mic Setup
-  and Exercise screens to display written pitch instead of concert pitch (display
-  only — detection stays in concert pitch). Selecting a new instrument resets
-  rangeStart/rangeEnd to one octave from the current root note closest to middle C
-  (same rule as changing the Key on Home). Below the dropdown, a chip row for Tempo
+  (default: Piano, index 0), plus Soprano Voice | Alto Voice | Tenor Voice
+  **only for a premium user** — the three Voice instruments are filtered out of
+  the dropdown entirely otherwise (see Premium below), not just disabled.
+  Selecting a transposing instrument causes Mic Setup and Exercise screens to
+  display written pitch instead of concert pitch (display only — detection stays
+  in concert pitch). Selecting a new instrument snaps rangeStart/rangeEnd, Grace
+  Frames, Octave Correction, and Pitch Tolerance to that instrument's row in the
+  Rust `INSTRUMENTS` table (`setInstrument` action in `rust/src/settings.rs`) —
+  NOT the key-based one-octave-from-root formula (that only applies when the Key
+  itself changes on Home). Below the dropdown, a chip row for Tempo
   (BPM): 60 80 100 120 140, default 100.
 - **Sound & Display** — checkbox "Play Pass/Fail Sounds" (a chime when a test is
   passed, a different tone when it fails); an "Intro Sound" dropdown: Root Note |
@@ -611,6 +635,16 @@ doesn't fragment into a dozen near-empty entries:
 
 Pitch Detection (Mic Sensitivity, Note Stability, Mic Warmup Frames) lives on the
 Mic Setup screen, not here — see the Mic Setup Screen section above for why.
+
+**Premium** — a `premium` flag on each `InstrumentInfo` row gates two things: the three
+Voice instruments (filtered out of the Instrument dropdown entirely for a non-premium
+user) and the Pitch Tolerance advanced control on Mic Setup (hidden unless the
+*currently selected* instrument is premium). There is no real entitlement/billing system
+yet — `isPremium` is a plain boolean held in app state, and the only way to set it true
+today is a dev-build-only "Debug: Premium" checkbox at the bottom of this screen on
+every platform (desktop: `import.meta.env.DEV`; Android/iOS: their own debug-build
+checks) — excluded from production builds. Wire this up for real (purchase/subscription
+flow) before shipping the premium tier.
 
 Below the sections: "Reset to Defaults" button (confirmation dialog before it takes
 effect; resets settings only, progress history is unaffected), then
@@ -809,18 +843,43 @@ Resources build phase, so anything placed there silently never renders on iOS; s
 
 ## Pitch Meter Specification
 
-Circular widget, **90dp/px diameter**.
+Two different live-pitch widgets exist; which one appears is fixed per screen, not a
+user choice.
+
+### PitchMeter (Exercise screen)
+
+Circular widget, **90dp/px diameter**. Only updates on a confirmed (stability-gated) note.
 
 - Outer ring: 4px stroke
   - Grey (#BDBDBD) when no pitch detected
   - Green (#4CAF50) when pitch detected
-- Centre text: note label (e.g. "A4", "C#4")
+- Centre text: note label (e.g. "A4", "Db4")
   - Bold, 20sp (16sp if label is 3+ chars)
   - Dark (#212121) when detected, grey (#BDBDBD) when not
 - Shows "♪" (plain monochrome glyph, no emoji presentation — same family as
   the app's "▶"/"■"/"↻" button glyphs) when no pitch detected, not a bare
   "—" — a bare dash read as a misplaced divider rather than "no note
   detected yet" (fixed during the UI review, issue #30)
+
+### TunerMeter (Mic Setup screen)
+
+Semicircular dial, ~200×110 (desktop SVG units; Android/iOS scale equivalently),
+implemented identically on all three platforms (`TunerMeter.tsx` / `.kt` / `.swift`).
+Reads every frame's raw Hz directly — **not** gated behind note-stability confirmation
+— so the needle sweeps continuously like a real clip-on tuner, rather than jumping only
+when a note is confirmed.
+
+- A 180°→360° arc split into five colour bands by cents-off-pitch: red beyond ±20¢,
+  amber ±5–20¢, green within ±5¢ either side of dead-on (`GREEN_BAND`/`AMBER_BAND` =
+  5/20 cents; sweep clamped to ±50¢, `MAX_CENTS`)
+- A needle (line + dot) sweeps to the current cents offset, coloured by its zone
+- Below the dial: the note label (written pitch; shows a dual "written (concert)" label
+  for a transposing instrument), then a cents caption — "in tune" inside the green band,
+  otherwise "+n¢"/"-n¢"
+- Grey/muted (`#BDBDBD`) throughout, and "♪" for the label, when nothing is detected
+- Both the label row and the cents-caption row are always rendered (never conditionally
+  hidden) so their reserved height doesn't shift the rest of the screen when detection
+  starts/stops
 
 ---
 
@@ -979,23 +1038,37 @@ note-name/Hz readout, only the staff and pitch meter — see its own section abo
 
 The instrument index (0 = Piano) is persisted across restarts on all platforms.
 
-Each instrument has a `range_start` and `range_end` (concert MIDI) in the Rust `InstrumentInfo`
-struct, used as a reference. When the user selects a new instrument, all platforms reset
-`rangeStart`/`rangeEnd` to **one octave from the current root note closest to middle C**
-(same rule as changing the Key on the Home screen — NOT the instrument's hardcoded range).
-The JSON from `instrument_list_json()` includes `rangeStart`/`rangeEnd` fields for other purposes
-(e.g. initial defaults on first launch), but instrument changes use the key-based formula.
+Each instrument has a `range_start`/`range_end` (concert MIDI, always a 12-semitone/
+one-octave span), plus its own `grace_frames`/`octave_correction`/`pitch_tolerance_cents`
+detection defaults, in the Rust `InstrumentInfo` struct (`INSTRUMENTS` array in
+`music_theory.rs`). Selecting a new instrument (`setInstrument` action in
+`rust/src/settings.rs`) snaps **all** of these onto the new settings from that table —
+range included. This is different from changing the Key on Home, which instead
+re-derives the range as one octave from the new root note closest to middle C
+(`setRootNote` action) — the two actions use different rules, they just happen to both
+produce a 12-semitone span.
 
-| Instrument         | range_start (MIDI) | range_end (MIDI) |
-|--------------------|--------------------|-----------------|
-| Piano              | 60 (C4)            | 71 (B4)         |
-| Guitar             | 52 (E3)            | 63 (D#4)        |
-| Transposed Guitar  | 52 (E3)            | 63 (D#4)        |
-| Soprano Sax        | 58 (A#3)           | 69 (A4)         |
-| Alto Sax           | 51 (D#3)           | 62 (D4)         |
-| Tenor Sax          | 46 (A#2)           | 57 (A3)         |
-| Trumpet            | 55 (G3)            | 66 (F#4)        |
-| Clarinet           | 55 (G3)            | 66 (F#4)        |
+| Instrument         | range_start (MIDI) | range_end (MIDI) | Premium |
+|--------------------|---------------------|--------------------|---------|
+| Piano              | 60 (C4)             | 72 (C5)            |         |
+| Guitar             | 52 (E3)             | 64 (E4)            |         |
+| Transposed Guitar  | 52 (E3)             | 64 (E4)            |         |
+| Soprano Sax        | 58 (Bb3)            | 70 (Bb4)           |         |
+| Alto Sax           | 51 (Eb3)            | 63 (Eb4)           |         |
+| Tenor Sax          | 46 (Bb2)            | 58 (Bb3)           |         |
+| Trumpet            | 55 (G3)             | 67 (G4)            |         |
+| Clarinet           | 55 (G3)             | 67 (G4)            |         |
+| Soprano Voice      | 60 (C4)             | 72 (C5)            | ✓       |
+| Alto Voice         | 55 (G3)             | 67 (G4)            | ✓       |
+| Tenor Voice        | 48 (C3)             | 60 (C4)            | ✓       |
+
+The three Voice instruments also default to a wider Pitch Tolerance (80 cents vs. 50 for
+every other instrument) — real voices drift with natural vibrato, unlike an instrument
+with a mechanical pitch stop. This is what the `use_tuner_meter`/`useTunerMeter` field
+(any instrument's tolerance above `FIXED_PITCH_TOLERANCE_CENTS` = 50 flips it on) was
+originally for, though nothing currently reads that flag now that Mic Setup always shows
+TunerMeter regardless of instrument (see Pitch Meter Specification). See **Premium**
+under the Settings Screen section above for the entitlement gate itself.
 
 ## First Launch Behaviour
 
@@ -1101,6 +1174,16 @@ exception needed here anymore; this screen matches the spec like every other.
 The Melody Manager is a **standalone Tauri app** at `melody-manager/` used to vet,
 edit, and import melodies into the shared `rust/src/melodies.txt` library.
 It is **not** part of the shipping app — it is a developer-only tool.
+
+**The "Melody Snippets" test type this library was built for is not currently reachable
+in the shipped app.** It's not offered in Home's Test Type dropdown, and any stored
+`testType: 1` is silently remapped to Random Notes on load (see the Home Screen section
+above). The Rust melody FFI (`melody_count`, `melody_to_midi_by_index`, etc.),
+`melodies.txt`, and the melody-handling branches still in each platform's Exercise
+screen are all still there and exercised by `cargo test` — this was a UI-level removal,
+not a deletion — but nothing in the shipped UI can currently trigger them. Keep this
+tool and library maintained only if Melody Snippets is coming back; otherwise treat it
+like `rust_wasm/` (see Shared Logic Rule above) — don't extend it without asking first.
 
 **Full documentation:** `docs/melody-manager.md`
 

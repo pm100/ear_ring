@@ -1,52 +1,51 @@
 ## Getting Started
 
-In the settings tab select your instrument, then open the Mic tab and play some notes — you should see note detected on the staff and pitch meter. This confirms your microphone is working. If it doesn't correctly register the notes try playing at different volumes and make sure you stop and start as crisply as possible. 
+In the Settings tab, pick your instrument, then open the Mic tab and play a few notes — you should see them appear on the staff and pitch meter. This confirms your microphone is working. If notes aren't detected, try playing louder or more crisply, and check Mic Sensitivity on the Mic tab.
 
-On the Home tab, choose a key, scale, and range to match your instrument.
+On the Home tab, choose a test type, key, scale, range, and sequence length to match your instrument and what you want to practice.
 
 Tap ▶ Start Exercise. The app plays a chord to set the key, then a sequence of notes. Play the notes back in order.
 
 Green notes mean you nailed it — red means keep trying. The app replays the same sequence up to your retry limit, then moves on automatically.
 
+## Test Types
+
+Random Notes plays an arbitrary sequence within your selected range.
+
+Diatonic Arpeggios plays a triad (three notes) built from your selected key and scale — its quality (major, minor, or diminished) follows the scale automatically. Scale and Sequence Length are locked in this mode since the triad determines them.
+
 ## Mic Setup
 
-The Mic tab lets you test your microphone in real time. Play a note — the large note name, staff, and pitch meter all update live. Notes outside your selected range are ignored.
+The Mic tab lets you test your microphone in real time — it starts listening as soon as you open it. Play a note and watch the staff and pitch meter update live. Notes outside your selected range are ignored.
 
-If nothing is detected, check your microphone permissions or try playing louder. You can also adjust the Mic Sensitivity slider in Settings.
+Mic Sensitivity, Note Stability, and Mic Warmup Frames sit right on this screen so you can tune them by ear against that live feedback. Tap Advanced for further pitch-detection controls (Grace Frames, Octave Correction, YIN Threshold).
+
+Clear, below the staff, resets the note history shown there without affecting live detection.
 
 ## Running an Exercise
 
 When you start, the app runs hands-free:
 
-• A tonic chord plays to establish the key.
+• An intro sound (a chord by default — configurable in Settings) plays to establish the key.
 • The test sequence plays (the notes to play back).
 • Listening starts automatically.
 • Correct notes appear in green; wrong notes in red.
 • On a wrong note, the sequence replays up to your retry limit, then a new test starts.
-• If you get the sequence correct the app moves on to the next test sequence
+• Get the sequence right and the app moves straight on to the next test.
 
-Use the back gesture (or ⏹ Stop on desktop) to end the session and return to Home.
+Tap ■ Stop Testing (or use the back gesture on Android/iOS) to end the session early. Your session is saved as long as you completed at least one test.
 
-## Display Test Notes
+## Progress
 
-Found on the Home screen (checkbox). When checked, the expected notes are drawn on the staff in black before you play — they turn green as you get each one right. Good for learning.
+The Progress tab tracks your day streak, total recorded tests, and average score. Tap a past session to drill into its individual tests — expected vs. detected notes, attempts used, and score.
 
-When unchecked (default), the staff is blank until you play — each detected note appears in green or red. This is the challenge mode.
-
-## Use Key Signature
-
-Found on the Home screen (checkbox). When checked, the staff shows a standard key signature after the clef — only notes that are out of key get an accidental symbol (♯ or ♭).
-
-When unchecked (default), no key signature is drawn and every accidental is shown directly on the affected note.
+Clear All Progress erases all recorded history and appears once you have at least one session.
 
 ## Settings
 
-Tempo: how fast the test sequence plays.
-Max Retries: how many attempts you get per test before the app moves on.
-Mic Sensitivity: raise this if the mic picks up background noise; lower it if it misses quiet notes.
-Note Stability: how many consistent pitch frames are needed before a note is confirmed.
-Post-Chord Gap: the pause between the intro chord and the test sequence.
-Wrong-Note Pause: how long to wait after a wrong note before replaying.
+Settings is grouped into three sections you can expand: Instrument & Playback, Sound & Display, and Exercise & Timing. Tap the ⓘ icon next to any control for what it does.
+
+Reset to Defaults restores every setting to its default — your recorded progress isn't affected.
 
 ## About
 
