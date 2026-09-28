@@ -45,6 +45,7 @@ struct ExerciseView: View {
     var body: some View {
         portraitLayout
         .navigationBarTitleDisplayMode(.inline)
+        .hideTabBar()
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 // Always the actual (concert) key/range, regardless of instrument

@@ -13,6 +13,18 @@ extension View {
             self.toolbar(.hidden, for: .navigationBar)
         }
     }
+
+    // Exercise is a push route on the Home tab's NavigationStack, not a tab of its
+    // own — DESIGN.md requires the bottom tab bar hidden while it's showing, but
+    // TabView + NavigationStack doesn't do that automatically on push.
+    @ViewBuilder
+    func hideTabBar() -> some View {
+        if #available(iOS 18, *) {
+            self.toolbarVisibility(.hidden, for: .tabBar)
+        } else {
+            self.toolbar(.hidden, for: .tabBar)
+        }
+    }
 }
 
 // Labels for each tab — shared between TabView and sidebar.
