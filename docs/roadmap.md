@@ -331,8 +331,14 @@ worth allowing). The singing use case also depends on "Voice as an instrument" a
 the staff-reading use case works today with any existing instrument, no new pitch
 detection required.
 
-Open questions: whether a reference pitch (root note or tonic chord) still plays as an
-anchor even though the tested note itself stays silent, since singing cold with no
-pitch reference at all is a much harder skill than sight-singing typically expects;
-and whether this becomes its own Test Type, a per-Test-Type toggle, or is scoped to
-specific test types (e.g. Random Notes and Diatonic Arpeggios, not Melody Snippets).
+**2026-09-28: reference-pitch question settled** — yes, the intro still plays as an
+anchor. Confirmed flow: play the intro (root note/chord/arpeggio/scale, per the
+existing `introSoundMode` setting from issue #8) to establish the key, then show the
+prompt note(s) on the staff without ever playing them audibly, then arm the mic and
+grade what the user plays/sings against the shown notes — same capture/scoring
+pipeline as today, only the prompt step's audio for the tested note(s) is replaced by
+the visual.
+
+Open questions: whether this becomes its own Test Type, a per-Test-Type toggle, or is
+scoped to specific test types (e.g. Random Notes and Diatonic Arpeggios, not Melody
+Snippets).
