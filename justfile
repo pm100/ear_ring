@@ -13,6 +13,13 @@ avd      := env_var_or_default('ANDROID_AVD', 'Medium_Phone_API_36.1')
 apple_key_id    := env_var_or_default('APP_STORE_KEY_ID', 'W4T73HJBF4')
 apple_issuer_id := env_var_or_default('APP_STORE_ISSUER_ID', '30e7952a-07ae-4893-95c0-3a8cf2db56c4')
 
+# Node binary on the Mac, by absolute path. `just` runs recipe scripts via a
+# plain `#!/bin/sh`, not a login shell, so `node` alone isn't on PATH there
+# even though it resolves fine in an interactive/login SSH session (Homebrew's
+# PATH addition only gets sourced by zsh's login-shell startup files). Override
+# via MAC_NODE_BIN= if Node is ever reinstalled at a different path.
+mac_node := env_var_or_default('MAC_NODE_BIN', '/usr/local/bin/node')
+
 # Print the Android versionName (from build.gradle) and current git commit hash
 # before building. Not listed in `just --list`.
 [private]
@@ -265,60 +272,33 @@ ios-sim: _ios-version
     xcrun simctl install "$UDID" "$APP"
     xcrun simctl launch "$UDID" com.jollygoodsw.earring
 
-# Archive the iOS app and export a Release IPA.
+# Archive the iOS app and export a Release IPA. CFBundleVersion is picked
+# automatically (highest build ever uploaded + 1, via the App Store Connect
+# API) and self-corrects on conflict — see scripts/release_ios.js. Override
+# with IOS_BUILD_NUMBER=<n> to force a specific value.
 # Output: /tmp/earring_export/earring.ipa
-[doc("Archive the iOS app and export a Release IPA — macOS only")]
+[doc("Archive the iOS app and export a Release IPA (self-corrects build number) — macOS only")]
 ios-archive: _ios-version _ios-keychain-unlock
     #!/bin/sh
     set -eu
-    cd "{{justfile_directory()}}/ios"
-    xcodebuild archive \
-      -project earring.xcodeproj \
-      -scheme earring \
-      -configuration Release \
-      -archivePath /tmp/earring.xcarchive \
-      -allowProvisioningUpdates
-    xcodebuild -exportArchive \
-      -archivePath /tmp/earring.xcarchive \
-      -exportOptionsPlist ExportOptions.plist \
-      -exportPath /tmp/earring_export \
-      -allowProvisioningUpdates \
-      -authenticationKeyPath "$HOME/.private_keys/AuthKey_{{apple_key_id}}.p8" \
-      -authenticationKeyID {{apple_key_id}} \
-      -authenticationKeyIssuerID {{apple_issuer_id}}
-    echo "IPA ready: /tmp/earring_export/earring.ipa"
+    cd "{{justfile_directory()}}/scripts"
+    APP_STORE_KEY_ID={{apple_key_id}} APP_STORE_ISSUER_ID={{apple_issuer_id}} {{mac_node}} release_ios.js
 
-# Archive, export, and upload to TestFlight.
+# Archive, export, and upload to TestFlight. CFBundleVersion is picked
+# automatically (highest build ever uploaded + 1, via the App Store Connect
+# API) and self-corrects if Apple rejects it as already-used — see
+# scripts/release_ios.js. Override with IOS_BUILD_NUMBER=<n> to force a
+# specific value.
 # Requires ~/.private_keys/AuthKey_<KeyID>.p8 on the Mac (download once from
 # App Store Connect → Users & Access → Integrations → App Store Connect API).
 # Key ID/Issuer ID default to the team key above; override via env vars if
 # the key is ever rotated: APP_STORE_KEY_ID=... APP_STORE_ISSUER_ID=... just ios-testflight
-[doc("Archive, export, and upload to TestFlight — macOS only")]
+[doc("Archive, export, and upload to TestFlight (self-corrects build number) — macOS only")]
 ios-testflight: _ios-version _ios-keychain-unlock
     #!/bin/sh
     set -eu
-    cd "{{justfile_directory()}}/ios"
-    xcodebuild archive \
-      -project earring.xcodeproj \
-      -scheme earring \
-      -configuration Release \
-      -archivePath /tmp/earring.xcarchive \
-      -allowProvisioningUpdates
-    xcodebuild -exportArchive \
-      -archivePath /tmp/earring.xcarchive \
-      -exportOptionsPlist ExportOptions.plist \
-      -exportPath /tmp/earring_export \
-      -allowProvisioningUpdates \
-      -authenticationKeyPath "$HOME/.private_keys/AuthKey_{{apple_key_id}}.p8" \
-      -authenticationKeyID {{apple_key_id}} \
-      -authenticationKeyIssuerID {{apple_issuer_id}}
-    xcrun altool --upload-app \
-      -f /tmp/earring_export/earring.ipa \
-      -t ios \
-      --apiKey {{apple_key_id}} \
-      --apiIssuer {{apple_issuer_id}} \
-      --output-format xml
-    echo "Upload to TestFlight complete."
+    cd "{{justfile_directory()}}/scripts"
+    APP_STORE_KEY_ID={{apple_key_id}} APP_STORE_ISSUER_ID={{apple_issuer_id}} {{mac_node}} release_ios.js --upload
 
 # Build signed release AAB and upload to Play Store closed testing (alpha) —
 # the track our real named testers and the 12-tester/14-day production-
