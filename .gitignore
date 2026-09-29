@@ -70,3 +70,6 @@ screen_keydrop.png
 
 # graphify knowledge-graph output
 graphify-out/
+
+# superpowers scratch workspace (ledgers, task briefs, review packages)
+.superpowers/
