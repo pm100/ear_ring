@@ -50,10 +50,13 @@ struct ContentView: View {
     }()
 
     var body: some View {
-        if hsc == .regular {
-            iPadLayout
-        } else {
-            iPhoneLayout
+        VStack(spacing: 0) {
+            if hsc == .regular {
+                iPadLayout
+            } else {
+                iPhoneLayout
+            }
+            BannerAdView()  // TEMPORARY — Task 2 Step 5 verification only, removed before commit
         }
     }
 
