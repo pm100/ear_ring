@@ -210,6 +210,12 @@ issue for the resolution.)
 
 Section labels: small/label typography, muted colour, left-aligned, 6dp bottom margin.
 
+**iOS exception (UI Consistency Rule):** iOS shows a non-personalized banner ad
+(Google Mobile Ads test creative) fixed at the bottom of this screen, hidden when
+`isPremium` is true — Android and desktop do not have this yet (see
+`docs/roadmap.md`'s "Ads — UI and plumbing" item; desktop is permanently ad-free by
+design). Implemented in `HomeView.swift`'s `BannerAdView()`.
+
 ---
 
 ### Exercise Screen
@@ -507,6 +513,10 @@ Clear All Progress:
   Screen's Stop Testing note on error vs errorContainer) once at least one
   session exists.
 ```
+
+**iOS exception (UI Consistency Rule):** same banner-ad exception as the Home Screen
+above — see that section for details. Implemented in `ProgressScreen.swift`'s
+`BannerAdView()`, shown on both the session list and session detail views.
 
 ---
 

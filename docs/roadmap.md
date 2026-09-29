@@ -13,18 +13,30 @@ entitlement flag, currently always `false` with nothing to flip it yet.
 ## Dev/Test Infrastructure
 
 ### Dev switch for `isPremium`
-A developer-only toggle (Settings screen, hidden behind a long-press or debug-build
-flag) to flip `isPremium` on/off locally, so premium UI/UX can be built and tested
-before real billing exists. Should call the existing `setPremium()` on Android /
-`isPremium` setter on iOS directly — no new plumbing needed there, just a UI affordance
-and a guard so it can't ship visible in a release build.
+**Landed.** A `#if DEBUG` / `BuildConfig.DEBUG`-gated "Debug: Premium" toggle exists
+in Settings on both platforms (`SettingsView.swift`'s `Toggle("Debug: Premium",
+isOn: $model.isPremium)`, `SettingsScreen.kt`'s `SettingSwitchRow("Debug: Premium",
+state.isPremium) { viewModel.setPremium(it) }`), calling the existing
+setter/property directly, excluded from release builds. Nothing left to build here.
 
 ### Ads — UI and plumbing
-AdMob on Android + iOS (desktop stays ad-free). See prior discussion for the shape of
-this: banner on Home/Results screens only, never during the Exercise screen (audio
-session conflict risk), test ad unit IDs during dev, ATT prompt on iOS if personalized
-ads are wanted, and the Play Console "Advertising ID" data-safety declaration needs
-revisiting once a real SDK lands. Gate ad display behind `!isPremium` once both exist.
+**Landed on iOS (2026-09-28)**, see
+`docs/superpowers/specs/2026-09-28-ios-ads-design.md`: Google Mobile Ads SDK via
+CocoaPods, banner on Home + Progress tabs (there is no separate "Results" screen —
+Progress stands in for it), never during Exercise, non-personalized ads only (no ATT
+prompt), Google's public test App ID/ad unit ID until a real AdMob account exists,
+gated behind `!isPremium`.
+
+**Android is still open.** When picked up, mirror iOS's decisions rather than
+re-deciding them: same placement (Home + the session-history screen, never Exercise),
+non-personalized ads only, test IDs first, gate on the existing `isPremium`/
+`PREF_IS_PREMIUM` flag (its dev toggle already exists — see above, no new plumbing
+needed there), one config object for the ad unit ID. Integrates via Gradle
+(`implementation 'com.google.android.gms:play-services-ads:...'`) rather than
+CocoaPods. The Play Console "Advertising ID" data-safety declaration needs revisiting
+once Android's SDK lands (iOS has no equivalent Play-Console-style step, but its own
+App Store Connect App Privacy questionnaire will need a similar revisit before
+release — not done as part of this iOS branch).
 
 ---
 
