@@ -17,7 +17,7 @@ private struct BannerAdRepresentable: UIViewRepresentable {
     func makeUIView(context: Context) -> GoogleMobileAds.BannerView {
         let width = UIScreen.main.bounds.width
         let bannerView = GoogleMobileAds.BannerView()
-        bannerView.adSize = GoogleMobileAds.currentOrientationAnchoredAdaptiveBanner(width: width)
+        bannerView.adSize = GoogleMobileAds.largeAnchoredAdaptiveBanner(width: width)
         bannerView.adUnitID = AdConfig.bannerAdUnitID
         bannerView.rootViewController = Self.keyWindowRootViewController()
 
