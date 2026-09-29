@@ -190,163 +190,169 @@ struct HomeView: View {
     private var keyScale: CGFloat { isIPad ? 1.35 : 1.0 }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
 
-                // ── Title ──────────────────────────────────────────────────
-                VStack(spacing: 6) {
-                    HStack(spacing: 12) {
-                        Image("AppLogo")
-                            .resizable()
-                            .frame(width: 48, height: 48)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        Text("Ear Ring")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(.erPrimary)
-                    }
-                    Text("Ear Training")
-                        .font(.system(size: 16))
-                        .foregroundColor(.erCaption)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 24)
-
-                // ── Test Type ─────────────────────────────────────────────
-                sectionLabel("Test Type", tooltipKey: "test_type").padding(.top, 28)
-                OutlinedDropdown(
-                    selectedLabel: model.testType == 2 ? "Diatonic Arpeggios" : "Random Notes",
-                    options: [DropdownOption(value: 0, label: "Random Notes"), DropdownOption(value: 2, label: "Diatonic Arpeggios")],
-                    enabled: true,
-                    onSelect: { newType in
-                        model.testType = newType
-                        // 4-note (7th chord) arpeggios are suppressed for now — always 3 in diatonic mode.
-                        if newType == 2 {
-                            model.sequenceLength = 3
+                    // ── Title ──────────────────────────────────────────────────
+                    VStack(spacing: 6) {
+                        HStack(spacing: 12) {
+                            Image("AppLogo")
+                                .resizable()
+                                .frame(width: 48, height: 48)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            Text("Ear Ring")
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundColor(.erPrimary)
                         }
-                    }
-                )
-
-                // ── Key + Scale (side by side) ────────────────────────────
-                HStack(alignment: .top, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        sectionLabel("Key", tooltipKey: "key").padding(.top, 28)
-                        OutlinedDropdown(
-                            selectedLabel: {
-                                let writtenRoot = (model.rootNote + instrKeyTranspose) % 12
-                                return instrKeyTranspose != 0
-                                    ? "\(MusicTheory.NOTE_NAMES[writtenRoot]) (concert \(MusicTheory.NOTE_NAMES[model.rootNote]))"
-                                    : MusicTheory.NOTE_NAMES[model.rootNote]
-                            }(),
-                            options: (0..<12).map { wc -> DropdownOption<Int> in
-                                let concertChroma = (wc - instrKeyTranspose + 12) % 12
-                                let writtenName = MusicTheory.NOTE_NAMES[wc]
-                                let label = instrKeyTranspose != 0
-                                    ? "\(writtenName) (concert \(MusicTheory.NOTE_NAMES[concertChroma]))"
-                                    : writtenName
-                                return DropdownOption(value: concertChroma, label: label)
-                            },
-                            enabled: true,
-                            onSelect: { model.rootNote = $0; model.updateRangeForKey() }
-                        )
+                        Text("Ear Training")
+                            .font(.system(size: 16))
+                            .foregroundColor(.erCaption)
                     }
                     .frame(maxWidth: .infinity)
+                    .padding(.top, 24)
 
-                    VStack(alignment: .leading, spacing: 0) {
-                        sectionLabel("Scale", tooltipKey: "scale").padding(.top, 28)
-                        OutlinedDropdown(
-                            selectedLabel: EarRingCore.writtenScaleLabel(concertRootChroma: model.rootNote, scaleId: model.scaleId, instrumentIndex: model.instrumentIndex),
-                            options: MusicTheory.SELECTABLE_SCALE_IDS.map { i in
-                                DropdownOption(value: i, label: EarRingCore.writtenScaleLabel(concertRootChroma: model.rootNote, scaleId: i, instrumentIndex: model.instrumentIndex))
-                            },
-                            enabled: model.testType != 1,
-                            onSelect: { model.scaleId = $0 }
-                        )
-                        .opacity(model.testType == 1 ? 0.38 : 1.0)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-
-                // ── Range: typed start/end fields, plus a button opening the piano
-                // keyboard full-screen (it needs all the room it can get to stay tappable —
-                // see PianoRangePickerFullScreen below for why this isn't a small sheet). ──
-                sectionLabel("Range", tooltipKey: "range").padding(.top, 16)
-                HStack(alignment: .center, spacing: 10) {
-                    RangeTextInputs(
-                        rangeStart: model.rangeStart,
-                        rangeEnd: model.rangeEnd,
-                        enabled: model.testType != 1,
-                        onRangeChange: model.testType == 1 ? { _, _ in } : { s, e in model.setRange(start: s, end: e) }
+                    // ── Test Type ─────────────────────────────────────────────
+                    sectionLabel("Test Type", tooltipKey: "test_type").padding(.top, 28)
+                    OutlinedDropdown(
+                        selectedLabel: model.testType == 2 ? "Diatonic Arpeggios" : "Random Notes",
+                        options: [DropdownOption(value: 0, label: "Random Notes"), DropdownOption(value: 2, label: "Diatonic Arpeggios")],
+                        enabled: true,
+                        onSelect: { newType in
+                            model.testType = newType
+                            // 4-note (7th chord) arpeggios are suppressed for now — always 3 in diatonic mode.
+                            if newType == 2 {
+                                model.sequenceLength = 3
+                            }
+                        }
                     )
-                    Button {
-                        // Force any in-progress edit in the range fields to resign first
-                        // responder (their commit only fires on real focus loss) before the
-                        // full-screen picker opens over them — otherwise a value just typed
-                        // and not yet blurred could be silently lost. Mirrors the equivalent
-                        // fix on Android (LocalFocusManager.clearFocus()).
-                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                        showRangePicker = true
-                    } label: {
-                        Text("🎹")
-                            .font(.system(size: 20))
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 12)
-                            .background(
-                                // cornerRadius 6, not 8 — matches OutlinedDropdown's border
-                                // radius elsewhere on this screen instead of being a
-                                // slightly-off outlier next to it.
-                                RoundedRectangle(cornerRadius: 6)
-                                    .strokeBorder(Color.erMuted, lineWidth: 1)
+
+                    // ── Key + Scale (side by side) ────────────────────────────
+                    HStack(alignment: .top, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            sectionLabel("Key", tooltipKey: "key").padding(.top, 28)
+                            OutlinedDropdown(
+                                selectedLabel: {
+                                    let writtenRoot = (model.rootNote + instrKeyTranspose) % 12
+                                    return instrKeyTranspose != 0
+                                        ? "\(MusicTheory.NOTE_NAMES[writtenRoot]) (concert \(MusicTheory.NOTE_NAMES[model.rootNote]))"
+                                        : MusicTheory.NOTE_NAMES[model.rootNote]
+                                }(),
+                                options: (0..<12).map { wc -> DropdownOption<Int> in
+                                    let concertChroma = (wc - instrKeyTranspose + 12) % 12
+                                    let writtenName = MusicTheory.NOTE_NAMES[wc]
+                                    let label = instrKeyTranspose != 0
+                                        ? "\(writtenName) (concert \(MusicTheory.NOTE_NAMES[concertChroma]))"
+                                        : writtenName
+                                    return DropdownOption(value: concertChroma, label: label)
+                                },
+                                enabled: true,
+                                onSelect: { model.rootNote = $0; model.updateRangeForKey() }
                             )
-                    }
-                }
-
-                // ── Sequence Length ───────────────────────────────────────
-                sectionLabel("Sequence Length", tooltipKey: "sequence_length").padding(.top, 16)
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible()), count: 8),
-                    spacing: 6
-                ) {
-                    ForEach(1...8, id: \.self) { len in
-                        // Fully locked at 3 in diatonic mode (4-note/7th-chord arpeggios
-                        // are suppressed for now) — not narrowed to 3-4.
-                        let chipEnabled = model.testType == 0
-                        Button("\(len)") {
-                            if chipEnabled { model.sequenceLength = len }
                         }
-                        // selected shows regardless of chipEnabled — a locked row should
-                        // still show its current value highlighted, not gray it out too.
-                        .buttonStyle(ChipButtonStyle(selected: model.sequenceLength == len))
-                        .disabled(!chipEnabled)
-                        .opacity(chipEnabled ? 1.0 : 0.38)
-                    }
-                }
+                        .frame(maxWidth: .infinity)
 
-                // ── Action buttons ────────────────────────────────────────
-                VStack(spacing: 10) {
-                    Button("▶ Start Exercise") {
-                        model.startExerciseSession()
-                        path.append(AppRoute.exercise)
+                        VStack(alignment: .leading, spacing: 0) {
+                            sectionLabel("Scale", tooltipKey: "scale").padding(.top, 28)
+                            OutlinedDropdown(
+                                selectedLabel: EarRingCore.writtenScaleLabel(concertRootChroma: model.rootNote, scaleId: model.scaleId, instrumentIndex: model.instrumentIndex),
+                                options: MusicTheory.SELECTABLE_SCALE_IDS.map { i in
+                                    DropdownOption(value: i, label: EarRingCore.writtenScaleLabel(concertRootChroma: model.rootNote, scaleId: i, instrumentIndex: model.instrumentIndex))
+                                },
+                                enabled: model.testType != 1,
+                                onSelect: { model.scaleId = $0 }
+                            )
+                            .opacity(model.testType == 1 ? 0.38 : 1.0)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(PrimaryButtonStyle(height: 52, fontSize: 18))
+
+                    // ── Range: typed start/end fields, plus a button opening the piano
+                    // keyboard full-screen (it needs all the room it can get to stay tappable —
+                    // see PianoRangePickerFullScreen below for why this isn't a small sheet). ──
+                    sectionLabel("Range", tooltipKey: "range").padding(.top, 16)
+                    HStack(alignment: .center, spacing: 10) {
+                        RangeTextInputs(
+                            rangeStart: model.rangeStart,
+                            rangeEnd: model.rangeEnd,
+                            enabled: model.testType != 1,
+                            onRangeChange: model.testType == 1 ? { _, _ in } : { s, e in model.setRange(start: s, end: e) }
+                        )
+                        Button {
+                            // Force any in-progress edit in the range fields to resign first
+                            // responder (their commit only fires on real focus loss) before the
+                            // full-screen picker opens over them — otherwise a value just typed
+                            // and not yet blurred could be silently lost. Mirrors the equivalent
+                            // fix on Android (LocalFocusManager.clearFocus()).
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                            showRangePicker = true
+                        } label: {
+                            Text("🎹")
+                                .font(.system(size: 20))
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 12)
+                                .background(
+                                    // cornerRadius 6, not 8 — matches OutlinedDropdown's border
+                                    // radius elsewhere on this screen instead of being a
+                                    // slightly-off outlier next to it.
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .strokeBorder(Color.erMuted, lineWidth: 1)
+                                )
+                        }
+                    }
+
+                    // ── Sequence Length ───────────────────────────────────────
+                    sectionLabel("Sequence Length", tooltipKey: "sequence_length").padding(.top, 16)
+                    LazyVGrid(
+                        columns: Array(repeating: GridItem(.flexible()), count: 8),
+                        spacing: 6
+                    ) {
+                        ForEach(1...8, id: \.self) { len in
+                            // Fully locked at 3 in diatonic mode (4-note/7th-chord arpeggios
+                            // are suppressed for now) — not narrowed to 3-4.
+                            let chipEnabled = model.testType == 0
+                            Button("\(len)") {
+                                if chipEnabled { model.sequenceLength = len }
+                            }
+                            // selected shows regardless of chipEnabled — a locked row should
+                            // still show its current value highlighted, not gray it out too.
+                            .buttonStyle(ChipButtonStyle(selected: model.sequenceLength == len))
+                            .disabled(!chipEnabled)
+                            .opacity(chipEnabled ? 1.0 : 0.38)
+                        }
+                    }
+
+                    // ── Action buttons ────────────────────────────────────────
+                    VStack(spacing: 10) {
+                        Button("▶ Start Exercise") {
+                            model.startExerciseSession()
+                            path.append(AppRoute.exercise)
+                        }
+                        .buttonStyle(PrimaryButtonStyle(height: 52, fontSize: 18))
+                    }
+                    .padding(.top, 32)
+                    .padding(.bottom, 16)
                 }
-                .padding(.top, 32)
-                .padding(.bottom, 16)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: isIPad ? 680 : .infinity)
+                .frame(maxWidth: .infinity)  // centre on iPad
             }
-            .padding(.horizontal, 16)
-            .frame(maxWidth: isIPad ? 680 : .infinity)
-            .frame(maxWidth: .infinity)  // centre on iPad
-        }
-        .background(Color(.systemBackground))
-        .hideNavigationBar()
-        .onAppear { loadInstrTranspose() }
-        .onChange(of: model.instrumentIndex) { _ in loadInstrTranspose() }
-        .fullScreenCover(isPresented: $showRangePicker) {
-            PianoRangePickerFullScreen(
-                rangeStart: model.rangeStart,
-                rangeEnd: model.rangeEnd,
-                onRangeChange: model.testType == 1 ? { _, _ in } : { s, e in model.setRange(start: s, end: e) },
-                onDone: { showRangePicker = false }
-            )
+            .background(Color(.systemBackground))
+            .hideNavigationBar()
+            .onAppear { loadInstrTranspose() }
+            .onChange(of: model.instrumentIndex) { _ in loadInstrTranspose() }
+            .fullScreenCover(isPresented: $showRangePicker) {
+                PianoRangePickerFullScreen(
+                    rangeStart: model.rangeStart,
+                    rangeEnd: model.rangeEnd,
+                    onRangeChange: model.testType == 1 ? { _, _ in } : { s, e in model.setRange(start: s, end: e) },
+                    onDone: { showRangePicker = false }
+                )
+            }
+
+            if !model.isPremium {
+                BannerAdView()
+            }
         }
     }
 
