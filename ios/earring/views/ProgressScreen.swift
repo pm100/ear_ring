@@ -3,6 +3,7 @@ import SwiftUI
 /// Named ProgressScreen to avoid conflict with SwiftUI's built-in ProgressView.
 struct ProgressScreen: View {
     @EnvironmentObject var progressModel: ProgressModel
+    @EnvironmentObject var exerciseModel: ExerciseModel
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedTab: Int
     @State private var showClearConfirm = false
@@ -18,15 +19,21 @@ struct ProgressScreen: View {
     }()
 
     var body: some View {
-        Group {
-            if let session = selectedSession {
-                sessionDetail(session)
-            } else {
-                sessionList
+        VStack(spacing: 0) {
+            Group {
+                if let session = selectedSession {
+                    sessionDetail(session)
+                } else {
+                    sessionList
+                }
+            }
+            .background(Color(.systemBackground))
+            .onAppear { progressModel.reload() }
+
+            if !exerciseModel.isPremium {
+                BannerAdView()
             }
         }
-        .background(Color(.systemBackground))
-        .onAppear { progressModel.reload() }
     }
 
     private var sessionList: some View {
