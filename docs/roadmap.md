@@ -38,6 +38,18 @@ once Android's SDK lands (iOS has no equivalent Play-Console-style step, but its
 App Store Connect App Privacy questionnaire will need a similar revisit before
 release — not done as part of this iOS branch).
 
+**Known limitation to fix before real ad units ship:** `BannerAdView.swift` sizes itself
+from `UIScreen.main.bounds.width` and a fixed 50pt frame, not the view's actual
+container. On iPad's `NavigationSplitView` detail column (narrower than the screen)
+this makes the ad wider than its slot, and the fixed height clips whatever the SDK's
+adaptive sizing actually returns. This doesn't show up with the current fixed-size test
+unit, only with a real adaptive unit. A first attempt at a proper fix (`GeometryReader`
+for real width, dynamic height from the ad's own adaptive size) made the iPhone layout
+worse — the ad overlapped the tab bar — and was reverted rather than shipped without
+being able to verify it interactively. Needs a pass with real device/simulator
+interaction (tapping through iPad split-view states, rotation), not blind iteration
+over screenshots.
+
 ---
 
 ## Premium Feature Candidates
