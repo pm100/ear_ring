@@ -211,10 +211,16 @@ issue for the resolution.)
 Section labels: small/label typography, muted colour, left-aligned, 6dp bottom margin.
 
 **iOS exception (UI Consistency Rule):** iOS shows a non-personalized banner ad
-(Google Mobile Ads test creative) fixed at the bottom of this screen, hidden when
-`isPremium` is true — Android and desktop do not have this yet (see
-`docs/roadmap.md`'s "Ads — UI and plumbing" item; desktop is permanently ad-free by
-design). Implemented in `HomeView.swift`'s `BannerAdView()`.
+(Google Mobile Ads test creative) fixed at the bottom of this screen, below the
+scrollable content and above the tab bar — hidden when `isPremium` is true. Android
+and desktop do not have this yet (see `docs/roadmap.md`'s "Ads — UI and plumbing"
+item; desktop is permanently ad-free by design). Implemented in `HomeView.swift`'s
+`BannerAdView()` (component in `ios/earring/AdMob/BannerAdView.swift`): width matches
+the actual container (measured via `GeometryReader`, not the screen — correct in
+iPad's narrower `NavigationSplitView` detail column and after rotation); height is
+Google's adaptive value for that width (`largeAnchoredAdaptiveBanner`, typically
+50–100pt), not a fixed constant. Renders as blank space if no ad loads — no error UI,
+matching how banner ads behave in most apps.
 
 ---
 

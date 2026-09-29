@@ -207,6 +207,16 @@ ssh mac "cd ~/work/ear_ring && git pull --ff-only && just ios"
 automatically via `scripts/release_ios.js` — see that file's header comment for how it
 guesses and self-corrects. Override with `IOS_BUILD_NUMBER=<n>` to force a specific value.
 
+**CocoaPods:** the project uses CocoaPods (`ios/Podfile`) since the AdMob integration
+landed, so every iOS `just` recipe depends on a private `_ios-pods` recipe that runs
+`pod install` whenever `Podfile.lock` and `Pods/Manifest.lock` have drifted — you don't
+need to run it by hand. It requires **CocoaPods >=1.12** (the `Google-Mobile-Ads-SDK`
+pod's floor); the Mac's system CocoaPods may be older, so it's installed per-user via
+`gem install --user-install cocoapods` (no sudo, doesn't touch the system gem) at
+`~/.gem/ruby/2.6.0/bin/pod` — `_ios-pods` looks there first and falls back to a bare
+`pod` on PATH. If a fresh Mac or a wiped `Pods/` folder ever fails with "CocoaPods
+requires version >= 1.12.0", re-run that `gem install` line on the Mac.
+
 **Code signing headlessly:** plain SSH sessions cannot use the login keychain
 (`errSecInternalComponent` — no GUI SecurityAgent), so signing uses a dedicated
 `earring-build` keychain whose password is stored in

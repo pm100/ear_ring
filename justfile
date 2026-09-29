@@ -197,9 +197,24 @@ _ios-version:
     gh=$(git -C "{{justfile_directory()}}" rev-parse --short=7 HEAD)
     echo "iOS version $mv ($cv) — git $gh"
 
+# Install/update CocoaPods dependencies if Podfile.lock and Pods/Manifest.lock have
+# drifted (new pod, version bump, or a fresh/wiped Pods folder). Requires CocoaPods
+# >=1.12 — see AGENTS.md's "Remote iOS Builds over SSH" section for how that's
+# installed on the build Mac without touching the system gem.
+[private]
+_ios-pods:
+    #!/bin/sh
+    set -eu
+    cd "{{justfile_directory()}}/ios"
+    POD="$HOME/.gem/ruby/2.6.0/bin/pod"
+    if [ ! -x "$POD" ]; then POD="pod"; fi
+    if [ ! -f Pods/Manifest.lock ] || ! diff -q Podfile.lock Pods/Manifest.lock >/dev/null 2>&1; then
+      LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 "$POD" install
+    fi
+
 # Build the iOS app (debug) for a connected device
 [doc("Build the iOS app (Debug) — macOS only")]
-ios: _ios-version _ios-keychain-unlock
+ios: _ios-version _ios-keychain-unlock _ios-pods
     #!/bin/sh
     set -eu
     cd "{{justfile_directory()}}/ios"
@@ -214,7 +229,7 @@ ios: _ios-version _ios-keychain-unlock
 # Requires macOS + Xcode 15+. Uses the first device devicectl lists unless
 # IOS_DEVICE_ID is set (find identifiers with: xcrun devicectl list devices).
 [doc("Build + install on a connected iPhone/iPad and launch — macOS only")]
-ios-device: _ios-version _ios-keychain-unlock
+ios-device: _ios-version _ios-keychain-unlock _ios-pods
     #!/bin/sh
     set -eu
     cd "{{justfile_directory()}}/ios"
@@ -243,7 +258,7 @@ ios-device: _ios-version _ios-keychain-unlock
 # "iPhone 17" — override with IOS_SIMULATOR_NAME=<name> (see available names/UDIDs
 # via `xcrun simctl list devices available`) or IOS_SIMULATOR_UDID=<udid> directly.
 [doc("Build + install + launch on the iOS Simulator — macOS only")]
-ios-sim: _ios-version
+ios-sim: _ios-version _ios-pods
     #!/bin/sh
     set -eu
     cd "{{justfile_directory()}}/ios"
@@ -278,7 +293,7 @@ ios-sim: _ios-version
 # with IOS_BUILD_NUMBER=<n> to force a specific value.
 # Output: /tmp/earring_export/earring.ipa
 [doc("Archive the iOS app and export a Release IPA (self-corrects build number) — macOS only")]
-ios-archive: _ios-version _ios-keychain-unlock
+ios-archive: _ios-version _ios-keychain-unlock _ios-pods
     #!/bin/sh
     set -eu
     cd "{{justfile_directory()}}/scripts"
@@ -294,7 +309,7 @@ ios-archive: _ios-version _ios-keychain-unlock
 # Key ID/Issuer ID default to the team key above; override via env vars if
 # the key is ever rotated: APP_STORE_KEY_ID=... APP_STORE_ISSUER_ID=... just ios-testflight
 [doc("Archive, export, and upload to TestFlight (self-corrects build number) — macOS only")]
-ios-testflight: _ios-version _ios-keychain-unlock
+ios-testflight: _ios-version _ios-keychain-unlock _ios-pods
     #!/bin/sh
     set -eu
     cd "{{justfile_directory()}}/scripts"
