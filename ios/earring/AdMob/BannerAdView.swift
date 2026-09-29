@@ -23,7 +23,7 @@ struct BannerAdView: View {
 
     private func updateHeight(for width: CGFloat) {
         guard width > 0 else { return }
-        adHeight = GoogleMobileAds.largeAnchoredAdaptiveBanner(width: width).size.height
+        adHeight = GoogleMobileAds.currentOrientationAnchoredAdaptiveBanner(width: width).size.height
     }
 }
 
@@ -46,7 +46,12 @@ private struct BannerAdRepresentable: UIViewRepresentable {
     }
 
     private func load(into bannerView: GoogleMobileAds.BannerView, width: CGFloat) {
-        bannerView.adSize = GoogleMobileAds.largeAnchoredAdaptiveBanner(width: width)
+        // `currentOrientationAnchoredAdaptiveBanner` is deprecated in favor of
+        // `largeAnchoredAdaptiveBanner`, but "large" is a genuinely bigger format (up to
+        // ~15% of screen height) meant for full-width dedicated ad placements, not this
+        // compact footer slot — it overlapped the tab bar in testing. Deliberately keeping
+        // the deprecated, compact API here; the warning is cosmetic.
+        bannerView.adSize = GoogleMobileAds.currentOrientationAnchoredAdaptiveBanner(width: width)
         let request = GoogleMobileAds.Request()
         let extras = GoogleMobileAds.Extras()
         extras.additionalParameters = ["npa": "1"]
