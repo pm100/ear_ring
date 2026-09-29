@@ -204,7 +204,7 @@ ios: _ios-version _ios-keychain-unlock
     set -eu
     cd "{{justfile_directory()}}/ios"
     xcodebuild build \
-      -project earring.xcodeproj \
+      -workspace earring.xcworkspace \
       -scheme earring \
       -configuration Debug \
       -destination 'generic/platform=iOS' \
@@ -219,7 +219,7 @@ ios-device: _ios-version _ios-keychain-unlock
     set -eu
     cd "{{justfile_directory()}}/ios"
     xcodebuild build \
-      -project earring.xcodeproj \
+      -workspace earring.xcworkspace \
       -scheme earring \
       -configuration Debug \
       -destination 'generic/platform=iOS' \
@@ -261,7 +261,7 @@ ios-sim: _ios-version
       fi
     fi
     xcodebuild build \
-      -project earring.xcodeproj \
+      -workspace earring.xcworkspace \
       -scheme earring \
       -configuration Debug \
       -destination "id=$UDID" \

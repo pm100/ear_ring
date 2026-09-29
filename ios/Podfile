@@ -2,5 +2,5 @@ platform :ios, '16.0'
 
 target 'earring' do
   use_frameworks!
-  # No pods needed — using system frameworks only
+  pod 'Google-Mobile-Ads-SDK'
 end

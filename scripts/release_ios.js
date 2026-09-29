@@ -63,7 +63,7 @@ function writeBuildNumber(n) {
 function archiveAndExport() {
   console.log('\nArchiving...');
   let { status, output } = run('xcodebuild', [
-    'archive', '-project', 'earring.xcodeproj', '-scheme', 'earring',
+    'archive', '-workspace', 'earring.xcworkspace', '-scheme', 'earring',
     '-configuration', 'Release', '-archivePath', '/tmp/earring.xcarchive',
     '-allowProvisioningUpdates',
   ]);
