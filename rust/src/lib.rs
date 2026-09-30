@@ -1626,6 +1626,79 @@ mod android_jni {
         settings_jstring(&env, json)
     }
 
+    // ── Setup assistant ────────────────────────────────────────────────────────
+    // Same panic-safety rule as the settings exports above: fall back rather than unwind.
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeAssistantEndpoint(
+        env: JNIEnv,
+        _class: JClass,
+    ) -> jstring {
+        let url = std::panic::catch_unwind(|| super::assistant::PROXY_URL.to_string()).unwrap_or_default();
+        settings_jstring(&env, url)
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeAssistantRequest(
+        mut env: JNIEnv,
+        _class: JClass,
+        history: JString,
+        settings_in: JString,
+        is_premium: jint,
+        platform: jint,
+    ) -> jstring {
+        let history = settings_arg(&mut env, &history);
+        let settings_in = settings_arg(&mut env, &settings_in);
+        let json = std::panic::catch_unwind(|| {
+            super::assistant::request_json(&history, &settings_in, is_premium != 0, settings_platform(platform))
+        })
+        .unwrap_or_else(|_| "{}".to_string());
+        settings_jstring(&env, json)
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeAssistantResolveOutcome(
+        mut env: JNIEnv,
+        _class: JClass,
+        status: jint,
+        body: JString,
+        settings_in: JString,
+        is_premium: jint,
+        platform: jint,
+    ) -> jstring {
+        let body = settings_arg(&mut env, &body);
+        let settings_in = settings_arg(&mut env, &settings_in);
+        let json = std::panic::catch_unwind(|| {
+            super::assistant::resolve_outcome_json(
+                status as i64,
+                &body,
+                &settings_in,
+                is_premium != 0,
+                settings_platform(platform),
+            )
+        })
+        .unwrap_or_else(|_| super::assistant::error_view_json("server"));
+        settings_jstring(&env, json)
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeAssistantResolveProposal(
+        mut env: JNIEnv,
+        _class: JClass,
+        proposal: JString,
+        settings_in: JString,
+        is_premium: jint,
+        platform: jint,
+    ) -> jstring {
+        let proposal = settings_arg(&mut env, &proposal);
+        let settings_in = settings_arg(&mut env, &settings_in);
+        let json = std::panic::catch_unwind(|| {
+            super::assistant::resolve_proposal_json(&proposal, &settings_in, is_premium != 0, settings_platform(platform))
+        })
+        .unwrap_or_else(|_| r#"{"items":[],"rejected":[]}"#.to_string());
+        settings_jstring(&env, json)
+    }
+
     #[no_mangle]
     pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeGitHash(
         env: JNIEnv,

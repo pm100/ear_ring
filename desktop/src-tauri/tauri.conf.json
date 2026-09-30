@@ -13,7 +13,7 @@
     "allowlist": {
       "all": false,
       "shell": { "all": false, "open": true },
-      "http": { "all": true, "scope": ["https://tonejs.github.io/**"] }
+      "http": { "all": true, "scope": ["https://tonejs.github.io/**", "https://ear-ring-assistant.*.workers.dev/**"] }
     },
     "bundle": {
       "active": true,

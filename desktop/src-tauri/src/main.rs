@@ -323,6 +323,62 @@ fn cmd_settings_apply(current: String, action: String) -> String {
     settings::apply_json(&current, &action, Platform::Desktop)
 }
 
+#[tauri::command]
+fn cmd_assistant_endpoint() -> String {
+    ear_ring_core::assistant::PROXY_URL.to_string()
+}
+
+#[tauri::command]
+fn cmd_assistant_request(history: String, settings: String, is_premium: bool) -> String {
+    ear_ring_core::assistant::request_json(&history, &settings, is_premium, Platform::Desktop)
+}
+
+/// `status` is the HTTP status, or 0 if the request never reached the server.
+#[tauri::command]
+fn cmd_assistant_resolve_outcome(status: i64, body: String, settings: String, is_premium: bool) -> String {
+    ear_ring_core::assistant::resolve_outcome_json(status, &body, &settings, is_premium, Platform::Desktop)
+}
+
+#[tauri::command]
+fn cmd_assistant_resolve_proposal(proposal: String, settings: String, is_premium: bool) -> String {
+    ear_ring_core::assistant::resolve_proposal_json(&proposal, &settings, is_premium, Platform::Desktop)
+}
+
+#[cfg(test)]
+mod assistant_command_tests {
+    use super::*;
+
+    #[test]
+    fn request_carries_the_desktop_platform_and_premium_flag() {
+        let settings = cmd_settings_defaults();
+        let out = cmd_assistant_request(r#"[{"role":"user","text":"hi"}]"#.to_string(), settings, true);
+        assert!(out.contains(r#""platform":"desktop""#));
+        assert!(out.contains(r#""premium":true"#));
+    }
+
+    #[test]
+    fn outcome_zero_is_an_offline_error_and_200_is_a_reply() {
+        let settings = cmd_settings_defaults();
+        let offline = cmd_assistant_resolve_outcome(0, String::new(), settings.clone(), false);
+        assert!(offline.contains(r#""isError":true"#));
+        let ok = cmd_assistant_resolve_outcome(200, r#"{"reply":"Hi."}"#.to_string(), settings, false);
+        assert!(ok.contains(r#""reply":"Hi.""#));
+    }
+
+    #[test]
+    fn proposal_becomes_a_card_with_a_settings_action() {
+        let settings = cmd_settings_defaults();
+        let card = cmd_assistant_resolve_proposal(r#"[{"setting":"maxRetries","value":8}]"#.to_string(), settings, false);
+        assert!(card.contains(r#""to":"8""#));
+        assert!(card.contains(r#""type":"set""#));
+    }
+
+    #[test]
+    fn endpoint_is_the_core_proxy_url() {
+        assert_eq!(cmd_assistant_endpoint(), ear_ring_core::assistant::PROXY_URL);
+    }
+}
+
 #[cfg(test)]
 mod settings_command_tests {
     use super::*;
@@ -369,6 +425,10 @@ fn main() {
     tauri::Builder::default()
         .manage(TrackerState(Mutex::new(PitchTracker::new(0.003, 3))))
         .invoke_handler(tauri::generate_handler![
+            cmd_assistant_endpoint,
+            cmd_assistant_request,
+            cmd_assistant_resolve_outcome,
+            cmd_assistant_resolve_proposal,
             cmd_tracker_reset,
             cmd_tracker_reset_with_warmup,
             cmd_tracker_set_params,
