@@ -1,8 +1,8 @@
 # Setup Assistant — Design (WIP, brainstorming paused)
 
-**Status:** DRAFT, design complete through Section 3 (Section 3 not yet explicitly
-approved); awaiting Paul's review of this written spec. No plan written; no code written.
-Branch: `sage`.
+**Status:** Spec approved by Paul ("all is ok", 2026-09-30). Three implementation plans
+written (see "Changes decided while planning"); awaiting Paul's review and choice of execution
+method. No product code written. Branch: `sage`.
 **Path:** architectural (new subsystem, LLM backend, touches all platforms + settings core).
 
 ## Goal
@@ -162,6 +162,32 @@ core (schema, request/response, validation), and per-platform Help-tab UI.
 
 - Get explicit approval of Section 1.
 - Paul reviews this written spec → `writing-plans`.
+
+## Changes decided while planning (2026-09-30)
+
+These refine or override the sections above; the plans follow them.
+
+- **The language model is configuration, not code (Paul's requirement).** The proxy has a
+  `ModelProvider` interface with two implementations, Claude (official SDK) and any
+  OpenAI-compatible server (OpenAI, Gemini, Groq, OpenRouter, self-hosted Ollama/vLLM), chosen by
+  `PROVIDER`/`MODEL` variables. The apps and the Rust core never name a vendor. Default is
+  Claude `claude-haiku-4-5`.
+- **One Rust entry point for network results.** The core's `resolve_outcome_json(status, body, ...)`
+  maps HTTP status (0 = unreachable, 200, 429, other) to the chat view, so no platform interprets
+  status codes. The proxy address lives once in `assistant::PROXY_URL`.
+- **Not proposable in v1:** the note range, pitch tolerance and meter style (awkward for a model
+  to describe safely; pitch tolerance only shows for premium instruments). The assistant can
+  propose the 20 settings the Settings, Home and Mic Setup screens expose as chips, sliders and
+  toggles. Mic Sensitivity is proposed on its 1 to 10 slider scale.
+- **Proposals are validated by the settings core.** Each proposed change runs through
+  `settings::apply_json`; anything unknown, unavailable, premium-locked, already in effect, or
+  not actually applied is rejected before the user sees it. Apply re-validates against the
+  settings as they are at that moment.
+- **Hosting:** Cloudflare Workers with KV and a cron trigger; feedback digest emailed with Resend.
+- **Release work the feature adds:** privacy policy wording, App Store Connect App Privacy,
+  Google Play Data safety and `PrivacyInfo.xcprivacy` (plan 3, Task 4).
+- **Implementation plans:** `docs/superpowers/plans/2026-09-30-setup-assistant-1-rust-core.md`,
+  `-2-proxy.md` and `-3-platforms.md`, to be executed in that order.
 
 ## Context
 
