@@ -312,6 +312,74 @@ pub fn request_json(history_json: &str, settings_json: &str, is_premium: bool, p
     json!({"messages": messages, "context": context}).to_string()
 }
 
+// ── Proposal validation ──────────────────────────────────────────────────────
+
+/// Checks a proposal (`[{"setting":"noteRetries","value":5},...]`) against `settings_json` and
+/// returns the confirm card: `{"items":[{key,label,from,to,action}],"rejected":[{key,reason}]}`.
+///
+/// Items are validated in order against the running result, so a later item sees the effect of
+/// an earlier one. Anything unknown, unavailable, premium-locked for a free user, a no-op, or
+/// not actually applied by settings.rs (e.g. sequence length in Diatonic mode) is rejected and
+/// never shown as a change. Applying the card means dispatching each item's `action` in order.
+pub fn resolve_proposal_json(proposal_json: &str, settings_json: &str, is_premium: bool, platform: Platform) -> String {
+    let proposal: Value = serde_json::from_str(proposal_json).unwrap_or(Value::Null);
+    let mut state = normalize_json(settings_json, platform);
+    let mut items: Vec<Value> = Vec::new();
+    let mut rejected: Vec<Value> = Vec::new();
+    let reject = |rejected: &mut Vec<Value>, key: &str, reason: &str| rejected.push(json!({"key": key, "reason": reason}));
+
+    // A setting named twice keeps only its last value.
+    let entries: Vec<&Value> = proposal.as_array().map(|list| list.iter().collect()).unwrap_or_default();
+    let last_index = |key: &str| entries.iter().rposition(|e| e["setting"].as_str() == Some(key));
+    for (index, entry) in entries.iter().enumerate() {
+        let Some(key) = entry["setting"].as_str() else { continue };
+        if last_index(key) != Some(index) {
+            continue;
+        }
+        let Some(spec) = find_spec(key) else {
+            reject(&mut rejected, key, "not a setting the assistant can change");
+            continue;
+        };
+        let Some(requested) = entry.get("value").and_then(|raw| coerce(spec, raw)).filter(|v| is_available(spec, v)) else {
+            reject(&mut rejected, key, "that value isn't available");
+            continue;
+        };
+        if matches!(spec.kind, Kind::Instrument) {
+            let premium_instrument = requested.as_i64().and_then(|i| INSTRUMENTS.get(i as usize)).map_or(false, |i| i.premium);
+            if premium_instrument && !is_premium {
+                reject(&mut rejected, key, "that instrument is a premium feature");
+                continue;
+            }
+        }
+        let before_settings: Value = serde_json::from_str(&state).unwrap_or(Value::Null);
+        let action = action_for(spec, &requested);
+        let next_state = apply_json(&state, &action.to_string(), platform);
+        let after_settings: Value = serde_json::from_str(&next_state).unwrap_or(Value::Null);
+        let (Some(before), Some(after)) = (user_value(&before_settings, spec), user_value(&after_settings, spec)) else {
+            reject(&mut rejected, key, "couldn't be applied");
+            continue;
+        };
+        if !same(&after, &requested) {
+            let reason = if key == "sequenceLength" { "sequence length is fixed at 3 for Diatonic Arpeggios" } else { "couldn't be applied" };
+            reject(&mut rejected, key, reason);
+            continue;
+        }
+        if same(&before, &after) {
+            reject(&mut rejected, key, "already set to that");
+            continue;
+        }
+        items.push(json!({
+            "key": key,
+            "label": spec.label,
+            "from": display(spec, &before),
+            "to": display(spec, &after),
+            "action": action,
+        }));
+        state = next_state;
+    }
+    json!({"items": items, "rejected": rejected}).to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -480,5 +548,139 @@ mod tests {
         let history = json!([{"role": "user", "text": long}]).to_string();
         let req = parse(&request_json(&history, &defaults(), false, ANDROID));
         assert_eq!(req["messages"][0]["text"].as_str().unwrap().chars().count(), MAX_TURN_CHARS);
+    }
+
+    // ── Proposal validation ──────────────────────────────────────────────────
+
+    fn resolve(proposal: &str, settings: &str, premium: bool) -> Value {
+        parse(&resolve_proposal_json(proposal, settings, premium, ANDROID))
+    }
+
+    #[test]
+    fn proposal_for_retry_same_note_becomes_a_card_item_with_the_settings_action() {
+        let card = resolve(r#"[{"setting":"noteRetries","value":5}]"#, &defaults(), false);
+        let item = &card["items"][0];
+        assert_eq!(item["key"], "noteRetries");
+        assert_eq!(item["label"], "Retry Same Note");
+        assert_eq!(item["from"], "2");
+        assert_eq!(item["to"], "5");
+        assert_eq!(item["action"], json!({"type": "set", "values": {"noteRetries": 5}}));
+        assert_eq!(card["rejected"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn dispatching_a_cards_actions_produces_the_proposed_settings() {
+        let card = resolve(
+            r#"[{"setting":"noteRetries","value":5},{"setting":"rootNote","value":7},{"setting":"micSensitivity","value":10}]"#,
+            &defaults(),
+            false,
+        );
+        let mut settings = defaults();
+        for item in card["items"].as_array().unwrap() {
+            settings = with(&settings, &item["action"].to_string());
+        }
+        let out = parse(&settings);
+        assert_eq!(out["noteRetries"], 5);
+        assert_eq!(out["rootNote"], 7);
+        assert_eq!(out["silenceThreshold"], 0.001);
+    }
+
+    #[test]
+    fn unknown_setting_and_unavailable_values_are_rejected() {
+        let card = resolve(
+            r#"[{"setting":"theme","value":"dark"},{"setting":"maxRetries","value":7},{"setting":"tempoBpm","value":"fast"},{"setting":"showTestNotes","value":1},{"setting":"yinThreshold","value":0.9}]"#,
+            &defaults(),
+            false,
+        );
+        assert_eq!(card["items"].as_array().unwrap().len(), 0);
+        let keys: Vec<&str> = card["rejected"].as_array().unwrap().iter().map(|r| r["key"].as_str().unwrap()).collect();
+        assert_eq!(keys, ["theme", "maxRetries", "tempoBpm", "showTestNotes", "yinThreshold"]);
+    }
+
+    #[test]
+    fn premium_instrument_is_rejected_for_free_users_and_accepted_for_premium() {
+        let voice = INSTRUMENTS.iter().position(|i| i.premium).unwrap();
+        let proposal = format!(r#"[{{"setting":"instrumentIndex","value":{voice}}}]"#);
+        let free = resolve(&proposal, &defaults(), false);
+        assert_eq!(free["items"].as_array().unwrap().len(), 0);
+        assert!(free["rejected"][0]["reason"].as_str().unwrap().contains("premium"));
+        let paid = resolve(&proposal, &defaults(), true);
+        assert_eq!(paid["items"][0]["to"], INSTRUMENTS[voice].name);
+        assert_eq!(paid["items"][0]["action"], json!({"type": "setInstrument", "value": voice}));
+    }
+
+    #[test]
+    fn a_change_that_is_already_in_effect_is_reported_not_proposed() {
+        let card = resolve(r#"[{"setting":"noteRetries","value":2}]"#, &defaults(), false);
+        assert_eq!(card["items"].as_array().unwrap().len(), 0);
+        assert_eq!(card["rejected"][0]["reason"], "already set to that");
+    }
+
+    #[test]
+    fn sequence_length_is_rejected_while_diatonic_mode_is_selected() {
+        let diatonic = with(&defaults(), r#"{"type":"setTestType","value":2}"#);
+        let card = resolve(r#"[{"setting":"sequenceLength","value":5}]"#, &diatonic, false);
+        assert_eq!(card["items"].as_array().unwrap().len(), 0);
+        assert!(card["rejected"][0]["reason"].as_str().unwrap().contains("Diatonic"));
+    }
+
+    #[test]
+    fn items_are_validated_against_the_result_of_earlier_items() {
+        // Switching to Diatonic first makes the later sequence length impossible.
+        let card = resolve(
+            r#"[{"setting":"testType","value":2},{"setting":"sequenceLength","value":5}]"#,
+            &defaults(),
+            false,
+        );
+        assert_eq!(card["items"].as_array().unwrap().len(), 1);
+        assert_eq!(card["items"][0]["key"], "testType");
+        assert_eq!(card["rejected"][0]["key"], "sequenceLength");
+    }
+
+    #[test]
+    fn a_setting_named_twice_keeps_only_its_last_value() {
+        let card = resolve(
+            r#"[{"setting":"maxRetries","value":3},{"setting":"maxRetries","value":8}]"#,
+            &defaults(),
+            false,
+        );
+        assert_eq!(card["items"].as_array().unwrap().len(), 1);
+        assert_eq!(card["items"][0]["to"], "8");
+    }
+
+    #[test]
+    fn integral_floats_and_step_snapping_are_accepted() {
+        let card = resolve(r#"[{"setting":"maxRetries","value":8.0},{"setting":"yinThreshold","value":0.2004}]"#, &defaults(), false);
+        assert_eq!(card["items"].as_array().unwrap().len(), 2);
+        assert_eq!(card["items"][1]["to"], "0.2");
+    }
+
+    #[test]
+    fn numeric_strings_and_missing_or_null_values_are_rejected() {
+        let card = resolve(
+            r#"[{"setting":"maxRetries","value":"5"},{"setting":"tempoBpm"},{"setting":"noteRetries","value":null}]"#,
+            &defaults(),
+            false,
+        );
+        assert_eq!(card["items"].as_array().unwrap().len(), 0);
+        assert_eq!(card["rejected"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn out_of_range_choices_and_fractional_ints_are_rejected() {
+        let card = resolve(
+            r#"[{"setting":"rootNote","value":12},{"setting":"rootNote","value":-1},{"setting":"maxRetries","value":2.5},{"setting":"postChordGapMs","value":450}]"#,
+            &defaults(),
+            false,
+        );
+        assert_eq!(card["items"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn proposal_tolerates_garbage() {
+        for bad in ["", "not json", "{}", "null", "[1,2,{}]", r#"[{"setting":5}]"#] {
+            let card = resolve(bad, &defaults(), false);
+            assert_eq!(card["items"].as_array().unwrap().len(), 0, "proposal {bad:?}");
+        }
     }
 }
