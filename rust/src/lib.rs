@@ -1,3 +1,4 @@
+pub mod assistant;
 pub mod music_theory;
 pub mod pitch_detection;
 pub mod settings;
