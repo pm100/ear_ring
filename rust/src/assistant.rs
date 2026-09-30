@@ -902,4 +902,14 @@ mod tests {
             assert_eq!(v["reply"], error_text("server"));
         }
     }
+
+    /// Regenerates the proxy's example-question fixture (run by hand, see the proxy plan):
+    /// `cargo test -p ear_ring_core write_context_fixture -- --ignored`
+    #[test]
+    #[ignore]
+    fn write_context_fixture() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../assistant-proxy/test/fixtures/context.json");
+        std::fs::create_dir_all(std::path::Path::new(path).parent().unwrap()).unwrap();
+        std::fs::write(path, context_json(&defaults(), false, ANDROID)).unwrap();
+    }
 }
