@@ -15,7 +15,7 @@
 - **Never run `git commit` or `git push` on your own initiative** (AGENTS.md). Commit steps below are what to commit *when the user says so*.
 - Work on branch `sage`. Keep code comments short.
 - Run commands from `C:\work\ear_ring\assistant-proxy` (after Task 1 creates it) unless a step says otherwise.
-- API keys and secrets go in Wrangler secrets or the untracked `.dev.vars` only. Never commit one, never print one, never paste one into a file in the repo.
+- API keys, secrets and personal data (including the digest address `DIGEST_TO`) go in Wrangler secrets or the untracked `.dev.vars` only. Never commit one, never print one, never paste one into a file in the repo; `wrangler.toml` is committed, so nothing personal may appear in it.
 
 ## Decisions made while planning (change them in one place if you disagree)
 
@@ -146,7 +146,6 @@ id = "REPLACE_WITH_FEEDBACK_NAMESPACE_ID"
 FREE_DAILY_LIMIT = "5"
 PREMIUM_DAILY_LIMIT = "20"
 DIGEST_FROM = "Ear Ring <onboarding@resend.dev>"
-DIGEST_TO = "YOUR-EMAIL-ADDRESS"
 
 # Which language model answers. Change these (and redeploy) to switch; no app release needed.
 # Claude (default):
@@ -159,7 +158,8 @@ MODEL = "claude-haiku-4-5"
 #   OPENAI_MAX_TOKENS_FIELD = "max_completion_tokens"   # only if the server rejects "max_tokens"
 
 # Secrets (set with `npx wrangler secret put <NAME>`, never committed):
-#   ANTHROPIC_API_KEY (provider anthropic) or OPENAI_API_KEY (provider openai), and RESEND_API_KEY
+#   ANTHROPIC_API_KEY (provider anthropic) or OPENAI_API_KEY (provider openai), RESEND_API_KEY,
+#   and DIGEST_TO (the address digests go to; a secret so it never lands in the repo)
 ```
 
 Create `assistant-proxy/.gitignore`:
@@ -2291,7 +2291,7 @@ git commit -m "assistant-proxy: contract test against the Rust core's context"
 This task is mostly manual and spends a small amount of real money (a few cents of model calls). It needs the user's Cloudflare, model-provider and Resend accounts, so **stop and ask the user before running anything here**, and do not paste any key into a file or message.
 
 **Files:**
-- Modify: `assistant-proxy/wrangler.toml` (namespace ids, email variables, provider variables)
+- Modify: `assistant-proxy/wrangler.toml` (namespace ids and, if desired, the email sender and provider variables)
 - Create: `assistant-proxy/scripts/examples.mjs`, `assistant-proxy/README.md`
 - Modify: `rust/src/assistant.rs` (`PROXY_URL`), `desktop/src-tauri/tauri.conf.json` (HTTP scope)
 
@@ -2363,11 +2363,12 @@ npx wrangler kv namespace create FEEDBACK
 
 Each command prints an `id`. Put them in `wrangler.toml` in place of `REPLACE_WITH_QUOTA_NAMESPACE_ID` and `REPLACE_WITH_FEEDBACK_NAMESPACE_ID`. (Older Wrangler versions spell the command `kv:namespace create`.)
 
-Then set `DIGEST_TO` (the email address of the user's Resend account) in the `[vars]` section, and store the secrets (Wrangler prompts for each value; nothing is written to a file). For the default Claude provider:
+Then store the secrets (Wrangler prompts for each value; nothing is written to a file). `DIGEST_TO` is a secret on purpose: it is the user's email address, and `wrangler.toml` is committed to GitHub. Use the address of the user's own Resend account, because the shared `onboarding@resend.dev` sender only delivers to that address. For the default Claude provider:
 
 ```powershell
 npx wrangler secret put ANTHROPIC_API_KEY
 npx wrangler secret put RESEND_API_KEY
+npx wrangler secret put DIGEST_TO
 ```
 
 Use a **dedicated** provider API key for this service, with a monthly spend limit set in the provider's console, so a bug or abuse has a ceiling.
@@ -2401,7 +2402,7 @@ In a second terminal run `npx wrangler tail`, then repeat Step 4. Each request l
 - If `cache_read` is greater than 0 on repeat requests, prompt caching is working.
 - If it is always 0, the static prompt is shorter than the model's minimum cacheable length, so the breakpoint is ignored. That is harmless (the prompt is only a few thousand tokens), but it means no saving; leave it.
 
-To test the digest without waiting for 08:00 UTC, trigger the cron locally: `npx wrangler dev --test-scheduled`, then open `http://localhost:8787/__scheduled`. Expected: an email with the stored feedback arrives, and the logged line `feedback digest sent: N item(s)`.
+To test the digest without waiting for 08:00 UTC, trigger the cron locally: put `RESEND_API_KEY=...` and `DIGEST_TO=...` in the untracked `assistant-proxy/.dev.vars`, run `npx wrangler dev --test-scheduled`, then open `http://localhost:8787/__scheduled`. Expected: an email with the stored feedback arrives, and the logged line `feedback digest sent: N item(s)`.
 
 - [ ] **Step 6: Prove the provider really is switchable** (optional but recommended; it is the point of the provider design)
 
@@ -2468,8 +2469,8 @@ Change the vars, `npx wrangler deploy`, then run `node scripts/examples.mjs <url
 
     npx wrangler deploy
 
-Secrets (`npx wrangler secret put`): the provider key, and `RESEND_API_KEY`.
-Variables (`wrangler.toml`): `PROVIDER`, `MODEL`, limits, `DIGEST_TO`, `DIGEST_FROM`.
+Secrets (`npx wrangler secret put`): the provider key, `RESEND_API_KEY` and `DIGEST_TO`.
+Variables (`wrangler.toml`): `PROVIDER`, `MODEL`, limits, `DIGEST_FROM`.
 
 ## After changing the settings the apps expose
 
