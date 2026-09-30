@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
+import AssistantChat from './AssistantChat';
+import type { Dispatch } from '../useSettings';
+import type { ExerciseSettings } from '../types';
 
 interface HelpSection {
   title: string;
@@ -8,6 +11,9 @@ interface HelpSection {
 
 interface Props {
   onBack: () => void;
+  settings: ExerciseSettings;
+  isPremium: boolean;
+  onAction: Dispatch;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -19,7 +25,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-export default function HelpScreen({ onBack }: Props) {
+export default function HelpScreen({ onBack, settings, isPremium, onAction }: Props) {
   const [sections, setSections] = useState<HelpSection[]>([]);
 
   useEffect(() => {
@@ -35,6 +41,8 @@ export default function HelpScreen({ onBack }: Props) {
         <span className="screen-title">Help</span>
         <div style={{ width: 48 }} />
       </div>
+
+      <AssistantChat settings={settings} isPremium={isPremium} onAction={onAction} />
 
       {sections.map(({ title, body }) => (
         <Section key={title} title={title}>

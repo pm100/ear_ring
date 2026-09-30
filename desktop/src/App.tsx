@@ -227,7 +227,12 @@ function AppContent({ settings, dispatch }: { settings: ExerciseSettings; dispat
         />
       )}
       {screen === 'help' && (
-        <HelpScreen onBack={() => setScreen('home')} />
+        <HelpScreen
+          onBack={() => setScreen('home')}
+          settings={settings}
+          isPremium={isPremium}
+          onAction={dispatch}
+        />
       )}
       </div>
     </div>
