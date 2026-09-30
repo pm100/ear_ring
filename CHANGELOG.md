@@ -5,6 +5,11 @@ All notable changes to Ear Ring are documented here.
 ## [Unreleased]
 
 ### Added
+- **Ask about setup** — a chat at the top of the Help tab on all three platforms. Describe
+  what you want ("I want a chance to correct a wrong note") and the assistant answers, or
+  suggests a settings change you confirm with Apply. Feature requests are passed on to the
+  developer. Questions and current settings are sent to a server; no audio or practice
+  history is. A few questions per day are free.
 - **Pass/fail sound effects** — a bright ascending chime (C6-E6-G6) plays when a test
   is passed, and a softer descending tone (A4-F4) when it fails, on all three
   platforms. Synthesized on the fly as short sine tones (Web Audio oscillators on

@@ -606,6 +606,38 @@ Body text uses \n\n to separate paragraphs. Platforms split on \n\n and render e
 any help content — it propagates to all three platforms automatically at next build.
 Sections start with `## Section Title`; paragraphs are separated by blank lines.
 
+#### Setup Assistant (top of the Help screen)
+
+A chat above the help sections, identical on all three platforms (Android `ui/AssistantChat.kt`,
+iOS `views/AssistantChatView.swift`, desktop `components/AssistantChat.tsx`).
+
+```
+Ask about setup                           (16 sp bold, primary colour)
+Describe what you want, e.g. “I want a chance to correct a wrong note”. Your question and
+current settings are sent to a server to get an answer.        (footnote, secondary colour)
+                          [ I want a chance to correct a wrong note ]   user bubble, right, primary
+[ Give yourself more tries.                        ]   assistant bubble, left, light neutral
+[ ┌ Retry Same Note: 2 → 5      ┐                  ]   confirm card (only while pending)
+[ └ [Apply]  [Not now]          ┘                  ]
+[ Ask how to set something up                 ] [Send]   input (max 500 characters) + Send
+3 questions left today                            (caption)
+```
+
+- Nothing changes until **Apply**. Apply re-validates the proposal against the *current*
+  settings in the Rust core and dispatches each returned action through the normal settings
+  path, so a setting changed by hand in the meantime is not overwritten; if nothing is left to
+  change the bubble says `Already up to date.`
+- After Apply: `Applied. You can review it in Settings.`; after Not now: `No changes made.`;
+  when the reply passed feedback on: `Sent as feedback, thanks.`
+- Errors (offline, daily limit reached, server problem) appear as a light-red bubble with the
+  core's wording and a `Try again` button; the conversation is kept.
+- The transcript is in memory only and is discarded when the user leaves the Help screen.
+- Premium comes from the existing per-platform `isPremium` flag; the assistant tells free users
+  that premium-only options (the Voice instruments) are premium features instead of proposing them.
+- Everything except rendering lives in `rust/src/assistant.rs`: the request body, what an HTTP
+  status means, which proposed changes are valid, and the error wording. The proxy address is
+  `assistant::PROXY_URL`. Design: `docs/superpowers/specs/2026-09-30-setup-assistant-design.md`.
+
 ---
 
 ## Music Staff Specification
@@ -934,6 +966,10 @@ Persistence rules:
 - Save a `TestRecord` every time a test ends, whether passed or failed.
 - Save the session summary when the user stops/leaves Exercise after completing at least one test.
 - Continuous testing mode has no post-test summary screen; users inspect outcomes from Home -> Progress.
+- The setup assistant keeps one random install id (a UUID, created on first use) so the proxy
+  can count questions per install. Android: `SharedPreferences` file `ear_ring_assistant`, key
+  `install_id`. iOS: `UserDefaults` key `assistantInstallId`. Desktop: `localStorage` key
+  `ear_ring_install_id`. Chat transcripts are never stored.
 
 Streak = number of consecutive calendar days with at least one session.
 

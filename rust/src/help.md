@@ -8,6 +8,12 @@ Tap ▶ Start Exercise. The app plays a chord to set the key, then a sequence of
 
 Green notes mean you nailed it — red means keep trying. The app replays the same sequence up to your retry limit, then moves on automatically.
 
+## Ask About Setup
+
+Not sure which setting does what? Type what you want at the top of this screen, for example “I want a chance to correct a wrong note”, and the assistant will answer or suggest a change. Nothing changes until you tap Apply, and you can always review it in Settings.
+
+Your question and current settings are sent to a server to get an answer. No audio or practice history is sent. You get a limited number of questions each day, and the assistant can pass feature requests on to the developer.
+
 ## Test Types
 
 Random Notes plays an arbitrary sequence within your selected range.
