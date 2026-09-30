@@ -380,6 +380,105 @@ pub fn resolve_proposal_json(proposal_json: &str, settings_json: &str, is_premiu
     json!({"items": items, "rejected": rejected}).to_string()
 }
 
+// ── Response handling ────────────────────────────────────────────────────────
+
+/// User-facing text for a failure. `kind` is one of "offline", "quota_exceeded", "server";
+/// anything else is treated as an unreadable response.
+pub fn error_text(kind: &str) -> String {
+    match kind {
+        "offline" => "Can't reach the assistant right now. Check your connection and try again.",
+        "quota_exceeded" => "You've used today's free questions. You can still change everything in Settings, and the assistant will be back tomorrow.",
+        "server" => "The assistant ran into a problem. Please try again in a moment.",
+        _ => "The assistant sent something I couldn't read. Please try again.",
+    }
+    .to_string()
+}
+
+pub fn error_view_json(kind: &str) -> String {
+    json!({"reply": error_text(kind), "card": null, "proposal": null, "feedbackSent": false, "quota": null, "isError": true}).to_string()
+}
+
+/// `{"remaining","resetsAt"}` from the proxy's quota object, if it sent one.
+fn quota_view(quota: Option<&Value>) -> Option<Value> {
+    let quota = quota?.as_object()?;
+    Some(json!({
+        "remaining": quota.get("remaining").and_then(Value::as_i64).unwrap_or(0),
+        "resetsAt": quota.get("resetsAt").and_then(Value::as_str).unwrap_or(""),
+    }))
+}
+
+/// Turns the proxy's response body into what the chat shows:
+/// `{"reply","card","proposal","feedbackSent","quota","isError"}`. `card` is the validated
+/// confirm card (or null if nothing usable was proposed); `proposal` is kept so the platform can
+/// re-validate it with [`resolve_proposal_json`] at the moment the user taps Apply.
+pub fn resolve_response_json(response_json: &str, settings_json: &str, is_premium: bool, platform: Platform) -> String {
+    let Ok(Value::Object(response)) = serde_json::from_str::<Value>(response_json) else {
+        return error_view_json("bad_response");
+    };
+    let mut reply = truncate_chars(response.get("reply").and_then(Value::as_str).unwrap_or(""), MAX_REPLY_CHARS);
+    let feedback_sent = response.get("feedbackSent").and_then(Value::as_bool).unwrap_or(false);
+
+    let proposal = response.get("proposal").filter(|p| p.is_array()).cloned();
+    let mut card = Value::Null;
+    let mut kept_proposal = Value::Null;
+    let mut nothing_usable = false;
+    if let Some(proposal) = proposal {
+        let resolved: Value =
+            serde_json::from_str(&resolve_proposal_json(&proposal.to_string(), settings_json, is_premium, platform)).unwrap_or(Value::Null);
+        let has_items = resolved["items"].as_array().map_or(false, |items| !items.is_empty());
+        let has_rejections = resolved["rejected"].as_array().map_or(false, |r| !r.is_empty());
+        if has_items {
+            card = resolved;
+            kept_proposal = proposal;
+        } else if has_rejections {
+            nothing_usable = true;
+        }
+    }
+
+    if reply.is_empty() {
+        reply = if !card.is_null() {
+            "Here's the change I'd suggest:".to_string()
+        } else if nothing_usable {
+            "I couldn't find a safe change for that. Try rephrasing, or use the Settings screen.".to_string()
+        } else if feedback_sent {
+            "Thanks, I've passed that on as feedback.".to_string()
+        } else {
+            "Sorry, I don't have an answer for that. Try rephrasing.".to_string()
+        };
+    }
+
+    let quota = quota_view(response.get("quota")).unwrap_or(Value::Null);
+
+    json!({
+        "reply": reply,
+        "card": card,
+        "proposal": kept_proposal,
+        "feedbackSent": feedback_sent,
+        "quota": quota,
+        "isError": false,
+    })
+    .to_string()
+}
+
+/// What the chat shows for one proxy round trip. `status` is the HTTP status, or 0 when the
+/// request never reached the server. A 429 also carries the quota so the footer can say 0 left.
+/// This is the only function a platform needs to call with a network result.
+pub fn resolve_outcome_json(status: i64, body: &str, settings_json: &str, is_premium: bool, platform: Platform) -> String {
+    match status {
+        200 => resolve_response_json(body, settings_json, is_premium, platform),
+        0 => error_view_json("offline"),
+        429 => {
+            let mut view: Value = serde_json::from_str(&error_view_json("quota_exceeded")).unwrap_or(Value::Null);
+            let quota = serde_json::from_str::<Value>(body).ok().and_then(|b| quota_view(b.get("quota")));
+            if let Some(quota) = quota {
+                view["quota"] = quota;
+            }
+            view.to_string()
+        }
+        _ => error_view_json("server"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -681,6 +780,126 @@ mod tests {
         for bad in ["", "not json", "{}", "null", "[1,2,{}]", r#"[{"setting":5}]"#] {
             let card = resolve(bad, &defaults(), false);
             assert_eq!(card["items"].as_array().unwrap().len(), 0, "proposal {bad:?}");
+        }
+    }
+
+    // ── Response ─────────────────────────────────────────────────────────────
+
+    fn view(response: &str) -> Value {
+        parse(&resolve_response_json(response, &defaults(), false, ANDROID))
+    }
+
+    #[test]
+    fn text_only_reply_has_no_card() {
+        let v = view(r#"{"reply":"Try a slower tempo.","quota":{"remaining":4,"resetsAt":"2026-10-01T00:00:00Z"}}"#);
+        assert_eq!(v["reply"], "Try a slower tempo.");
+        assert!(v["card"].is_null());
+        assert_eq!(v["isError"], false);
+        assert_eq!(v["quota"]["remaining"], 4);
+    }
+
+    #[test]
+    fn reply_with_a_proposal_carries_a_card_and_the_proposal_for_reapplying() {
+        let v = view(r#"{"reply":"Give yourself more tries.","proposal":[{"setting":"noteRetries","value":5}]}"#);
+        assert_eq!(v["card"]["items"][0]["to"], "5");
+        assert_eq!(v["proposal"], json!([{"setting": "noteRetries", "value": 5}]));
+    }
+
+    #[test]
+    fn empty_reply_with_a_valid_proposal_gets_a_default_lead_in() {
+        let v = view(r#"{"proposal":[{"setting":"noteRetries","value":5}]}"#);
+        assert_eq!(v["reply"], "Here's the change I'd suggest:");
+    }
+
+    #[test]
+    fn unusable_proposal_falls_back_to_text_and_never_shows_a_card() {
+        let v = view(r#"{"reply":"","proposal":[{"setting":"theme","value":"dark"}]}"#);
+        assert!(v["card"].is_null());
+        assert!(v["proposal"].is_null());
+        assert!(v["reply"].as_str().unwrap().contains("couldn't find a safe change"));
+        let with_text = view(r#"{"reply":"I can't do that.","proposal":[{"setting":"theme","value":"dark"}]}"#);
+        assert_eq!(with_text["reply"], "I can't do that.");
+        assert!(with_text["card"].is_null());
+    }
+
+    #[test]
+    fn feedback_only_reply_gets_a_thanks() {
+        let v = view(r#"{"feedbackSent":true}"#);
+        assert_eq!(v["feedbackSent"], true);
+        assert!(v["reply"].as_str().unwrap().contains("feedback"));
+    }
+
+    #[test]
+    fn empty_response_gets_a_generic_reply() {
+        assert!(view("{}")["reply"].as_str().unwrap().contains("Try rephrasing"));
+    }
+
+    #[test]
+    fn malformed_response_is_an_error_view() {
+        for bad in ["", "not json", "[]", "null", "42"] {
+            let v = view(bad);
+            assert_eq!(v["isError"], true, "response {bad:?}");
+            assert!(v["card"].is_null());
+        }
+    }
+
+    #[test]
+    fn overlong_reply_is_truncated() {
+        let long = "y".repeat(MAX_REPLY_CHARS + 100);
+        let v = view(&json!({"reply": long}).to_string());
+        assert_eq!(v["reply"].as_str().unwrap().chars().count(), MAX_REPLY_CHARS);
+    }
+
+    #[test]
+    fn proxy_url_is_an_https_ask_endpoint() {
+        assert!(PROXY_URL.starts_with("https://"));
+        assert!(PROXY_URL.ends_with("/v1/ask"));
+    }
+
+    #[test]
+    fn error_text_covers_each_failure_kind() {
+        let kinds = ["offline", "quota_exceeded", "server", "bad_response", "anything else"];
+        let texts: Vec<String> = kinds.iter().map(|k| error_text(k)).collect();
+        assert!(texts.iter().all(|t| !t.is_empty()));
+        assert_eq!(texts[3], texts[4], "unknown kinds read as an unreadable response");
+        assert!(texts[1].contains("Settings"));
+    }
+
+    // ── Outcome (status mapping) ─────────────────────────────────────────────
+
+    fn outcome(status: i64, body: &str) -> Value {
+        parse(&resolve_outcome_json(status, body, &defaults(), false, ANDROID))
+    }
+
+    #[test]
+    fn outcome_200_is_the_resolved_response() {
+        let v = outcome(200, r#"{"reply":"Hi."}"#);
+        assert_eq!(v["reply"], "Hi.");
+        assert_eq!(v["isError"], false);
+    }
+
+    #[test]
+    fn outcome_0_means_offline() {
+        let v = outcome(0, "");
+        assert_eq!(v["isError"], true);
+        assert_eq!(v["reply"], error_text("offline"));
+    }
+
+    #[test]
+    fn outcome_429_is_quota_exceeded_and_keeps_the_quota_when_sent() {
+        let v = outcome(429, r#"{"error":"quota_exceeded","quota":{"remaining":0,"resetsAt":"2026-10-02T00:00:00Z"}}"#);
+        assert_eq!(v["isError"], true);
+        assert_eq!(v["reply"], error_text("quota_exceeded"));
+        assert_eq!(v["quota"]["resetsAt"], "2026-10-02T00:00:00Z");
+        assert!(outcome(429, "garbage")["quota"].is_null());
+    }
+
+    #[test]
+    fn outcome_for_any_other_status_is_a_server_error() {
+        for status in [400, 413, 500, 502, 503] {
+            let v = outcome(status, r#"{"reply":"ignored"}"#);
+            assert_eq!(v["isError"], true, "status {status}");
+            assert_eq!(v["reply"], error_text("server"));
         }
     }
 }
