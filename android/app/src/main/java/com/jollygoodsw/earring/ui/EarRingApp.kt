@@ -196,7 +196,7 @@ fun EarRingApp() {
                 )
             }
             composable(Routes.HELP) {
-                HelpScreen()
+                HelpScreen(exerciseViewModel)
             }
         }
     }

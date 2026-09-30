@@ -69,6 +69,13 @@ object EarRingCore {
     @JvmStatic external fun nativeSettingsNormalize(input: String, platform: Int): String
     @JvmStatic external fun nativeSettingsApply(current: String, action: String, platform: Int): String
 
+    // Setup assistant (rust/src/assistant.rs): request building, HTTP-status handling and
+    // proposal validation all live in Rust; this side only moves strings.
+    @JvmStatic external fun nativeAssistantEndpoint(): String
+    @JvmStatic external fun nativeAssistantRequest(history: String, settings: String, isPremium: Int, platform: Int): String
+    @JvmStatic external fun nativeAssistantResolveOutcome(status: Int, body: String, settings: String, isPremium: Int, platform: Int): String
+    @JvmStatic external fun nativeAssistantResolveProposal(proposal: String, settings: String, isPremium: Int, platform: Int): String
+
     // ── PitchTracker JNI ─────────────────────────────────────────────────────────
     @JvmStatic external fun nativeTrackerNew(silenceThreshold: Float, requiredFrames: Int): Long
     @JvmStatic external fun nativeTrackerFree(handle: Long)
@@ -370,4 +377,21 @@ object EarRingCore {
     /** Applies one action (e.g. `{"type":"setInstrument","value":8}`) and returns the new settings JSON. */
     fun settingsApply(current: String, action: String): String =
         if (loaded) nativeSettingsApply(current, action, SETTINGS_PLATFORM) else current
+
+    /** Where questions are POSTed (the proxy's address lives once, in Rust). */
+    fun assistantEndpoint(): String = if (loaded) nativeAssistantEndpoint() else ""
+
+    /** The proxy request body for chat [history] JSON and the current settings. */
+    fun assistantRequest(history: String, settings: String, isPremium: Boolean): String =
+        if (loaded) nativeAssistantRequest(history, settings, if (isPremium) 1 else 0, SETTINGS_PLATFORM) else "{}"
+
+    /** The chat view for one round trip; [status] is the HTTP status, or 0 if nothing was received. */
+    fun assistantResolveOutcome(status: Int, body: String, settings: String, isPremium: Boolean): String =
+        if (loaded) nativeAssistantResolveOutcome(status, body, settings, if (isPremium) 1 else 0, SETTINGS_PLATFORM)
+        else """{"reply":"The assistant isn't available right now.","card":null,"proposal":null,"feedbackSent":false,"quota":null,"isError":true}"""
+
+    /** Re-validates a proposal against the current settings; its items' actions are what to dispatch. */
+    fun assistantResolveProposal(proposal: String, settings: String, isPremium: Boolean): String =
+        if (loaded) nativeAssistantResolveProposal(proposal, settings, if (isPremium) 1 else 0, SETTINGS_PLATFORM)
+        else """{"items":[],"rejected":[]}"""
 }

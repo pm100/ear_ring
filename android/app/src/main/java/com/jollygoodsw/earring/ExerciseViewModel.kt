@@ -197,6 +197,12 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
      *  whichever tab the user tapped landed on Help instead. */
     fun resetSettings() = dispatch(JSONObject().put("type", "reset"))
 
+    /** The settings JSON as it is now, for the setup assistant. */
+    fun settingsSnapshot(): String = settingsJson
+
+    /** Applies the assistant's confirmed actions in order, through the same path as any settings change. */
+    fun applyAssistantActions(actions: List<JSONObject>) = actions.forEach { dispatch(it) }
+
     private val _state = MutableStateFlow(
         ExerciseState.fromSettings(settingsJson, isPremium = prefs.getBoolean(PREF_IS_PREMIUM, false))
     )

@@ -12,10 +12,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jollygoodsw.earring.EarRingCore
+import com.jollygoodsw.earring.ExerciseViewModel
 import org.json.JSONArray
 
 @Composable
-fun HelpScreen() {
+fun HelpScreen(viewModel: ExerciseViewModel) {
     val sections = remember {
         parseHelpSections(EarRingCore.helpContent())
     }
@@ -36,7 +37,8 @@ fun HelpScreen() {
             Spacer(Modifier.weight(1f))
         }
 
-        Spacer(Modifier.height(16.dp))
+        AssistantChat(viewModel)
+        HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
 
         sections.forEach { (title, body) ->
             HelpSection(title) {
