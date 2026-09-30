@@ -93,6 +93,14 @@ class ExerciseModel: ObservableObject {
         dispatch(["type": "set", "values": [field: value]])
     }
 
+    /// The settings JSON as it is now, for the setup assistant.
+    var assistantSettingsJson: String { settingsJson }
+
+    /// Applies the assistant's confirmed actions in order, through the same path as any settings change.
+    func applyAssistantActions(_ actions: [[String: Any]]) {
+        actions.forEach { dispatch($0) }
+    }
+
     /// Re-derives the default range for the key (Rust does this as part of `setRootNote`).
     var rootNote: Int {
         get { settings.rootNote }

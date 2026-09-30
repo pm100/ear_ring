@@ -320,6 +320,53 @@ struct EarRingCore {
         return String(cString: ptr)
     }
 
+    // MARK: - Setup assistant (rust/src/assistant.rs)
+    // Request building, HTTP-status handling and proposal validation all live in Rust; Swift only
+    // moves strings. Every C call returns a Rust-allocated string released with ear_ring_free_string.
+
+    private static func assistantString(_ ptr: UnsafeMutablePointer<CChar>?, fallback: String) -> String {
+        guard let ptr else { return fallback }
+        defer { ear_ring_free_string(ptr) }
+        return String(cString: ptr)
+    }
+
+    /// Where questions are POSTed (the proxy's address lives once, in Rust).
+    static func assistantEndpoint() -> String {
+        assistantString(ear_ring_assistant_endpoint(), fallback: "")
+    }
+
+    /// The proxy request body for chat `history` JSON and the current settings.
+    static func assistantRequest(history: String, settings: String, isPremium: Bool) -> String {
+        let ptr = history.withCString { historyPtr in
+            settings.withCString { settingsPtr in
+                ear_ring_assistant_request(historyPtr, settingsPtr, isPremium ? 1 : 0, settingsPlatform)
+            }
+        }
+        return assistantString(ptr, fallback: "{}")
+    }
+
+    /// The chat view for one round trip; `status` is the HTTP status, or 0 if nothing was received.
+    static func assistantResolveOutcome(status: Int, body: String, settings: String, isPremium: Bool) -> String {
+        let ptr = body.withCString { bodyPtr in
+            settings.withCString { settingsPtr in
+                ear_ring_assistant_resolve_outcome(Int32(status), bodyPtr, settingsPtr, isPremium ? 1 : 0, settingsPlatform)
+            }
+        }
+        return assistantString(
+            ptr,
+            fallback: #"{"reply":"The assistant isn't available right now.","card":null,"proposal":null,"feedbackSent":false,"quota":null,"isError":true}"#)
+    }
+
+    /// Re-validates a proposal against the current settings; its items' actions are what to dispatch.
+    static func assistantResolveProposal(_ proposal: String, settings: String, isPremium: Bool) -> String {
+        let ptr = proposal.withCString { proposalPtr in
+            settings.withCString { settingsPtr in
+                ear_ring_assistant_resolve_proposal(proposalPtr, settingsPtr, isPremium ? 1 : 0, settingsPlatform)
+            }
+        }
+        return assistantString(ptr, fallback: #"{"items":[],"rejected":[]}"#)
+    }
+
     /// Result from processing one audio buffer through the Rust pitch tracker.
     struct TrackerFrame {
         /// Detected frequency in Hz. 0 when silent or no confident pitch.

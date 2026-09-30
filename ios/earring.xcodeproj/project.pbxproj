@@ -27,6 +27,8 @@
 		AA20000000000140 /* TunerMeterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000140 /* TunerMeterView.swift */; };
 		AA20000000000100 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000100 /* SettingsView.swift */; };
 		AA20000000000110 /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000110 /* HelpView.swift */; };
+		AA20000000000150 /* AssistantClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000150 /* AssistantClient.swift */; };
+		AA20000000000160 /* AssistantChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000160 /* AssistantChatView.swift */; };
 		B5EF2949546CBF9135D51680 /* PianoRangePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 928562E53D2D807A5FEED52B /* PianoRangePickerView.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
@@ -39,6 +41,7 @@
 		928562E53D2D807A5FEED52B /* PianoRangePickerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PianoRangePickerView.swift; sourceTree = "<group>"; };
 		AA1000000000001A /* EarRingApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EarRingApp.swift; path = earring/EarRingApp.swift; sourceTree = "<group>"; };
 		AA1000000000002A /* EarRingCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EarRingCore.swift; path = earring/EarRingCore.swift; sourceTree = "<group>"; };
+		AA10000000000150 /* AssistantClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AssistantClient.swift; path = earring/AssistantClient.swift; sourceTree = "<group>"; };
 		AA1000000000003A /* AudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AudioCapture.swift; path = earring/AudioCapture.swift; sourceTree = "<group>"; };
 		AA1000000000004A /* AudioPlayback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AudioPlayback.swift; path = earring/AudioPlayback.swift; sourceTree = "<group>"; };
 		AA1000000000005A /* MusicTheory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MusicTheory.swift; path = earring/MusicTheory.swift; sourceTree = "<group>"; };
@@ -55,6 +58,7 @@
 		AA10000000000140 /* TunerMeterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunerMeterView.swift; sourceTree = "<group>"; };
 		AA10000000000100 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		AA10000000000110 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
+		AA10000000000160 /* AssistantChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantChatView.swift; sourceTree = "<group>"; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = earring/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* earring-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "earring-Bridging-Header.h"; path = "earring/earring-Bridging-Header.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -76,6 +80,7 @@
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
 				AA1000000000001A /* EarRingApp.swift */,
 				AA1000000000002A /* EarRingCore.swift */,
+				AA10000000000150 /* AssistantClient.swift */,
 				AA1000000000003A /* AudioCapture.swift */,
 				AA1000000000004A /* AudioPlayback.swift */,
 				AA1000000000005A /* MusicTheory.swift */,
@@ -131,6 +136,7 @@
 				AA10000000000140 /* TunerMeterView.swift */,
 				AA10000000000100 /* SettingsView.swift */,
 				AA10000000000110 /* HelpView.swift */,
+				AA10000000000160 /* AssistantChatView.swift */,
 				928562E53D2D807A5FEED52B /* PianoRangePickerView.swift */,
 			);
 			name = views;
@@ -250,6 +256,8 @@
 				AA20000000000140 /* TunerMeterView.swift in Sources */,
 				AA20000000000100 /* SettingsView.swift in Sources */,
 				AA20000000000110 /* HelpView.swift in Sources */,
+				AA20000000000150 /* AssistantClient.swift in Sources */,
+				AA20000000000160 /* AssistantChatView.swift in Sources */,
 				B5EF2949546CBF9135D51680 /* PianoRangePickerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

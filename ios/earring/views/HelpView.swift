@@ -13,6 +13,9 @@ struct HelpView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.bottom, 8)
 
+                AssistantChatView()
+                Divider().padding(.top, 16)
+
                 ForEach(sections, id: \.title) { section in
                     HelpSection(title: section.title) {
                         VStack(alignment: .leading, spacing: 8) {
