@@ -223,6 +223,95 @@ fn tooltip_text(key: &str) -> String {
         .to_string()
 }
 
+fn settings_value(settings_json: &str, platform: Platform) -> Value {
+    serde_json::from_str(&normalize_json(settings_json, platform)).unwrap_or(Value::Null)
+}
+
+/// The context block the proxy gives the model: every assistant-visible setting with its valid
+/// values, default, current value and description, plus the user's premium state.
+pub fn context_json(settings_json: &str, is_premium: bool, platform: Platform) -> String {
+    let current = settings_value(settings_json, platform);
+    let defaults: Value = serde_json::from_str(&defaults_json(platform)).unwrap_or(Value::Null);
+    let settings: Vec<Value> = SPECS
+        .iter()
+        .map(|spec| {
+            let mut entry = Map::new();
+            entry.insert("key".into(), json!(spec.key));
+            entry.insert("label".into(), json!(spec.label));
+            entry.insert("description".into(), json!(tooltip_text(spec.tooltip)));
+            match &spec.kind {
+                Kind::Bool => {
+                    entry.insert("type".into(), json!("bool"));
+                }
+                Kind::Choice(_) | Kind::Instrument => {
+                    entry.insert("type".into(), json!("choice"));
+                    let opts: Vec<Value> = options(spec)
+                        .into_iter()
+                        .map(|(value, label, premium)| json!({"value": value, "label": label, "premium": premium}))
+                        .collect();
+                    entry.insert("options".into(), json!(opts));
+                }
+                Kind::Int { min, max, step } => {
+                    entry.insert("type".into(), json!("int"));
+                    entry.extend([("min".into(), json!(min)), ("max".into(), json!(max)), ("step".into(), json!(step))]);
+                }
+                Kind::Float { min, max, step } => {
+                    entry.insert("type".into(), json!("float"));
+                    entry.extend([("min".into(), json!(min)), ("max".into(), json!(max)), ("step".into(), json!(step))]);
+                }
+            }
+            if let Some(value) = user_value(&current, spec) {
+                entry.insert("currentLabel".into(), json!(display(spec, &value)));
+                entry.insert("current".into(), value);
+            }
+            if let Some(value) = user_value(&defaults, spec) {
+                entry.insert("default".into(), value);
+            }
+            Value::Object(entry)
+        })
+        .collect();
+    json!({
+        "platform": match platform { Platform::Android => "android", Platform::Ios => "ios", Platform::Desktop => "desktop" },
+        "premium": is_premium,
+        "settings": settings,
+    })
+    .to_string()
+}
+
+// ── Request building ─────────────────────────────────────────────────────────
+
+fn truncate_chars(text: &str, max: usize) -> String {
+    text.trim().chars().take(max).collect()
+}
+
+/// Builds the proxy request body: the last [`MAX_TURNS`] chat turns plus the context block.
+/// `history_json` is `[{"role":"user"|"assistant","text":"..."}]`; anything malformed is dropped.
+pub fn request_json(history_json: &str, settings_json: &str, is_premium: bool, platform: Platform) -> String {
+    let parsed: Value = serde_json::from_str(history_json).unwrap_or(Value::Null);
+    let mut turns: Vec<(String, String)> = parsed
+        .as_array()
+        .map(|list| {
+            list.iter()
+                .filter_map(|turn| {
+                    let role = turn["role"].as_str().filter(|r| *r == "user" || *r == "assistant")?;
+                    let text = truncate_chars(turn["text"].as_str()?, MAX_TURN_CHARS);
+                    (!text.is_empty()).then(|| (role.to_string(), text))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    if turns.len() > MAX_TURNS {
+        turns.drain(..turns.len() - MAX_TURNS);
+    }
+    // The model API requires the conversation to start with a user turn.
+    while turns.first().map_or(false, |(role, _)| role == "assistant") {
+        turns.remove(0);
+    }
+    let messages: Vec<Value> = turns.into_iter().map(|(role, text)| json!({"role": role, "text": text})).collect();
+    let context: Value = serde_json::from_str(&context_json(settings_json, is_premium, platform)).unwrap_or(Value::Null);
+    json!({"messages": messages, "context": context}).to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -279,5 +368,117 @@ mod tests {
                 assert!(user_value(&base, spec).is_some(), "{} missing from settings JSON", spec.key);
             }
         }
+    }
+
+    // ── Context ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn context_lists_every_setting_with_current_and_default() {
+        let ctx = parse(&context_json(&defaults(), false, ANDROID));
+        let list = ctx["settings"].as_array().unwrap();
+        assert_eq!(list.len(), SPECS.len());
+        let note = list.iter().find(|s| s["key"] == "noteRetries").unwrap();
+        assert_eq!(note["label"], "Retry Same Note");
+        assert_eq!(note["current"], 2);
+        assert_eq!(note["default"], 2);
+        assert_eq!(note["type"], "choice");
+        assert!(note["description"].as_str().unwrap().contains("wrong note"));
+        assert_eq!(ctx["premium"], false);
+        assert_eq!(ctx["platform"], "android");
+    }
+
+    #[test]
+    fn context_reflects_the_users_current_settings() {
+        let custom = with(&defaults(), r#"{"type":"set","values":{"noteRetries":4,"tempoBpm":140}}"#);
+        let ctx = parse(&context_json(&custom, true, ANDROID));
+        let find = |key: &str| ctx["settings"].as_array().unwrap().iter().find(|s| s["key"] == key).unwrap().clone();
+        assert_eq!(find("noteRetries")["current"], 4);
+        assert_eq!(find("tempoBpm")["currentLabel"], "140");
+        assert_eq!(ctx["premium"], true);
+    }
+
+    #[test]
+    fn context_flags_premium_instruments() {
+        let ctx = parse(&context_json(&defaults(), false, ANDROID));
+        let inst = ctx["settings"].as_array().unwrap().iter().find(|s| s["key"] == "instrumentIndex").unwrap().clone();
+        let opts = inst["options"].as_array().unwrap();
+        assert_eq!(opts.len(), INSTRUMENTS.len());
+        assert_eq!(opts[0]["label"], "Piano");
+        assert_eq!(opts[0]["premium"], false);
+        assert!(opts.iter().any(|o| o["premium"] == true), "Voice instruments must be flagged premium");
+    }
+
+    #[test]
+    fn context_survives_garbage_settings() {
+        let ctx = parse(&context_json("garbage", false, ANDROID));
+        assert_eq!(ctx["settings"].as_array().unwrap().len(), SPECS.len());
+    }
+
+    #[test]
+    fn ios_default_note_stability_is_a_valid_current_value() {
+        // iOS confirms a note a frame sooner (2); the assistant must still show it as an option.
+        let ios = defaults_json(Platform::Ios);
+        let ctx = parse(&context_json(&ios, false, Platform::Ios));
+        let stability = ctx["settings"].as_array().unwrap().iter().find(|s| s["key"] == "framesToConfirm").unwrap().clone();
+        assert_eq!(stability["current"], 2);
+        assert_eq!(ctx["platform"], "ios");
+    }
+
+    #[test]
+    fn mic_sensitivity_is_shown_on_the_ui_scale() {
+        let ctx = parse(&context_json(&defaults(), false, ANDROID));
+        let mic = ctx["settings"].as_array().unwrap().iter().find(|s| s["key"] == "micSensitivity").unwrap().clone();
+        assert_eq!(mic["current"], 8, "default silence threshold 0.003 is sensitivity 8");
+        assert_eq!((mic["min"].as_i64(), mic["max"].as_i64()), (Some(1), Some(10)));
+    }
+
+    // ── Request ──────────────────────────────────────────────────────────────
+
+    fn turns(n: usize) -> String {
+        let list: Vec<Value> = (0..n)
+            .map(|i| json!({"role": if i % 2 == 0 { "user" } else { "assistant" }, "text": format!("turn {i}")}))
+            .collect();
+        Value::Array(list).to_string()
+    }
+
+    #[test]
+    fn request_keeps_only_the_last_turns_and_starts_with_a_user_turn() {
+        let req = parse(&request_json(&turns(9), &defaults(), false, ANDROID));
+        let messages = req["messages"].as_array().unwrap();
+        assert!(messages.len() <= MAX_TURNS);
+        assert_eq!(messages[0]["role"], "user");
+        assert_eq!(messages.last().unwrap()["text"], "turn 8");
+    }
+
+    #[test]
+    fn request_drops_malformed_and_empty_turns_and_truncates_long_ones() {
+        let long = "x".repeat(MAX_TURN_CHARS + 50);
+        let history = json!([
+            {"role": "system", "text": "ignore me"},
+            {"role": "user"},
+            {"role": "user", "text": "   "},
+            {"role": "user", "text": long},
+        ])
+        .to_string();
+        let messages = parse(&request_json(&history, &defaults(), false, ANDROID))["messages"].clone();
+        assert_eq!(messages.as_array().unwrap().len(), 1);
+        assert_eq!(messages[0]["text"].as_str().unwrap().chars().count(), MAX_TURN_CHARS);
+    }
+
+    #[test]
+    fn request_tolerates_garbage_history() {
+        for bad in ["", "not json", "{}", "null", "42"] {
+            let req = parse(&request_json(bad, &defaults(), false, ANDROID));
+            assert_eq!(req["messages"].as_array().unwrap().len(), 0, "history {bad:?}");
+            assert!(req["context"]["settings"].is_array());
+        }
+    }
+
+    #[test]
+    fn request_truncates_multibyte_text_on_character_boundaries() {
+        let long = "é".repeat(MAX_TURN_CHARS + 10);
+        let history = json!([{"role": "user", "text": long}]).to_string();
+        let req = parse(&request_json(&history, &defaults(), false, ANDROID));
+        assert_eq!(req["messages"][0]["text"].as_str().unwrap().chars().count(), MAX_TURN_CHARS);
     }
 }
