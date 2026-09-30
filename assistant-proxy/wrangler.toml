@@ -1,6 +1,8 @@
 name = "ear-ring-assistant"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
+# The Claude SDK (bundled even when another provider is active) imports Node built-ins.
+compatibility_flags = ["nodejs_compat"]
 
 # Daily feedback digest at 08:00 UTC.
 [triggers]
@@ -10,11 +12,11 @@ crons = ["0 8 * * *"]
 # and paste the returned ids here.
 [[kv_namespaces]]
 binding = "QUOTA"
-id = "REPLACE_WITH_QUOTA_NAMESPACE_ID"
+id = "f23679cba5ae45da9452b5dc37306adb"
 
 [[kv_namespaces]]
 binding = "FEEDBACK"
-id = "REPLACE_WITH_FEEDBACK_NAMESPACE_ID"
+id = "3c41090d3648419c8d7fbb88c0f6bb02"
 
 [vars]
 FREE_DAILY_LIMIT = "5"
@@ -22,14 +24,14 @@ PREMIUM_DAILY_LIMIT = "20"
 DIGEST_FROM = "Ear Ring <onboarding@resend.dev>"
 
 # Which language model answers. Change these (and redeploy) to switch; no app release needed.
-# Claude (default):
-PROVIDER = "anthropic"
-MODEL = "claude-haiku-4-5"
-# Any OpenAI-compatible server (OpenAI, Gemini, Groq, OpenRouter, a self-hosted Ollama/vLLM...):
-#   PROVIDER = "openai"
-#   MODEL = "<the provider's model id>"
-#   OPENAI_BASE_URL = "https://api.openai.com/v1"
+# Active: an OpenAI-compatible server (OpenAI itself here).
+PROVIDER = "openai"
+MODEL = "gpt-4o-mini"
+OPENAI_BASE_URL = "https://api.openai.com/v1"
 #   OPENAI_MAX_TOKENS_FIELD = "max_completion_tokens"   # only if the server rejects "max_tokens"
+# To use Claude instead:
+#   PROVIDER = "anthropic"
+#   MODEL = "claude-haiku-4-5"
 
 # Secrets (set with `npx wrangler secret put <NAME>`, never committed):
 #   ANTHROPIC_API_KEY (provider anthropic) or OPENAI_API_KEY (provider openai), RESEND_API_KEY,

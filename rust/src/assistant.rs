@@ -15,7 +15,7 @@ const MAX_TURN_CHARS: usize = 500;
 /// Longest model reply shown, in characters.
 const MAX_REPLY_CHARS: usize = 4000;
 /// Where every platform POSTs questions. Replace with the deployed proxy's address.
-pub const PROXY_URL: &str = "https://ear-ring-assistant.example.workers.dev/v1/ask";
+pub const PROXY_URL: &str = "https://ear-ring-assistant.paulmoore100.workers.dev/v1/ask";
 
 enum Kind {
     /// Discrete options: (stored value, label).
