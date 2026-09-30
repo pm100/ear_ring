@@ -23,6 +23,7 @@ struct AssistantChatView: View {
     @State private var busy = false
     @State private var remaining: Int? = nil
     @State private var nextId = 1
+    @State private var session = 0
 
     private let maxInputChars = 500
 
@@ -67,9 +68,20 @@ struct AssistantChatView: View {
                     .foregroundColor(.secondary)
             }
         }
+        .onDisappear(perform: reset)
     }
 
     // MARK: Actions
+
+    /// A TabView keeps this view alive across tab switches, so clear the conversation explicitly
+    /// when the user leaves; bumping `session` makes a reply still in flight get dropped.
+    private func reset() {
+        entries = []
+        input = ""
+        remaining = nil
+        busy = false
+        session += 1
+    }
 
     private func takeId() -> Int {
         defer { nextId += 1 }
@@ -88,8 +100,10 @@ struct AssistantChatView: View {
         let history = transcript.filter { !$0.isError }.map { (role: $0.role, text: $0.text) }
         let settings = model.assistantSettingsJson
         let premium = model.isPremium
+        let startedIn = session
         Task { @MainActor in
             let view = await AssistantClient.ask(history: history, settingsJson: settings, isPremium: premium)
+            guard startedIn == session else { return }
             if let left = view.remaining { remaining = left }
             entries = transcript + [ChatEntry(
                 id: takeId(), role: "assistant", text: view.reply, card: view.card,
