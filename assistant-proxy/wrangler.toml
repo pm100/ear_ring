@@ -1,0 +1,36 @@
+name = "ear-ring-assistant"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Daily feedback digest at 08:00 UTC.
+[triggers]
+crons = ["0 8 * * *"]
+
+# Create both namespaces once with `npx wrangler kv namespace create QUOTA` / `... FEEDBACK`
+# and paste the returned ids here.
+[[kv_namespaces]]
+binding = "QUOTA"
+id = "REPLACE_WITH_QUOTA_NAMESPACE_ID"
+
+[[kv_namespaces]]
+binding = "FEEDBACK"
+id = "REPLACE_WITH_FEEDBACK_NAMESPACE_ID"
+
+[vars]
+FREE_DAILY_LIMIT = "5"
+PREMIUM_DAILY_LIMIT = "20"
+DIGEST_FROM = "Ear Ring <onboarding@resend.dev>"
+
+# Which language model answers. Change these (and redeploy) to switch; no app release needed.
+# Claude (default):
+PROVIDER = "anthropic"
+MODEL = "claude-haiku-4-5"
+# Any OpenAI-compatible server (OpenAI, Gemini, Groq, OpenRouter, a self-hosted Ollama/vLLM...):
+#   PROVIDER = "openai"
+#   MODEL = "<the provider's model id>"
+#   OPENAI_BASE_URL = "https://api.openai.com/v1"
+#   OPENAI_MAX_TOKENS_FIELD = "max_completion_tokens"   # only if the server rejects "max_tokens"
+
+# Secrets (set with `npx wrangler secret put <NAME>`, never committed):
+#   ANTHROPIC_API_KEY (provider anthropic) or OPENAI_API_KEY (provider openai), RESEND_API_KEY,
+#   and DIGEST_TO (the address digests go to; a secret so it never lands in the repo)
