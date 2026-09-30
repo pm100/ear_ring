@@ -1026,6 +1026,60 @@ pub extern "C" fn ear_ring_free_string(s: *mut c_char) {
     }
 }
 
+// ── Setup assistant (C FFI) ───────────────────────────────────────────────────
+// Thin wrappers over the tested `assistant` module, with the same string ownership rules as
+// the settings functions above: release each result with `ear_ring_free_string`.
+
+/// Builds the assistant's proxy request body from chat history JSON and the current settings.
+#[no_mangle]
+pub extern "C" fn ear_ring_assistant_request(
+    history: *const c_char,
+    settings: *const c_char,
+    is_premium: c_uchar,
+    platform: c_uchar,
+) -> *mut c_char {
+    let (history, settings) = (settings_c_arg(history), settings_c_arg(settings));
+    settings_guarded("{}".to_string(), || {
+        assistant::request_json(&history, &settings, is_premium != 0, settings::Platform::from_id(platform))
+    })
+}
+
+/// Turns one proxy round trip into the chat view (reply, validated confirm card, quota, error).
+/// `status` is the HTTP status, or 0 if the request never reached the server.
+#[no_mangle]
+pub extern "C" fn ear_ring_assistant_resolve_outcome(
+    status: c_int,
+    body: *const c_char,
+    settings: *const c_char,
+    is_premium: c_uchar,
+    platform: c_uchar,
+) -> *mut c_char {
+    let (body, settings) = (settings_c_arg(body), settings_c_arg(settings));
+    settings_guarded(assistant::error_view_json("server"), || {
+        assistant::resolve_outcome_json(status as i64, &body, &settings, is_premium != 0, settings::Platform::from_id(platform))
+    })
+}
+
+/// Re-validates a proposal against the current settings; call it when the user taps Apply.
+#[no_mangle]
+pub extern "C" fn ear_ring_assistant_resolve_proposal(
+    proposal: *const c_char,
+    settings: *const c_char,
+    is_premium: c_uchar,
+    platform: c_uchar,
+) -> *mut c_char {
+    let (proposal, settings) = (settings_c_arg(proposal), settings_c_arg(settings));
+    settings_guarded(r#"{"items":[],"rejected":[]}"#.to_string(), || {
+        assistant::resolve_proposal_json(&proposal, &settings, is_premium != 0, settings::Platform::from_id(platform))
+    })
+}
+
+/// The proxy URL questions are POSTed to (`assistant::PROXY_URL`).
+#[no_mangle]
+pub extern "C" fn ear_ring_assistant_endpoint() -> *mut c_char {
+    settings_guarded(String::new(), || assistant::PROXY_URL.to_string())
+}
+
 // ── Android JNI exports ───────────────────────────────────────────────────────
 #[cfg(target_os = "android")]
 mod android_jni {
@@ -1930,5 +1984,47 @@ mod ffi_tests {
             ear_ring_pick_melody_by_index(0, 0, out_midi.as_mut_ptr(), out_dur.as_mut_ptr(), -1);
 
         assert_eq!(written, -1, "a negative capacity must not bypass the bounds check via usize wraparound");
+    }
+
+    // ── Setup assistant ──────────────────────────────────────────────────────
+
+    #[test]
+    fn assistant_request_ffi_builds_the_body_and_honours_the_premium_flag() {
+        let settings = take(ear_ring_settings_defaults(0));
+        let history = r#"[{"role":"user","text":"hi"}]"#;
+        let out = take(ear_ring_assistant_request(c(history).as_ptr(), c(&settings).as_ptr(), 1, 0));
+        assert_eq!(out, assistant::request_json(history, &settings, true, settings::Platform::Android));
+        assert!(out.contains(r#""premium":true"#));
+    }
+
+    #[test]
+    fn assistant_resolve_outcome_ffi_returns_a_card_for_200_and_an_error_otherwise() {
+        let settings = take(ear_ring_settings_defaults(0));
+        let response = r#"{"reply":"ok","proposal":[{"setting":"noteRetries","value":5}]}"#;
+        let ok = take(ear_ring_assistant_resolve_outcome(200, c(response).as_ptr(), c(&settings).as_ptr(), 0, 0));
+        assert!(ok.contains(r#""to":"5""#));
+        let offline = take(ear_ring_assistant_resolve_outcome(0, c("").as_ptr(), c(&settings).as_ptr(), 0, 0));
+        assert!(offline.contains(r#""isError":true"#));
+    }
+
+    #[test]
+    fn assistant_resolve_proposal_ffi_returns_items() {
+        let settings = take(ear_ring_settings_defaults(0));
+        let proposal = r#"[{"setting":"maxRetries","value":8}]"#;
+        let out = take(ear_ring_assistant_resolve_proposal(c(proposal).as_ptr(), c(&settings).as_ptr(), 0, 0));
+        assert!(out.contains(r#""key":"maxRetries""#));
+    }
+
+    #[test]
+    fn assistant_endpoint_ffi_returns_the_proxy_url() {
+        assert_eq!(take(ear_ring_assistant_endpoint()), assistant::PROXY_URL);
+    }
+
+    #[test]
+    fn assistant_ffi_treats_null_pointers_as_empty_strings() {
+        let null = std::ptr::null();
+        assert!(take(ear_ring_assistant_request(null, null, 0, 0)).contains(r#""messages":[]"#));
+        assert!(take(ear_ring_assistant_resolve_outcome(200, null, null, 0, 0)).contains(r#""isError":true"#));
+        assert!(take(ear_ring_assistant_resolve_proposal(null, null, 0, 0)).contains(r#""items":[]"#));
     }
 }

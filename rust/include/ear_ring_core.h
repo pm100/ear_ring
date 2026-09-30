@@ -341,6 +341,23 @@ char *ear_ring_settings_apply(const char *current, const char *action, unsigned 
 /// Releases a string returned by any `ear_ring_settings_*` function. Null is ignored.
 void ear_ring_free_string(char *s);
 
+/// The proxy URL questions are POSTed to.
+/// Returns a newly allocated string; release it with `ear_ring_free_string`.
+char *ear_ring_assistant_endpoint(void);
+
+/// Builds the assistant's proxy request body from chat history JSON and the current settings.
+/// Returns a newly allocated string; release it with `ear_ring_free_string`.
+char *ear_ring_assistant_request(const char *history, const char *settings, unsigned char is_premium, unsigned char platform);
+
+/// Turns one proxy round trip into the chat view. `status` is the HTTP status, or 0 if the
+/// request never reached the server.
+/// Returns a newly allocated string; release it with `ear_ring_free_string`.
+char *ear_ring_assistant_resolve_outcome(int status, const char *body, const char *settings, unsigned char is_premium, unsigned char platform);
+
+/// Re-validates a proposal against the current settings; call it when the user taps Apply.
+/// Returns a newly allocated string; release it with `ear_ring_free_string`.
+char *ear_ring_assistant_resolve_proposal(const char *proposal, const char *settings, unsigned char is_premium, unsigned char platform);
+
 #ifdef __cplusplus
 }
 #endif
