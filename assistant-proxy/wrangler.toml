@@ -26,8 +26,10 @@ DIGEST_FROM = "Ear Ring <onboarding@resend.dev>"
 # Which language model answers. Change these (and redeploy) to switch; no app release needed.
 # Active: an OpenAI-compatible server (OpenAI itself here).
 PROVIDER = "openai"
-MODEL = "gpt-4o-mini"
+MODEL = "gpt-4o"
 OPENAI_BASE_URL = "https://api.openai.com/v1"
+# Steadier tool use; remove for models that only accept their default temperature.
+OPENAI_TEMPERATURE = "0.2"
 #   OPENAI_MAX_TOKENS_FIELD = "max_completion_tokens"   # only if the server rejects "max_tokens"
 # To use Claude instead:
 #   PROVIDER = "anthropic"

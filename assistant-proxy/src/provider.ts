@@ -5,6 +5,13 @@ import type { Env, ModelProvider } from './types';
 
 export const PROVIDERS = ['anthropic', 'openai'] as const;
 
+/** A number from 0 to 2, or undefined (which sends no temperature at all). */
+function parseTemperature(value: string | undefined): number | undefined {
+  if (!value?.trim()) return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 && n <= 2 ? n : undefined;
+}
+
 /**
  * Picks the model backend from configuration, so switching provider or model never needs an app
  * release. Throws a descriptive error (no secrets) if the chosen provider is not fully configured;
@@ -25,6 +32,7 @@ export function makeProvider(env: Env, fetchFn: typeof fetch = fetch): ModelProv
         apiKey: env.OPENAI_API_KEY!,
         model: env.MODEL!,
         maxTokensField: env.OPENAI_MAX_TOKENS_FIELD || 'max_tokens',
+        temperature: parseTemperature(env.OPENAI_TEMPERATURE),
       },
       fetchFn,
     );

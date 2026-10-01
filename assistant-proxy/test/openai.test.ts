@@ -52,6 +52,15 @@ describe('openai-compatible provider', () => {
     expect(system.indexOf('SETTINGS SCHEMA')).toBeLessThan(system.indexOf('USER STATE'));
   });
 
+  it('sends a temperature only when one is configured', async () => {
+    const plain = fakeFetch(completion({ content: 'ok' }));
+    await makeOpenAIProvider(config, plain.fn).ask(askBody());
+    expect(JSON.parse(plain.calls[0]!.init.body as string).temperature).toBeUndefined();
+    const tuned = fakeFetch(completion({ content: 'ok' }));
+    await makeOpenAIProvider({ ...config, temperature: 0.2 }, tuned.fn).ask(askBody());
+    expect(JSON.parse(tuned.calls[0]!.init.body as string).temperature).toBe(0.2);
+  });
+
   it('uses the configured name for the token limit field', async () => {
     const { fn, calls } = fakeFetch(completion({ content: 'ok' }));
     await makeOpenAIProvider({ ...config, maxTokensField: 'max_completion_tokens' }, fn).ask(askBody());

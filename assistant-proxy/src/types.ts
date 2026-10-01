@@ -26,6 +26,8 @@ export interface Env {
   OPENAI_API_KEY?: string;
   /** Some servers want "max_completion_tokens" instead of the default "max_tokens". */
   OPENAI_MAX_TOKENS_FIELD?: string;
+  /** 0 to 2. Lower is steadier tool use; unset for models that reject it. */
+  OPENAI_TEMPERATURE?: string;
 }
 
 export interface Turn {

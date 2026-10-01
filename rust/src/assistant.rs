@@ -227,6 +227,16 @@ fn settings_value(settings_json: &str, platform: Platform) -> Value {
     serde_json::from_str(&normalize_json(settings_json, platform)).unwrap_or(Value::Null)
 }
 
+/// What the model is told a setting does. Mic sensitivity is the 1-10 slider (higher = more
+/// sensitive), but its tooltip is worded for the silence threshold and would send the model the
+/// wrong way, so it gets its own text.
+fn description_for(spec: &Spec) -> String {
+    if spec.key == "micSensitivity" {
+        return "How sensitive the microphone is, on a 1 to 10 scale: higher means more sensitive (picks up quieter notes but also more background noise), lower means less sensitive. Raise it if quiet playing is missed; lower it if background noise triggers false notes.".to_string();
+    }
+    tooltip_text(spec.tooltip)
+}
+
 /// The context block the proxy gives the model: every assistant-visible setting with its valid
 /// values, default, current value and description, plus the user's premium state.
 pub fn context_json(settings_json: &str, is_premium: bool, platform: Platform) -> String {
@@ -238,7 +248,7 @@ pub fn context_json(settings_json: &str, is_premium: bool, platform: Platform) -
             let mut entry = Map::new();
             entry.insert("key".into(), json!(spec.key));
             entry.insert("label".into(), json!(spec.label));
-            entry.insert("description".into(), json!(tooltip_text(spec.tooltip)));
+            entry.insert("description".into(), json!(description_for(spec)));
             match &spec.kind {
                 Kind::Bool => {
                     entry.insert("type".into(), json!("bool"));
@@ -589,6 +599,15 @@ mod tests {
         let stability = ctx["settings"].as_array().unwrap().iter().find(|s| s["key"] == "framesToConfirm").unwrap().clone();
         assert_eq!(stability["current"], 2);
         assert_eq!(ctx["platform"], "ios");
+    }
+
+    #[test]
+    fn mic_sensitivity_description_says_higher_is_more_sensitive() {
+        let ctx = parse(&context_json(&defaults(), false, ANDROID));
+        let mic = ctx["settings"].as_array().unwrap().iter().find(|s| s["key"] == "micSensitivity").unwrap().clone();
+        let text = mic["description"].as_str().unwrap().to_lowercase();
+        assert!(text.contains("higher") && text.contains("more sensitive"), "{text}");
+        assert!(!text.contains("raise this if background noise"), "tooltip's threshold wording leaked: {text}");
     }
 
     #[test]

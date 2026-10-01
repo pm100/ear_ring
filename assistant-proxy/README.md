@@ -15,7 +15,7 @@ The apps never know which model answers. `wrangler.toml` `[vars]`:
 | PROVIDER | Needs |
 |---|---|
 | `anthropic` (default) | secret `ANTHROPIC_API_KEY`; `MODEL` optional (default `claude-haiku-4-5`) |
-| `openai` (any OpenAI-compatible API) | secret `OPENAI_API_KEY`; vars `OPENAI_BASE_URL`, `MODEL`; optional `OPENAI_MAX_TOKENS_FIELD` |
+| `openai` (any OpenAI-compatible API) | secret `OPENAI_API_KEY`; vars `OPENAI_BASE_URL`, `MODEL`; optional `OPENAI_MAX_TOKENS_FIELD`, `OPENAI_TEMPERATURE` (0 to 2) |
 
 Change the vars, `npx wrangler deploy`, then run `node scripts/examples.mjs <url>` to check behaviour.
 

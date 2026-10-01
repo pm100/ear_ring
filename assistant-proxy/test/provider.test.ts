@@ -45,6 +45,22 @@ describe('makeProvider', () => {
     expect(JSON.parse(calls[0]!.init.body as string).max_completion_tokens).toBeGreaterThan(0);
   });
 
+  it('passes OPENAI_TEMPERATURE through when it is a sensible number and ignores junk', async () => {
+    const sentWith = async (value: string | undefined) => {
+      const { fn, calls } = fakeFetch();
+      const provider = makeProvider(
+        makeEnv({ PROVIDER: 'openai', OPENAI_BASE_URL: 'https://x/v1', OPENAI_API_KEY: 'k', MODEL: 'm', OPENAI_TEMPERATURE: value }),
+        fn,
+      );
+      await provider.ask(askBody());
+      return JSON.parse(calls[0]!.init.body as string).temperature;
+    };
+    expect(await sentWith('0.2')).toBe(0.2);
+    expect(await sentWith('0')).toBe(0);
+    expect(await sentWith(undefined)).toBeUndefined();
+    for (const junk of ['', 'warm', '-1', '3', 'NaN']) expect(await sentWith(junk)).toBeUndefined();
+  });
+
   it('names exactly what is missing for the OpenAI-compatible provider, never a secret value', () => {
     const env = makeEnv({ PROVIDER: 'openai', OPENAI_API_KEY: 'sk-very-secret' });
     let message = '';

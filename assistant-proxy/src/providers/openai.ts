@@ -9,6 +9,8 @@ export interface OpenAIConfig {
   model: string;
   /** "max_tokens" for most servers; "max_completion_tokens" for some newer OpenAI models. */
   maxTokensField: string;
+  /** Sampling temperature; leave unset for models that only accept their default. */
+  temperature?: number;
 }
 
 const REQUEST_TIMEOUT_MS = 25_000;
@@ -57,6 +59,7 @@ export function makeOpenAIProvider(config: OpenAIConfig, fetchFn: typeof fetch =
         body: JSON.stringify({
           model: config.model,
           [config.maxTokensField]: MAX_TOKENS,
+          ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
           messages: [
             { role: 'system', content: `${stable}\n\n${volatile}` },
             ...body.messages.map((turn) => ({ role: turn.role, content: turn.text })),
