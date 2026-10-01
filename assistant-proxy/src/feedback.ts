@@ -67,7 +67,12 @@ export async function sendDigest(
     headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ from: env.DIGEST_FROM, to: env.DIGEST_TO, subject, text }),
   });
-  if (!response.ok) throw new Error(`digest email failed: ${response.status}`);
+  if (!response.ok) {
+    // Only the error type: the message can echo the recipient address.
+    const body = (await response.json().catch(() => ({}))) as { name?: unknown };
+    const kind = typeof body.name === 'string' ? ` ${body.name.slice(0, 40)}` : '';
+    throw new Error(`digest email failed: ${response.status}${kind}`);
+  }
   for (const { key, item } of pending) {
     await env.FEEDBACK.put(key, JSON.stringify({ ...item, sent: true }));
   }

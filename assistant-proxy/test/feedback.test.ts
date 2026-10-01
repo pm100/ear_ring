@@ -47,6 +47,20 @@ describe('feedback', () => {
     for (const value of env.FEEDBACK.data.values()) expect((JSON.parse(value) as StoredFeedback).sent).toBe(true);
   });
 
+  it("names the email service's error type, but not its message (which echoes the address)", async () => {
+    const env = makeEnv();
+    await storeFeedback(env.FEEDBACK, item('one'), 'a');
+    const refusing = (async () =>
+      new Response(
+        JSON.stringify({ name: 'validation_error', message: 'You can only send testing emails to your own email address (me@example.com).' }),
+        { status: 403 },
+      )) as unknown as typeof fetch;
+    const error = await sendDigest(env, refusing).catch((e) => e as Error);
+    expect((error as Error).message).toContain('403');
+    expect((error as Error).message).toContain('validation_error');
+    expect((error as Error).message).not.toContain('example.com');
+  });
+
   it('sends nothing, and makes no email call, when there is nothing new', async () => {
     const env = makeEnv();
     const { fn, calls } = fakeFetch();
