@@ -1014,7 +1014,7 @@ optional step widget, then a full-width primary button, then optional text butto
 | # | id | Content | Primary button |
 |---|----|---------|----------------|
 | 1 | `welcome` | What the app does, green/red meaning | Get started |
-| 2 | `instrument` | Instrument dropdown (premium-filtered, same list and `setInstrument` action as Settings) and a "Range: X to Y" line in written pitch; text warns that the device will next ask for microphone permission | Next |
+| 2 | `instrument` | Instrument dropdown (premium-filtered, same list and `setInstrument` action as Settings) and a "Range: X to Y" line in concert pitch, the same as the Range on Home; text warns that the device will next ask for microphone permission | Next |
 | 3 | `mic` | System mic-permission prompt appears here. Embeds the real **Mic Setup screen** (same code as the Mic tab, in an `embedded` mode without its title and instruction line): listening indicator, staff, tuner meter, Mic Sensitivity slider and Advanced. Below it, a hint after 10 s of silence, and a tick plus success text on the first note that registers on the staff (confirmed and inside the instrument's range) | Next (disabled until a note is heard) |
 | 4 | `ready` | Where to go next | Done (lands on Home) |
 

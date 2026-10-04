@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.jollygoodsw.earring.EarRingCore
 import com.jollygoodsw.earring.ExerciseViewModel
+import com.jollygoodsw.earring.MusicTheory
 import kotlinx.coroutines.delay
 import org.json.JSONArray
 
@@ -164,8 +165,9 @@ private fun InstrumentChoice(viewModel: ExerciseViewModel) {
         }
     }
     Spacer(Modifier.height(8.dp))
-    val low = EarRingCore.writtenMidiLabel(state.rangeStart, state.instrumentIndex)
-    val high = EarRingCore.writtenMidiLabel(state.rangeEnd, state.instrumentIndex)
+    // Concert pitch, the same as the Range on Home.
+    val low = MusicTheory.midiToLabel(state.rangeStart)
+    val high = MusicTheory.midiToLabel(state.rangeEnd)
     Text(
         "Range: $low to $high",
         style = MaterialTheme.typography.bodyMedium,

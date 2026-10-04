@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/tauri';
 import SetupScreen from './SetupScreen';
 import { ExerciseSettings } from '../types';
 import { SettingsAction } from '../settingsStore';
+import { midiToLabel } from '../music';
 
 interface Step {
   id: string;
@@ -23,9 +24,6 @@ interface Props {
   isPremium: boolean;
   onFinished: () => void;
 }
-
-const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const noteLabel = (midi: number) => `${NOTE_NAMES[((midi % 12) + 12) % 12]}${Math.floor(midi / 12) - 1}`;
 
 /** First-run welcome flow (issue #43). Step text comes from the Rust core. */
 export default function WelcomeScreen({ settings, onAction, isPremium, onFinished }: Props) {
@@ -90,7 +88,6 @@ function InstrumentChoice({ settings, onAction, isPremium }: Pick<Props, 'settin
       .then(json => setInstruments(JSON.parse(json) as InstrumentInfo[]))
       .catch(() => setInstruments([]));
   }, []);
-  const semis = instruments[settings.instrumentIndex]?.semitones ?? 0;
   return (
     <>
       <select
@@ -103,7 +100,7 @@ function InstrumentChoice({ settings, onAction, isPremium }: Pick<Props, 'settin
         ))}
       </select>
       <div style={{ marginTop: 8, fontSize: 14, color: '#757575' }}>
-        Range: {noteLabel(settings.rangeStart + semis)} to {noteLabel(settings.rangeEnd + semis)}
+        Range: {midiToLabel(settings.rangeStart)} to {midiToLabel(settings.rangeEnd)}
       </div>
     </>
   );

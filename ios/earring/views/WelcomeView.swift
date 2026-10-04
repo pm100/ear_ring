@@ -135,7 +135,8 @@ private struct InstrumentChoice: View {
                 ForEach(instruments, id: \.id) { Text($0.name).tag($0.id) }
             }
             .pickerStyle(.menu)
-            Text("Range: \(EarRingCore.writtenMidiLabel(concertMidi: model.rangeStart, instrumentIndex: model.instrumentIndex)) to \(EarRingCore.writtenMidiLabel(concertMidi: model.rangeEnd, instrumentIndex: model.instrumentIndex))")
+            // Concert pitch, the same as the Range on Home.
+            Text("Range: \(MusicTheory.midiToLabel(model.rangeStart)) to \(MusicTheory.midiToLabel(model.rangeEnd))")
                 .font(.subheadline).foregroundColor(.secondary)
         }
     }
