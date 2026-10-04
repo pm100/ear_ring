@@ -41,16 +41,19 @@ struct ContentView: View {
     @EnvironmentObject var progressModel: ProgressModel
     @Environment(\.horizontalSizeClass) var hsc
 
-    @State private var selectedTab: Int = {
-        if !UserDefaults.standard.bool(forKey: "hasLaunched") {
-            UserDefaults.standard.set(true, forKey: "hasLaunched")
-            return 4  // Help tab
-        }
-        return 0
-    }()
+    @State private var selectedTab: Int = 0
+    // First launch starts on the welcome flow (issue #43). The flag is set when it is finished
+    // or skipped, not on first load.
+    @State private var showWelcome: Bool = !UserDefaults.standard.bool(forKey: "hasLaunched")
 
     var body: some View {
-        if hsc == .regular {
+        if showWelcome {
+            WelcomeView {
+                UserDefaults.standard.set(true, forKey: "hasLaunched")
+                selectedTab = 0
+                showWelcome = false
+            }
+        } else if hsc == .regular {
             iPadLayout
         } else {
             iPhoneLayout
@@ -73,7 +76,7 @@ struct ContentView: View {
             NavigationStack { SettingsView().hideNavigationBar() }
                 .tabItem { Label(tabItems[3].label, systemImage: tabItems[3].icon) }
                 .tag(3)
-            NavigationStack { HelpView().hideNavigationBar() }
+            NavigationStack { HelpView(onReplayWelcome: { showWelcome = true }).hideNavigationBar() }
                 .tabItem { Label(tabItems[4].label, systemImage: tabItems[4].icon) }
                 .tag(4)
         }
@@ -112,7 +115,7 @@ struct ContentView: View {
         case 1: NavigationStack { SetupView().hideNavigationBar() }
         case 2: NavigationStack { ProgressScreen(selectedTab: $selectedTab).hideNavigationBar() }
         case 3: NavigationStack { SettingsView().hideNavigationBar() }
-        case 4: NavigationStack { HelpView().hideNavigationBar() }
+        case 4: NavigationStack { HelpView(onReplayWelcome: { showWelcome = true }).hideNavigationBar() }
         default: HomeTabView()
         }
     }

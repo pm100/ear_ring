@@ -1001,10 +1001,39 @@ under the Settings Screen section above for the entitlement gate itself.
 
 ---
 
+## Welcome / Onboarding (first launch)
+
+Issue #43. On the very first launch the app shows a full-screen, tab-bar-less **Welcome**
+flow instead of Home (or Help). Android is the reference; iOS and desktop match it.
+Step text, labels and hints come from the Rust core (`rust/src/onboarding.rs`, exposed as
+`onboarding_steps_json()` / `ear_ring_onboarding_steps` / `nativeOnboardingSteps` /
+`cmd_onboarding_steps`); platforms only render them. Centered column, max 520 wide on
+iPad/desktop, 24dp padding, "Step N of 4" caption, title, centered body paragraphs, an
+optional step widget, then a full-width primary button, then optional text buttons.
+
+| # | id | Content | Primary button |
+|---|----|---------|----------------|
+| 1 | `welcome` | What the app does, green/red meaning | Get started |
+| 2 | `instrument` | Instrument dropdown (premium-filtered, same list and `setInstrument` action as Settings) and a "Range: X to Y" line in written pitch; text warns that the device will next ask for microphone permission | Next |
+| 3 | `mic` | System mic-permission prompt appears here. Embeds the real **Mic Setup screen** (same code as the Mic tab, in an `embedded` mode without its title and instruction line): listening indicator, staff, tuner meter, Mic Sensitivity slider and Advanced. Below it, a hint after 10 s of silence, and a tick plus success text on the first note that registers on the staff (confirmed and inside the instrument's range) | Next (disabled until a note is heard) |
+| 4 | `ready` | Where to go next | Done (lands on Home) |
+
+- Step 3 has a **Skip mic check** text button (the only way past without a note, also covering
+  permission denied and desktop without a mic). If permission is denied, Android and iOS show
+  an explanation (enable it in system settings, or replay from Help) instead of the staff.
+- Steps 1 to 3 have a **Skip setup** text button (top right) that leaves the flow at once and lands on Home, setting the first-launch flag like finishing does. Its label (`exitLabel`) comes from the Rust core. Skipping before step 3 means the microphone prompt is not shown by the flow; Android then asks at the next app start, and iOS and desktop ask when capture first starts.
+- Back goes to the previous step (system back on Android, a "← Back" text button elsewhere). On iOS and desktop the Next, Back and Skip buttons are pinned below a scrolling content area, so they stay visible beside the tall embedded Mic Setup screen.
+- Finishing or skipping sets the first-launch flag (see below). Quitting mid-flow leaves it
+  unset, so the flow restarts at step 1 next launch.
+- Help ends with a **Replay welcome** button that reopens the flow; finishing it returns to Home.
+- Android no longer asks for microphone permission at app start on first launch; it does so on
+  step 3. After the flag is set it asks at start as before.
+
 ## First Launch Behaviour
 
-On the very first launch of the app (detected via a persistent flag), the app navigates
-to the **Help** screen instead of Home. After that, it always starts on Home. This flag
+On the very first launch of the app (detected via a persistent flag), the app shows the
+**Welcome** flow (above) instead of Home. The flag is set when the flow is finished or
+skipped, not on first load. After that, the app always starts on Home. This flag
 is app state, not a setting — it lives outside the settings model (see above) on every
 platform, specifically so a settings reset never touches it (issue: on Android, clearing
 it on reset used to send the next-tapped tab to Help instead, since Android's first-launch

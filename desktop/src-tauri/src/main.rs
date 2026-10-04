@@ -226,6 +226,11 @@ fn cmd_help_content() -> String {
 }
 
 #[tauri::command]
+fn cmd_onboarding_steps() -> String {
+    ear_ring_core::onboarding_steps_json()
+}
+
+#[tauri::command]
 fn cmd_tooltip_content() -> String {
     tooltips_json()
 }
@@ -396,6 +401,7 @@ fn main() {
             cmd_accidental_in_key,
             cmd_key_sig_positions,
             cmd_help_content,
+            cmd_onboarding_steps,
             cmd_tooltip_content,
             cmd_instrument_list,
             cmd_git_hash,

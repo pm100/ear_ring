@@ -18,6 +18,9 @@ pub use music_theory::{
 pub use pitch_detection::{detect_pitch, DEFAULT_YIN_THRESHOLD};
 pub use tracker::{FrameResult, PitchTracker};
 
+mod onboarding;
+pub use onboarding::onboarding_steps_json;
+
 // ── Help content ──────────────────────────────────────────────────────────────
 
 const HELP_MD: &str = include_str!("help.md");
@@ -159,6 +162,19 @@ pub extern "C" fn ear_ring_help_content() -> *const std::os::raw::c_char {
     static CACHE: OnceLock<CString> = OnceLock::new();
     CACHE.get_or_init(|| {
         CString::new(help_sections_json()).unwrap_or_else(|_| CString::new("[]").unwrap())
+    }).as_ptr()
+}
+
+/// Returns a pointer to a null-terminated UTF-8 JSON string with the first-run welcome steps:
+/// `[{"id","title","body","primaryLabel","hint","success","skipLabel"},...]`.
+/// The pointer is valid for the lifetime of the process (static storage).
+#[no_mangle]
+pub extern "C" fn ear_ring_onboarding_steps() -> *const std::os::raw::c_char {
+    use std::ffi::CString;
+    use std::sync::OnceLock;
+    static CACHE: OnceLock<CString> = OnceLock::new();
+    CACHE.get_or_init(|| {
+        CString::new(onboarding_steps_json()).unwrap_or_else(|_| CString::new("[]").unwrap())
     }).as_ptr()
 }
 
@@ -1488,6 +1504,17 @@ mod android_jni {
         _class: JClass,
     ) -> jstring {
         let json = super::help_sections_json();
+        env.new_string(json)
+            .map(|s| s.into_raw())
+            .unwrap_or(std::ptr::null_mut())
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_jollygoodsw_earring_EarRingCore_nativeOnboardingSteps(
+        env: JNIEnv,
+        _class: JClass,
+    ) -> jstring {
+        let json = super::onboarding_steps_json();
         env.new_string(json)
             .map(|s| s.into_raw())
             .unwrap_or(std::ptr::null_mut())

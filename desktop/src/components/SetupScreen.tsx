@@ -40,9 +40,13 @@ interface Props {
   yinThreshold: number;
   pitchToleranceCents: number;
   useTunerMeter: boolean;
+  /** Used inside the welcome flow (issue #43): no header or instruction line. */
+  embedded?: boolean;
+  /** Called when a note is added to the staff (confirmed and in range). */
+  onNoteHeard?: () => void;
 }
 
-export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, rootChroma, scaleId, keySignatureMode, silenceThreshold, framesToConfirm, warmupFrames, instrumentIndex, graceFrames, octaveCorrection, yinThreshold, pitchToleranceCents, useTunerMeter }: Props) {
+export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, rootChroma, scaleId, keySignatureMode, silenceThreshold, framesToConfirm, warmupFrames, instrumentIndex, graceFrames, octaveCorrection, yinThreshold, pitchToleranceCents, useTunerMeter, embedded, onNoteHeard }: Props) {
   const set = <K extends keyof ExerciseSettings>(key: K, value: ExerciseSettings[K]) =>
     onAction({ type: 'set', values: { [key]: value } });
 
@@ -58,6 +62,7 @@ export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, ro
     if (frame.confirmedMidi >= 0) {
       const midi = frame.confirmedMidi;
       if (midi >= rangeStart && midi <= rangeEnd) {
+        onNoteHeard?.();
         setNoteHistory(prev => {
           const next = [...prev, midi];
           if (next.length > 8) next.shift();
@@ -65,7 +70,7 @@ export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, ro
         });
       }
     }
-  }, [rangeStart, rangeEnd]);
+  }, [rangeStart, rangeEnd, onNoteHeard]);
 
   // Load instrument transposition semitones and apply instrument-specific tracker params.
   const [transpSemitones, setTranspSemitones] = useState(0);
@@ -104,12 +109,16 @@ export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, ro
 
   return (
     <div className="screen">
-      <div className="screen-header">
-        <button className="btn-back" onClick={onBack}>{'←'} Back</button>
-        <span className="screen-title">Mic Setup</span>
-      </div>
+      {!embedded && (
+        <>
+          <div className="screen-header">
+            <button className="btn-back" onClick={onBack}>{'←'} Back</button>
+            <span className="screen-title">Mic Setup</span>
+          </div>
 
-      <p className="setup-instruction">Play a note to test your microphone.</p>
+          <p className="setup-instruction">Play a note to test your microphone.</p>
+        </>
+      )}
 
       <div className="listening-indicator">
         <span className="listening-ear">👂</span>

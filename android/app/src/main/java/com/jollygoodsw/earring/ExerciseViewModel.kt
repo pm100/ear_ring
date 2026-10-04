@@ -162,11 +162,12 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
 
     private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    /** True if this is the very first launch (flag not yet set). Marks as launched. */
-    fun consumeFirstLaunch(): Boolean {
-        if (prefs.getBoolean(PREF_HAS_LAUNCHED, false)) return false
+    /** True until the welcome flow has been finished or skipped (issue #43). */
+    fun isFirstLaunch(): Boolean = !prefs.getBoolean(PREF_HAS_LAUNCHED, false)
+
+    /** Marks the welcome flow done, so later launches start on Home. */
+    fun completeWelcome() {
         prefs.edit().putBoolean(PREF_HAS_LAUNCHED, true).apply()
-        return true
     }
 
     /**

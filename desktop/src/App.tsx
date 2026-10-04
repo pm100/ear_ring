@@ -7,6 +7,7 @@ import SetupScreen from './components/SetupScreen';
 import ProgressScreen from './components/ProgressScreen';
 import SettingsScreen from './components/SettingsScreen';
 import HelpScreen from './components/HelpScreen';
+import WelcomeScreen from './components/WelcomeScreen';
 import Sidebar from './components/Sidebar';
 import { useSettings, Dispatch } from './useSettings';
 
@@ -38,11 +39,8 @@ const HAS_LAUNCHED_KEY = 'ear_ring_has_launched';
 const IS_PREMIUM_KEY = 'ear_ring_is_premium';
 
 function getInitialScreen(): Screen {
-  if (!localStorage.getItem(HAS_LAUNCHED_KEY)) {
-    localStorage.setItem(HAS_LAUNCHED_KEY, '1');
-    return 'help';
-  }
-  return 'home';
+  // The flag is set when the welcome flow is finished or skipped, not on first load (issue #43).
+  return localStorage.getItem(HAS_LAUNCHED_KEY) ? 'home' : 'welcome';
 }
 
 const TAB_SCREENS: Screen[] = ['home', 'setup', 'progress', 'settings', 'help'];
@@ -168,6 +166,11 @@ function AppContent({ settings, dispatch }: { settings: ExerciseSettings; dispat
     setScreen('home');
   }, []);
 
+  const finishWelcome = useCallback(() => {
+    localStorage.setItem(HAS_LAUNCHED_KEY, '1');
+    setScreen('home');
+  }, []);
+
   const showNav = TAB_SCREENS.includes(screen);
 
   return (
@@ -227,7 +230,15 @@ function AppContent({ settings, dispatch }: { settings: ExerciseSettings; dispat
         />
       )}
       {screen === 'help' && (
-        <HelpScreen onBack={() => setScreen('home')} />
+        <HelpScreen onBack={() => setScreen('home')} onReplayWelcome={() => setScreen('welcome')} />
+      )}
+      {screen === 'welcome' && (
+        <WelcomeScreen
+          settings={settings}
+          onAction={dispatch}
+          isPremium={isPremium}
+          onFinished={finishWelcome}
+        />
       )}
       </div>
     </div>

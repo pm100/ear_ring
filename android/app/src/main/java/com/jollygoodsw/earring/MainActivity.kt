@@ -20,7 +20,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = true
-        requestMicPermissionIfNeeded()
+        // First-run users are asked on the welcome flow's mic-check step instead (issue #43).
+        if (getSharedPreferences("ear_ring_settings", MODE_PRIVATE).getBoolean("hasLaunched", false)) {
+            requestMicPermissionIfNeeded()
+        }
         setContent {
             EarRingTheme {
                 EarRingApp()

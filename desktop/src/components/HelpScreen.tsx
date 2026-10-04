@@ -8,6 +8,7 @@ interface HelpSection {
 
 interface Props {
   onBack: () => void;
+  onReplayWelcome: () => void;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -19,7 +20,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-export default function HelpScreen({ onBack }: Props) {
+export default function HelpScreen({ onBack, onReplayWelcome }: Props) {
   const [sections, setSections] = useState<HelpSection[]>([]);
 
   useEffect(() => {
@@ -54,6 +55,8 @@ export default function HelpScreen({ onBack }: Props) {
           })}
         </Section>
       ))}
+
+      <button type="button" className="btn-outlined" onClick={onReplayWelcome}>Replay welcome</button>
     </div>
   );
 }

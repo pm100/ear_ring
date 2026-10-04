@@ -22,7 +22,7 @@ import org.json.JSONArray
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, rootChroma: Int = 0, concertKeyChroma: Int = 0, keySignatureMode: Int = 0, silenceThreshold: Float = 0.003f, framesToConfirm: Int = 3, warmupFrames: Int = 4, instrumentIndex: Int = 0, graceFrames: Int = 3, octaveCorrection: Boolean = false, yinThreshold: Float = 0.15f, pitchToleranceCents: Float = 50f, useTunerMeter: Boolean = false) {
+fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: Int = 60, rangeEnd: Int = 72, rootChroma: Int = 0, concertKeyChroma: Int = 0, keySignatureMode: Int = 0, silenceThreshold: Float = 0.003f, framesToConfirm: Int = 3, warmupFrames: Int = 4, instrumentIndex: Int = 0, graceFrames: Int = 3, octaveCorrection: Boolean = false, yinThreshold: Float = 0.15f, pitchToleranceCents: Float = 50f, useTunerMeter: Boolean = false, embedded: Boolean = false, onNoteHeard: () -> Unit = {}) {
     val noteStepDp = 44.dp
     var advancedOpen by remember { mutableStateOf(false) }
     // Mic Setup exists to test what the mic can hear, independent of whatever
@@ -50,6 +50,7 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
         pitchToleranceCents = pitchToleranceCents,
         onConfirmed = { midi, _ ->
             if (midi in rangeStart..rangeEnd) {
+                onNoteHeard()
                 concertHistory.add(midi)
                 if (concertHistory.size > maxHistory) concertHistory.removeAt(0)
             }
@@ -71,7 +72,7 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
         } catch (_: Exception) { false }
     }
 
-    BackHandler { onBack() }
+    BackHandler(enabled = !embedded) { onBack() }
 
     Column(
         modifier = Modifier
@@ -80,17 +81,20 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Spacer(Modifier.weight(1f))
-            Text("Mic Setup", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.weight(1f))
-        }
+        // The welcome flow (issue #43) shows its own title and instruction above this screen.
+        if (!embedded) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Spacer(Modifier.weight(1f))
+                Text("Mic Setup", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+            }
 
-        Spacer(Modifier.height(16.dp))
-        Text("Play a note to test your microphone.", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(16.dp))
+            Text("Play a note to test your microphone.", style = MaterialTheme.typography.bodyMedium)
+        }
         Spacer(Modifier.height(12.dp))
 
         // Listening indicator
@@ -247,4 +251,42 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
             }
         }
     }
+}
+
+/** Mic Setup wired to the view model's state; used by the Mic tab and the welcome flow. */
+@Composable
+fun SetupScreenForState(
+    viewModel: ExerciseViewModel,
+    onBack: () -> Unit,
+    embedded: Boolean = false,
+    onNoteHeard: () -> Unit = {}
+) {
+    val state by viewModel.state.collectAsState()
+    val instrKeyTranspose = remember(state.instrumentIndex) {
+        try {
+            val arr = JSONArray(EarRingCore.instrumentList())
+            val sem = arr.getJSONObject(state.instrumentIndex).getInt("semitones")
+            ((sem % 12) + 12) % 12
+        } catch (_: Exception) { 0 }
+    }
+    SetupScreen(
+        viewModel = viewModel,
+        onBack = onBack,
+        rangeStart = state.rangeStart,
+        rangeEnd = state.rangeEnd,
+        rootChroma = (EarRingCore.effectiveKeyChroma(state.rootNote, state.scaleId) + instrKeyTranspose) % 12,
+        concertKeyChroma = EarRingCore.effectiveKeyChroma(state.rootNote, state.scaleId),
+        keySignatureMode = state.keySignatureMode,
+        silenceThreshold = state.silenceThreshold,
+        framesToConfirm = state.framesToConfirm,
+        warmupFrames = state.warmupFrames,
+        instrumentIndex = state.instrumentIndex,
+        graceFrames = state.graceFrames,
+        octaveCorrection = state.octaveCorrection,
+        yinThreshold = state.yinThreshold,
+        pitchToleranceCents = state.pitchToleranceCents,
+        useTunerMeter = state.useTunerMeter,
+        embedded = embedded,
+        onNoteHeard = onNoteHeard
+    )
 }

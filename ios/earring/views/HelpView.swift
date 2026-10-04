@@ -1,6 +1,12 @@
 import SwiftUI
 
 struct HelpView: View {
+    var onReplayWelcome: () -> Void
+
+    init(onReplayWelcome: @escaping () -> Void = {}) {
+        self.onReplayWelcome = onReplayWelcome
+    }
+
     private var sections: [(title: String, body: String)] = {
         parseHelpSections(EarRingCore.helpContent())
     }()
@@ -23,6 +29,10 @@ struct HelpView: View {
                         .font(.body)
                     }
                 }
+                Button("Replay welcome") { onReplayWelcome() }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 16)
                 Spacer(minLength: 24)
             }
             .padding(16)

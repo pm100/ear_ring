@@ -190,6 +190,13 @@ struct EarRingCore {
         return String(cString: ptr)
     }
 
+    /// Returns a JSON string with the first-run welcome steps (issue #43):
+    /// `[{"id","title","body","primaryLabel","hint","success","skipLabel"},...]`
+    static func onboardingSteps() -> String {
+        guard let ptr = ear_ring_onboarding_steps() else { return "[]" }
+        return String(cString: ptr)
+    }
+
     /// Returns a JSON string: `[{"key":"...","text":"..."},...]` (issue #11).
     static func tooltipContent() -> String {
         guard let ptr = ear_ring_tooltip_content() else { return "[]" }

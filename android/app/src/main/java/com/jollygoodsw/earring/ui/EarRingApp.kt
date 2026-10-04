@@ -29,6 +29,7 @@ object Routes {
     const val PROGRESS = "progress"
     const val SETTINGS = "settings"
     const val HELP = "help"
+    const val WELCOME = "welcome"
 }
 
 private val TAB_ROUTES = listOf(Routes.HOME, Routes.SETUP, Routes.PROGRESS, Routes.SETTINGS, Routes.HELP)
@@ -42,19 +43,9 @@ fun EarRingApp() {
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute in TAB_ROUTES
 
-    // Navigate to Help on very first launch. Keyed on navBackStackEntry (not Unit) and
-    // gated on it being non-null: navBackStackEntry only becomes non-null once NavHost
-    // below has actually installed the graph and landed on the start destination — on a
-    // fresh install, this LaunchedEffect could otherwise run its navigate() call before
-    // that happens, crashing with "Navigation graph has not been set for NavController"
-    // (issue #13).
-    LaunchedEffect(navBackStackEntry) {
-        if (navBackStackEntry != null && exerciseViewModel.consumeFirstLaunch()) {
-            navController.navigate(Routes.HELP) {
-                popUpTo(Routes.HOME) { saveState = true }
-                launchSingleTop = true
-            }
-        }
+    // First launch starts on the welcome flow (issue #43) instead of Home.
+    val startDestination = remember {
+        if (exerciseViewModel.isFirstLaunch()) Routes.WELCOME else Routes.HOME
     }
 
     Scaffold(
@@ -131,7 +122,7 @@ fun EarRingApp() {
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = Routes.HOME,
+            startDestination = startDestination,
             modifier = Modifier.padding(paddingValues)
         ) {
             composable(Routes.HOME) {
@@ -150,31 +141,9 @@ fun EarRingApp() {
                 )
             }
             composable(Routes.SETUP) {
-                val state by exerciseViewModel.state.collectAsState()
-                val instrKeyTranspose = remember(state.instrumentIndex) {
-                    try {
-                        val arr = JSONArray(EarRingCore.instrumentList())
-                        val sem = arr.getJSONObject(state.instrumentIndex).getInt("semitones")
-                        ((sem % 12) + 12) % 12
-                    } catch (_: Exception) { 0 }
-                }
-                SetupScreen(
+                SetupScreenForState(
                     viewModel = exerciseViewModel,
-                    onBack = { navController.popBackStack() },
-                    rangeStart = state.rangeStart,
-                    rangeEnd = state.rangeEnd,
-                    rootChroma = (EarRingCore.effectiveKeyChroma(state.rootNote, state.scaleId) + instrKeyTranspose) % 12,
-                    concertKeyChroma = EarRingCore.effectiveKeyChroma(state.rootNote, state.scaleId),
-                    keySignatureMode = state.keySignatureMode,
-                    silenceThreshold = state.silenceThreshold,
-                    framesToConfirm = state.framesToConfirm,
-                    warmupFrames = state.warmupFrames,
-                    instrumentIndex = state.instrumentIndex,
-                    graceFrames = state.graceFrames,
-                    octaveCorrection = state.octaveCorrection,
-                    yinThreshold = state.yinThreshold,
-                    pitchToleranceCents = state.pitchToleranceCents,
-                    useTunerMeter = state.useTunerMeter
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable(Routes.PROGRESS) {
@@ -196,7 +165,19 @@ fun EarRingApp() {
                 )
             }
             composable(Routes.HELP) {
-                HelpScreen()
+                HelpScreen(onReplayWelcome = { navController.navigate(Routes.WELCOME) })
+            }
+            composable(Routes.WELCOME) {
+                WelcomeScreen(
+                    viewModel = exerciseViewModel,
+                    onFinished = {
+                        exerciseViewModel.completeWelcome()
+                        navController.navigate(Routes.HOME) {
+                            popUpTo(Routes.WELCOME) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                )
             }
         }
     }

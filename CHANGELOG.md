@@ -5,6 +5,13 @@ All notable changes to Ear Ring are documented here.
 ## [Unreleased]
 
 ### Added
+- **First-run welcome flow** (issue #43) — instead of dropping a new user on the Help
+  screen, the first launch now shows a four-step welcome on all three platforms:
+  what the app does, pick your instrument (shows the range it will use), a live
+  microphone check, and a ready screen that lands on Home. Step text lives in the
+  Rust core (`rust/src/onboarding.rs`). The microphone permission prompt now appears
+  on the mic-check step (after a warning on the previous step) instead of at app
+  start; the check can be skipped. Help has a "Replay welcome" button.
 - **Pass/fail sound effects** — a bright ascending chime (C6-E6-G6) plays when a test
   is passed, and a softer descending tone (A4-F4) when it fails, on all three
   platforms. Synthesized on the fly as short sine tones (Web Audio oscillators on

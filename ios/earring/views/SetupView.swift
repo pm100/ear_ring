@@ -5,6 +5,11 @@ struct SetupView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) var hsc
 
+    /// Used inside the welcome flow (issue #43): no title or instruction line, and
+    /// `onNoteHeard` fires when a note is added to the staff (confirmed and in range).
+    var embedded: Bool = false
+    var onNoteHeard: (() -> Void)? = nil
+
     @State private var concertMidi: Int = -1
     @State private var concertHistory: [Int] = []
     @State private var transpSemitones: Int = 0
@@ -37,18 +42,20 @@ struct SetupView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Mic Setup")
-                .font(.title2.bold())
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
+            if !embedded {
+                Text("Mic Setup")
+                    .font(.title2.bold())
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
 
-            // ── Instruction text ──────────────────────────────────────────
-            Spacer().frame(height: 12)
-            Text("Play a note to test your microphone.")
-                .font(.body)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
+                // ── Instruction text ──────────────────────────────────────
+                Spacer().frame(height: 12)
+                Text("Play a note to test your microphone.")
+                    .font(.body)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+            }
 
             // ── Listening indicator ───────────────────────────────────────
             Spacer().frame(height: 8)
@@ -140,6 +147,7 @@ struct SetupView: View {
             guard let midi = model.confirmedLiveMidi else { return }
             concertMidi = midi
             guard midi >= model.rangeStart && midi <= model.rangeEnd else { return }
+            onNoteHeard?()
             var h = concertHistory + [midi]
             if h.count > 8 { h.removeFirst() }
             concertHistory = h

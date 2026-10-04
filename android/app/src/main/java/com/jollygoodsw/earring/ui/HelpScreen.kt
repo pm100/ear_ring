@@ -15,7 +15,7 @@ import com.jollygoodsw.earring.EarRingCore
 import org.json.JSONArray
 
 @Composable
-fun HelpScreen() {
+fun HelpScreen(onReplayWelcome: () -> Unit = {}) {
     val sections = remember {
         parseHelpSections(EarRingCore.helpContent())
     }
@@ -45,6 +45,10 @@ fun HelpScreen() {
                     Text(para.trim(), style = MaterialTheme.typography.bodyMedium)
                 }
             }
+        }
+        Spacer(Modifier.height(16.dp))
+        OutlinedButton(onClick = onReplayWelcome, modifier = Modifier.fillMaxWidth()) {
+            Text("Replay welcome")
         }
         Spacer(Modifier.height(16.dp))
     }

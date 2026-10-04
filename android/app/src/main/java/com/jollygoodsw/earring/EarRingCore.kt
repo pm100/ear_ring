@@ -45,6 +45,7 @@ object EarRingCore {
     @JvmStatic external fun nativeKeySigPositions(rootChroma: Int): IntArray
     @JvmStatic external fun nativeStaffPositionInKey(midi: Int, rootChroma: Int): Int
     @JvmStatic external fun nativeHelpContent(): String
+    @JvmStatic external fun nativeOnboardingSteps(): String
     @JvmStatic external fun nativeTooltipContent(): String
     @JvmStatic external fun nativeInstrumentList(): String
     @JvmStatic external fun nativeGitHash(): String
@@ -276,6 +277,9 @@ object EarRingCore {
 
     fun helpContent(): String =
         if (loaded) nativeHelpContent() else "[]"
+
+    fun onboardingSteps(): String =
+        if (loaded) nativeOnboardingSteps() else "[]"
 
     fun tooltipContent(): String =
         if (loaded) nativeTooltipContent() else "[]"

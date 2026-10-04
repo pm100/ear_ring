@@ -36,11 +36,21 @@ class NavigationTest {
     @get:Rule(order = 0)
     val permissionRule: GrantPermissionRule = GrantPermissionRule.grant(Manifest.permission.RECORD_AUDIO)
 
+    // Mark the welcome flow as done so the app starts on Home (issue #43); the Activity
+    // reads the flag at launch, so this must run before composeRule.
     @get:Rule(order = 1)
+    val welcomeDoneRule: org.junit.rules.ExternalResource = object : org.junit.rules.ExternalResource() {
+        override fun before() {
+            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+                .getSharedPreferences("ear_ring_settings", android.content.Context.MODE_PRIVATE)
+                .edit().putBoolean("hasLaunched", true).commit()
+        }
+    }
+
+    @get:Rule(order = 2)
     val composeRule = createAndroidComposeRule<MainActivity>()
 
-    /** First launch redirects to Help (see EarRingApp's consumeFirstLaunch effect) —
-     *  always start from a known screen rather than assume where launch landed. */
+    /** Always start from a known screen rather than assume where launch landed. */
     private fun goHome() {
         composeRule.onNodeWithText("Home").performClick()
         composeRule.onNodeWithText("Ear Ring").assertIsDisplayed()

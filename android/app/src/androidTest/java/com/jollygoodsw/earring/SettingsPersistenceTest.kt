@@ -107,9 +107,9 @@ class SettingsPersistenceTest {
     @Test
     fun reset_doesNotClearTheFirstLaunchFlag() {
         val vm = newViewModel()
-        assertTrue(vm.consumeFirstLaunch())
+        vm.completeWelcome()
         vm.resetSettings()
-        assertFalse("reset must not make the next navigation redirect to Help", vm.consumeFirstLaunch())
+        assertFalse("reset must not bring the welcome flow back", vm.isFirstLaunch())
     }
 
     @Test
