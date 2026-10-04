@@ -46,17 +46,6 @@ struct ExerciseView: View {
         portraitLayout
         .navigationBarTitleDisplayMode(.inline)
         .hideTabBar()
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                // Always the actual (concert) key/range, regardless of instrument
-                // transposition — unlike the staff, it's not notation to read/play.
-                let concertKeyChroma = EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId)
-                let rootLabel = EarRingCore.preferredNoteLabel(midi: model.rootNote, rootChroma: concertKeyChroma)
-                let rangeLabel = "\(EarRingCore.preferredMidiLabel(midi: model.rangeStart, rootChroma: concertKeyChroma))–\(EarRingCore.preferredMidiLabel(midi: model.rangeEnd, rootChroma: concertKeyChroma))"
-                Text("\(rootLabel) \(rangeLabel) \(MusicTheory.SCALE_NAMES[model.scaleId])")
-                    .font(.subheadline.weight(.semibold))
-            }
-        }
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
             loadTransposition()
@@ -213,9 +202,23 @@ struct ExerciseView: View {
     // rather than a bespoke split layout, so this screen doesn't feel inconsistent
     // with the rest of the app.
 
+    /// Key, range and scale as plain centred text, like Android's title. It used to sit in the
+    /// navigation bar, where iOS 26 draws it as a tappable-looking capsule that does nothing
+    /// (issue #45). Always the actual (concert) key/range, regardless of instrument
+    /// transposition — unlike the staff, it's not notation to read/play.
+    private var keyRangeTitle: some View {
+        let concertKeyChroma = EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId)
+        let rootLabel = EarRingCore.preferredNoteLabel(midi: model.rootNote, rootChroma: concertKeyChroma)
+        let rangeLabel = "\(EarRingCore.preferredMidiLabel(midi: model.rangeStart, rootChroma: concertKeyChroma))–\(EarRingCore.preferredMidiLabel(midi: model.rangeEnd, rootChroma: concertKeyChroma))"
+        return Text("\(rootLabel) \(rangeLabel)  \(MusicTheory.SCALE_NAMES[model.scaleId])")
+            .font(.system(size: 16, weight: .medium))
+            .frame(maxWidth: .infinity, alignment: .center)
+    }
+
     private var portraitLayout: some View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer().frame(height: 8)
+            keyRangeTitle
             chordLabelRow
             staffView
             Spacer().frame(height: 8)

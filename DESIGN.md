@@ -295,6 +295,10 @@ Current attempt row (if one or more notes were detected this attempt):
     user to Home, and saves the session summary if at least one test was completed
 ```
 
+iOS: the title is plain centred text in the screen content (16pt medium), not a navigation-bar
+toolbar item. In the navigation bar iOS 26 draws it as a capsule that looks tappable but does
+nothing (issue #45).
+
 Exercise dynamics:
 - Entering Exercise automatically starts the test loop. There is **no** Play button and **no** Start Listening button.
 - For each test:
