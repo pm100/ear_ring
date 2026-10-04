@@ -147,8 +147,9 @@ private struct MicCheck: View {
 
     var body: some View {
         VStack(spacing: 8) {
+            // Natural height: the staff and meter are taller on iPad than on iPhone.
             SetupView(embedded: true, onNoteHeard: { heard = true })
-                .frame(height: 560)
+                .fixedSize(horizontal: false, vertical: true)
             if heard {
                 Text("\u{2713} " + step.success)
                     .font(.subheadline.weight(.semibold)).foregroundColor(.erPrimary)
