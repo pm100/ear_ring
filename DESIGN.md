@@ -1018,11 +1018,12 @@ optional step widget, then a full-width primary button, then optional text butto
 | 3 | `mic` | System mic-permission prompt appears here. Embeds the real **Mic Setup screen** (same code as the Mic tab, in an `embedded` mode without its title and instruction line): listening indicator, staff, tuner meter, Mic Sensitivity slider and Advanced. Below it, a hint after 10 s of silence, and a tick plus success text on the first note that registers on the staff (confirmed and inside the instrument's range) | Next (disabled until a note is heard) |
 | 4 | `ready` | Where to go next | Done (lands on Home) |
 
-- Step 3 has a **Skip mic check** text button (the only way past without a note, also covering
-  permission denied and desktop without a mic). If permission is denied, Android and iOS show
-  an explanation (enable it in system settings, or replay from Help) instead of the staff.
+- Step 3 has no skip of its own: Next stays disabled until a note registers on the staff, so a user
+  who cannot or will not use the mic (permission denied, no mic) leaves with **Skip setup** below. If
+  permission is denied, Android and iOS show an explanation (enable it in system settings, or
+  replay from Help) instead of the staff.
 - Steps 1 to 3 have a **Skip setup** text button (top right) that leaves the flow at once and lands on Home, setting the first-launch flag like finishing does. Its label (`exitLabel`) comes from the Rust core. Skipping before step 3 means the microphone prompt is not shown by the flow; Android then asks at the next app start, and iOS and desktop ask when capture first starts.
-- Back goes to the previous step (system back on Android, a "← Back" text button elsewhere). On iOS and desktop the Next, Back and Skip buttons are pinned below a scrolling content area, so they stay visible beside the tall embedded Mic Setup screen.
+- Back goes to the previous step (system back on Android, a "← Back" text button elsewhere). On iOS and desktop the Next and Back buttons are pinned below a scrolling content area, so they stay visible beside the tall embedded Mic Setup screen.
 - Finishing or skipping sets the first-launch flag (see below). Quitting mid-flow leaves it
   unset, so the flow restarts at step 1 next launch.
 - Help ends with a **Replay welcome** button that reopens the flow; finishing it returns to Home.

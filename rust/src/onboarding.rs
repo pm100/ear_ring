@@ -11,8 +11,6 @@ struct Step {
     hint: &'static str,
     /// Mic-check step only: shown once a note is detected.
     success: &'static str,
-    /// Mic-check step only: label of the "skip" link.
-    skip_label: &'static str,
     /// Label of the action that leaves the whole flow early; empty on the last step.
     exit_label: &'static str,
 }
@@ -25,7 +23,6 @@ const STEPS: [Step; 4] = [
         primary_label: "Get started",
         hint: "",
         success: "",
-        skip_label: "",
         exit_label: "Skip setup",
     },
     Step {
@@ -35,7 +32,6 @@ const STEPS: [Step; 4] = [
         primary_label: "Next",
         hint: "",
         success: "",
-        skip_label: "",
         exit_label: "Skip setup",
     },
     Step {
@@ -45,7 +41,6 @@ const STEPS: [Step; 4] = [
         primary_label: "Next",
         hint: "Nothing heard yet. Try playing louder or more crisply, and closer to the device.",
         success: "Got it. Your microphone is working.",
-        skip_label: "Skip mic check",
         exit_label: "Skip setup",
     },
     Step {
@@ -55,26 +50,24 @@ const STEPS: [Step; 4] = [
         primary_label: "Done",
         hint: "",
         success: "",
-        skip_label: "",
         exit_label: "",
     },
 ];
 
 /// The steps as JSON:
-/// `[{"id","title","body","primaryLabel","hint","success","skipLabel","exitLabel"},...]`.
+/// `[{"id","title","body","primaryLabel","hint","success","exitLabel"},...]`.
 pub fn onboarding_steps_json() -> String {
     let items: Vec<String> = STEPS
         .iter()
         .map(|s| {
             format!(
-                "{{\"id\":{},\"title\":{},\"body\":{},\"primaryLabel\":{},\"hint\":{},\"success\":{},\"skipLabel\":{},\"exitLabel\":{}}}",
+                "{{\"id\":{},\"title\":{},\"body\":{},\"primaryLabel\":{},\"hint\":{},\"success\":{},\"exitLabel\":{}}}",
                 crate::json_string(s.id),
                 crate::json_string(s.title),
                 crate::json_string(s.body),
                 crate::json_string(s.primary_label),
                 crate::json_string(s.hint),
                 crate::json_string(s.success),
-                crate::json_string(s.skip_label),
                 crate::json_string(s.exit_label),
             )
         })
@@ -104,7 +97,6 @@ mod tests {
             let is_mic = s.id == "mic";
             assert_eq!(!s.hint.is_empty(), is_mic, "{}", s.id);
             assert_eq!(!s.success.is_empty(), is_mic, "{}", s.id);
-            assert_eq!(!s.skip_label.is_empty(), is_mic, "{}", s.id);
         }
     }
 

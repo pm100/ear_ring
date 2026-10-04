@@ -31,7 +31,6 @@ private data class WelcomeStep(
     val primaryLabel: String,
     val hint: String,
     val success: String,
-    val skipLabel: String,
     val exitLabel: String,
 )
 
@@ -42,7 +41,7 @@ private fun parseWelcomeSteps(json: String): List<WelcomeStep> = try {
         WelcomeStep(
             o.getString("id"), o.getString("title"), o.getString("body"),
             o.getString("primaryLabel"), o.optString("hint"), o.optString("success"),
-            o.optString("skipLabel"), o.optString("exitLabel"),
+            o.optString("exitLabel"),
         )
     }
 } catch (_: Exception) {
@@ -123,9 +122,6 @@ fun WelcomeScreen(viewModel: ExerciseViewModel, onFinished: () -> Unit) {
             enabled = !isMic || micHeard,
             modifier = Modifier.fillMaxWidth()
         ) { Text(step.primaryLabel) }
-        if (isMic && step.skipLabel.isNotEmpty()) {
-            TextButton(onClick = { next() }) { Text(step.skipLabel) }
-        }
     }
 }
 
@@ -212,7 +208,7 @@ private fun MicCheck(
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         if (denied) {
             Text(
-                "Microphone access was not allowed. You can turn it on in your device's Settings under Apps, Ear Ring, Permissions. Then replay the welcome from the Help tab, or skip this check for now.",
+                "Microphone access was not allowed. You can turn it on in your device's Settings under Apps, Ear Ring, Permissions. Then replay the welcome from the Help tab, or tap Skip setup to carry on without it.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
                 textAlign = TextAlign.Center

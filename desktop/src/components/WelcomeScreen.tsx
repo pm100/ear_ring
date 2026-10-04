@@ -12,7 +12,6 @@ interface Step {
   primaryLabel: string;
   hint: string;
   success: string;
-  skipLabel: string;
   exitLabel: string;
 }
 
@@ -63,7 +62,7 @@ export default function WelcomeScreen({ settings, onAction, isPremium, onFinishe
         {isMic && <MicCheck settings={settings} onAction={onAction} step={step} heard={micHeard} onHeard={markHeard} />}
       </div>
 
-      {/* Pinned so Next, Skip and Back stay visible beside the tall embedded Mic Setup screen. */}
+      {/* Pinned so Next and Back stay visible beside the tall embedded Mic Setup screen. */}
       <div style={{ position: 'sticky', bottom: 0, background: '#fff', padding: '8px 0 12px' }}>
         <button type="button" className="btn-primary" disabled={isMic && !micHeard}
           style={isMic && !micHeard ? { opacity: 0.5, cursor: 'default' } : undefined}
@@ -72,9 +71,6 @@ export default function WelcomeScreen({ settings, onAction, isPremium, onFinishe
           {index > 0
             ? <button type="button" className="btn-back" onClick={() => setIndex(index - 1)}>{'\u2190'} Back</button>
             : <span />}
-          {isMic && step.skipLabel && (
-            <button type="button" className="btn-back" onClick={next}>{step.skipLabel}</button>
-          )}
         </div>
       </div>
     </div>

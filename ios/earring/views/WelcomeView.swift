@@ -7,7 +7,6 @@ private struct WelcomeStep {
     let primaryLabel: String
     let hint: String
     let success: String
-    let skipLabel: String
     let exitLabel: String
 }
 
@@ -17,7 +16,7 @@ private func parseWelcomeSteps(_ json: String) -> [WelcomeStep] {
     return arr.map { o in
         WelcomeStep(id: o["id"] ?? "", title: o["title"] ?? "", body: o["body"] ?? "",
                     primaryLabel: o["primaryLabel"] ?? "Next", hint: o["hint"] ?? "",
-                    success: o["success"] ?? "", skipLabel: o["skipLabel"] ?? "",
+                    success: o["success"] ?? "",
                     exitLabel: o["exitLabel"] ?? "")
     }
 }
@@ -37,7 +36,7 @@ struct WelcomeView: View {
         } else {
             let step = steps[min(index, steps.count - 1)]
             let isMic = step.id == "mic"
-            // The content scrolls; the buttons stay pinned below it so Next, Skip and Back are
+            // The content scrolls; the buttons stay pinned below it so Next and Back are
             // always visible, even beside the tall embedded Mic Setup screen.
             VStack(spacing: 0) {
                 HStack {
@@ -91,9 +90,6 @@ struct WelcomeView: View {
                             Button("\u{2190} Back") { index -= 1 }
                         }
                         Spacer()
-                        if isMic && !step.skipLabel.isEmpty {
-                            Button(step.skipLabel) { advance() }
-                        }
                     }
                     .frame(minHeight: 36)
                 }
