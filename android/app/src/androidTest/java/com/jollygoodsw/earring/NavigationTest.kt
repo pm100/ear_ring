@@ -36,16 +36,9 @@ class NavigationTest {
     @get:Rule(order = 0)
     val permissionRule: GrantPermissionRule = GrantPermissionRule.grant(Manifest.permission.RECORD_AUDIO)
 
-    // Mark the welcome flow as done so the app starts on Home (issue #43); the Activity
-    // reads the flag at launch, so this must run before composeRule.
+    // Start on Home, not the first-run welcome (issue #43).
     @get:Rule(order = 1)
-    val welcomeDoneRule: org.junit.rules.ExternalResource = object : org.junit.rules.ExternalResource() {
-        override fun before() {
-            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
-                .getSharedPreferences("ear_ring_settings", android.content.Context.MODE_PRIVATE)
-                .edit().putBoolean("hasLaunched", true).commit()
-        }
-    }
+    val welcomeDone = welcomeDoneRule()
 
     @get:Rule(order = 2)
     val composeRule = createAndroidComposeRule<MainActivity>()

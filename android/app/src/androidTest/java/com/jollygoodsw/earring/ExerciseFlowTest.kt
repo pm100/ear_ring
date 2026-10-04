@@ -28,7 +28,11 @@ class ExerciseFlowTest {
     @get:Rule(order = 0)
     val permissionRule: GrantPermissionRule = GrantPermissionRule.grant(Manifest.permission.RECORD_AUDIO)
 
+    // Start on Home, not the first-run welcome (issue #43).
     @get:Rule(order = 1)
+    val welcomeDone = welcomeDoneRule()
+
+    @get:Rule(order = 2)
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test

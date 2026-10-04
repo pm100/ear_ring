@@ -45,6 +45,7 @@ class SettingsPersistenceTest {
     @Test
     fun settings_surviveARestart() {
         val vm = newViewModel()
+        vm.setPremium(true) // Voice instruments are premium-only; a clean install would reset them
         vm.setTempoBpm(140)
         vm.setInstrumentIndex(8) // Soprano Voice
 
