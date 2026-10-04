@@ -1,13 +1,3 @@
-## Getting Started
-
-In the Settings tab, pick your instrument, then open the Mic tab and play a few notes — you should see them appear on the staff and pitch meter. This confirms your microphone is working. If notes aren't detected, try playing louder or more crisply, and check Mic Sensitivity on the Mic tab.
-
-On the Home tab, choose a test type, key, scale, range, and sequence length to match your instrument and what you want to practice.
-
-Tap ▶ Start Exercise. The app plays a chord to set the key, then a sequence of notes. Play the notes back in order.
-
-Green notes mean you nailed it — red means keep trying. The app replays the same sequence up to your retry limit, then moves on automatically.
-
 ## Test Types
 
 Random Notes plays an arbitrary sequence within your selected range.

@@ -101,10 +101,10 @@ class NavigationTest {
     }
 
     @Test
-    fun helpTab_showsGettingStarted() {
+    fun helpTab_showsHelpSections() {
         goHome()
         composeRule.onNodeWithText("Help").performClick()
-        composeRule.onAllNodesWithText("Getting Started", substring = true).onFirst().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Test Types", substring = true).onFirst().assertIsDisplayed()
     }
 
     /** Resets settings through the real Settings UI (button, then the confirm dialog). */
