@@ -10,6 +10,15 @@ import com.jollygoodsw.earring.EarRingCore
 import com.jollygoodsw.earring.PitchFrame
 
 /**
+ * Serialises every use of the native tracker with freeing it. The capture thread is only asked to
+ * stop (it may still be inside onAudio -> trackerProcess), so without this, trackerFree could run
+ * under it: a use-after-free that corrupts memory and crashes the app later, at random.
+ */
+private class TrackerGuard {
+    var freed = false
+}
+
+/**
  * Shared pitch detection composable used identically by Mic Setup and Exercise screens.
  *
  * Owns [AudioCapture] and a Rust-side `PitchTracker` (via [EarRingCore.trackerNew]).
@@ -47,6 +56,7 @@ fun rememberPitchDetector(
     val audioCapture = remember { AudioCapture() }
     val trackerHandle = remember { EarRingCore.trackerNew(silenceThreshold, framesToConfirm) }
     val liveHzState = remember { mutableFloatStateOf(-1f) }
+    val guard = remember { TrackerGuard() }
 
     // Apply per-instrument detection params (grace frames, octave correction) whenever the
     // instrument changes, then push the caller's grace/octave/yin/tolerance overrides on
@@ -54,8 +64,11 @@ fun rememberPitchDetector(
     // round-trip could. Also re-runs on a live edit to any of the 4 overrides, so a manual
     // slider change takes effect immediately without waiting for an instrument switch.
     LaunchedEffect(instrumentIndex, graceFrames, octaveCorrection, yinThreshold, pitchToleranceCents) {
-        EarRingCore.trackerApplyInstrument(trackerHandle, instrumentIndex)
-        EarRingCore.trackerSetAdvancedParams(trackerHandle, graceFrames, octaveCorrection, yinThreshold, pitchToleranceCents)
+        synchronized(guard) {
+            if (guard.freed) return@LaunchedEffect
+            EarRingCore.trackerApplyInstrument(trackerHandle, instrumentIndex)
+            EarRingCore.trackerSetAdvancedParams(trackerHandle, graceFrames, octaveCorrection, yinThreshold, pitchToleranceCents)
+        }
     }
 
     // Tracker lifetime is tied to the composable, NOT to active — freeing on every
@@ -63,18 +76,28 @@ fun rememberPitchDetector(
     DisposableEffect(Unit) {
         onDispose {
             audioCapture.stop()
-            EarRingCore.trackerFree(trackerHandle)
+            synchronized(guard) {
+                guard.freed = true
+                EarRingCore.trackerFree(trackerHandle)
+            }
         }
     }
 
     DisposableEffect(active) {
         if (active) {
-            if (warmupFrames > 0) EarRingCore.trackerResetWithWarmup(trackerHandle, warmupFrames)
-            else EarRingCore.trackerReset(trackerHandle)
+            synchronized(guard) {
+                if (!guard.freed) {
+                    if (warmupFrames > 0) EarRingCore.trackerResetWithWarmup(trackerHandle, warmupFrames)
+                    else EarRingCore.trackerReset(trackerHandle)
+                }
+            }
             liveHzState.floatValue = -1f
 
             audioCapture.start { samples ->
-                when (val frame = EarRingCore.trackerProcess(trackerHandle, samples)) {
+                val result = synchronized(guard) {
+                    if (guard.freed) null else EarRingCore.trackerProcess(trackerHandle, samples)
+                } ?: return@start
+                when (val frame = result) {
                     is PitchFrame.Silence -> liveHzState.floatValue = -1f
                     is PitchFrame.Active -> {
                         liveHzState.floatValue = frame.hz
@@ -88,7 +111,7 @@ fun rememberPitchDetector(
             }
         } else {
             audioCapture.stop()
-            EarRingCore.trackerReset(trackerHandle)
+            synchronized(guard) { if (!guard.freed) EarRingCore.trackerReset(trackerHandle) }
             liveHzState.floatValue = -1f
         }
 
