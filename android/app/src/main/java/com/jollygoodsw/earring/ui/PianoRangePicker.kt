@@ -3,7 +3,6 @@ package com.jollygoodsw.earring.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -30,6 +29,8 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -65,10 +66,8 @@ fun PianoRangePicker(
     val blackKeyWidth: Dp = 14.dp * keyScale
     val whiteKeyHeight: Dp = 80.dp * keyScale
     val blackKeyHeight: Dp = 52.dp * keyScale
-    val handleRadius: Dp = 9.dp * keyScale
-    val handleArea: Dp = 22.dp * keyScale  // vertical area above keys for handles
     val labelTextSize: Dp = 13.dp * keyScale  // C-key octave labels
-    val totalHeight: Dp = handleArea + whiteKeyHeight
+    val totalHeight: Dp = whiteKeyHeight
     val totalWidth: Dp = whiteKeyWidth * TOTAL_WHITE_KEYS
 
     // Drawn and hit-tested below in this composable's normal (horizontal) coordinate frame
@@ -89,10 +88,11 @@ fun PianoRangePicker(
     // (untransformed) positions in the actual canvas frame, so touches are mapped back to
     // this composable's original (totalWidth x totalHeight) coordinate space by hand below —
     // the same technique desktop's HomeScreen.tsx uses for its own raw canvas + CSS rotation.
+    // The range is set by tapping keys only: the old drag-a-handle strip is gone (issue #44).
     //
     // keyScale shrinks every dimension so the whole keyboard fits without scrolling —
     // deliberately NOT wrapped in a scrollable container: this composable's own pointerInput
-    // always claims the first touch it sees (tap-to-shift or drag-a-handle), so nesting it
+    // always claims the first touch it sees (tap-to-set), so nesting it
     // inside a scroll region made ordinary swipes get misread as range edits instead of
     // scrolling.
     Canvas(
@@ -103,13 +103,7 @@ fun PianoRangePicker(
                 val wkw = with(density) { whiteKeyWidth.toPx() }
                 val bkw = with(density) { blackKeyWidth.toPx() }
                 val bkh = with(density) { blackKeyHeight.toPx() }
-                val hArea = with(density) { handleArea.toPx() }
-                val hRadius = with(density) { handleRadius.toPx() }
                 val totalHeightPx = with(density) { totalHeight.toPx() }
-
-                fun keyX(midi: Int): Float =
-                    if (isWhiteKey(midi)) whiteIndex(midi) * wkw + wkw / 2
-                    else whiteIndex(midi - 1) * wkw + wkw - bkw / 2
 
                 fun xToMidi(x: Float, yInKeys: Float): Int {
                     if (yInKeys in 0f..bkh) {
@@ -135,45 +129,12 @@ fun PianoRangePicker(
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val (x, y) = toOriginal(down.position)
-                    val handleY = hArea / 2
-                    val startX = keyX(rangeStart)
-                    val endX = keyX(rangeEnd)
-
-                    val which: Int? = when {
-                        kotlin.math.abs(x - startX) <= hRadius * 2.5f &&
-                            kotlin.math.abs(y - handleY) <= hRadius * 2.5f -> 0
-                        kotlin.math.abs(x - endX) <= hRadius * 2.5f &&
-                            kotlin.math.abs(y - handleY) <= hRadius * 2.5f -> 1
-                        else -> null
-                    }
-
-                    if (which == null) {
-                        // Tap away from either handle: move whichever endpoint (start or
-                        // end) is nearer to the tapped key directly there, instead of
-                        // requiring a precise drag on a small handle — a single tap sets
-                        // start or end.
-                        val yInKeys = (y - hArea).coerceAtLeast(0f)
-                        val tapped = xToMidi(x, yInKeys)
-                        if (kotlin.math.abs(tapped - rangeStart) <= kotlin.math.abs(tapped - rangeEnd)) {
-                            onRangeChange(tapped.coerceIn(PIANO_MIDI_MIN, rangeEnd - 12), rangeEnd)
-                        } else {
-                            onRangeChange(rangeStart, tapped.coerceIn(rangeStart + 12, PIANO_MIDI_MAX))
-                        }
+                    // A tap moves whichever endpoint (start or end) is nearer to the tapped key.
+                    val tapped = xToMidi(x, y.coerceAtLeast(0f))
+                    if (kotlin.math.abs(tapped - rangeStart) <= kotlin.math.abs(tapped - rangeEnd)) {
+                        onRangeChange(tapped.coerceIn(PIANO_MIDI_MIN, rangeEnd - 12), rangeEnd)
                     } else {
-                        // Consume the down event so the parent scroll doesn't intercept
-                        down.consume()
-                        drag(down.id) { change ->
-                            change.consume()
-                            val (nx, _) = toOriginal(change.position)
-                            val m = xToMidi(nx, bkh / 2f)
-                            if (which == 0) {
-                                val ns = m.coerceIn(PIANO_MIDI_MIN, rangeEnd - 12)
-                                onRangeChange(ns, rangeEnd)
-                            } else {
-                                val ne = m.coerceIn(rangeStart + 12, PIANO_MIDI_MAX)
-                                onRangeChange(rangeStart, ne)
-                            }
-                        }
+                        onRangeChange(rangeStart, tapped.coerceIn(rangeStart + 12, PIANO_MIDI_MAX))
                     }
                 }
             }
@@ -191,9 +152,7 @@ fun PianoRangePicker(
             val bkw = with(density) { blackKeyWidth.toPx() }
             val wkh = with(density) { whiteKeyHeight.toPx() }
             val bkh = with(density) { blackKeyHeight.toPx() }
-            val hArea = with(density) { handleArea.toPx() }
-            val hRadius = with(density) { handleRadius.toPx() }
-            val keyTop = hArea
+            val keyTop = 0f
 
             // White keys
             for (midi in PIANO_MIDI_MIN..PIANO_MIDI_MAX) {
@@ -247,20 +206,6 @@ fun PianoRangePicker(
                     "C$oct", cx, keyTop + wkh - with(density) { 4.dp.toPx() }, labelPaint
                 )
             }
-
-            // Handle helper
-            fun keyX(midi: Int): Float =if (isWhiteKey(midi)) whiteIndex(midi) * wkw + wkw / 2
-                else whiteIndex(midi - 1) * wkw + wkw - bkw / 2
-
-            val hy = hArea / 2
-            val sx = keyX(rangeStart)
-            val ex = keyX(rangeEnd)
-
-            // Connecting line
-            drawLine(color = primaryColor, start = Offset(sx, hy), end = Offset(ex, hy), strokeWidth = 3f)
-            // Handles
-            drawCircle(color = primaryColor, radius = hRadius, center = Offset(sx, hy))
-            drawCircle(color = primaryColor, radius = hRadius, center = Offset(ex, hy))
         }
     }
 }  // PianoRangePicker
@@ -268,7 +213,7 @@ fun PianoRangePicker(
 /**
  * Full-screen presentation of [PianoRangePicker] — deliberately not a small dialog: at
  * natural size the rotated keyboard is far taller than a dialog/AlertDialog can offer
- * without either scrolling (which fights the picker's own drag-a-handle gesture — see
+ * without either scrolling (which fights the picker's own tap gesture — see
  * PianoRangePicker's own comment) or shrinking it down to an untappable size.
  *
  * Rendered as a plain in-tree overlay (a sibling Box in the caller, not a system Dialog) —
@@ -284,18 +229,35 @@ fun PianoRangePicker(
 fun PianoRangePickerScreen(
     rangeStart: Int,
     rangeEnd: Int,
+    noteLabel: (Int) -> String,
     onRangeChange: (Int, Int) -> Unit,
+    onCancel: () -> Unit,
     onDone: () -> Unit
 ) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                Text("Note Range", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                TextButton(onClick = onCancel) { Text("Cancel") }
+                Text(
+                    "Note Range",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f)
+                )
                 TextButton(onClick = onDone) { Text("Done") }
             }
+            Text(
+                "${noteLabel(rangeStart)} – ${noteLabel(rangeEnd)}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+            )
             BoxWithConstraints(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 contentAlignment = Alignment.Center

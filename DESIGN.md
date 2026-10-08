@@ -179,11 +179,22 @@ Row (full width, left-aligned like every other Home block — this was previousl
 [16dp space]
 PianoRangePicker (full-screen, opened via the 🎹 button above)
   — Interactive piano keyboard, MIDI 36 (C2) to MIDI 84 (C6), 4 octaves, 29 white keys
-  — Horizontally scrollable; white keys 22dp wide × 80dp tall; black keys 14dp wide × 52dp tall
-  — Primary-colour handle circles (9dp radius) above each endpoint (rangeStart, rangeEnd)
-  — Connected by a primary-colour line; primary highlight on keys within the selected range
-  — Handle area: 22dp tall above the keyboard
-  — Drag a handle to resize range (minimum span = 12 semitones); tap elsewhere to shift range
+  — Displayed sideways (low notes at top), scaled to fit the screen; white keys 22dp wide × 80dp tall;
+    black keys 14dp wide × 52dp tall
+  — Header row: "Cancel" (left), small "Note Range" title (subtitle-size, muted, centred), "Done" (right).
+    Done keeps the range; **Cancel restores the range the picker was opened with** (the picker edits
+    the range live, so Home snapshots start/end on open and writes them back on Cancel)
+  — Range readout on its own line under the header: "<start> – <end>" (en dash), semibold, primary
+    colour, one step larger than the title, updating live as keys are tapped (issue #44). Notes use
+    the standard Xn format (C3, B5), key-aware spelling (preferredMidiLabel with the selected
+    key/scale's effective key chroma); for a transposing instrument (incl. Transposed Guitar's
+    octave) it reads "<written> (concert <concert>)", e.g. "D4 (concert C4)", matching the Key
+    dropdown's "written (concert X)" pattern
+  — No slider/handles: the old primary-colour handle circles + connecting line + 22dp handle strip
+    above the keyboard were removed (issue #44, hard to use and imprecise)
+  — Primary highlight on keys within the selected range
+  — Tap a key to set the range: the nearer endpoint (rangeStart or rangeEnd) moves to the tapped key
+    (ties go to rangeStart); minimum span = 12 semitones
   — Default: one octave (12 semitones, inclusive) from rootNote, using the octave closest to middle C
     e.g. root=C → (C4, C5) = MIDI 60–72; root=G → (G3, G4) = MIDI 55–67
   — On first display, scroll position centers the selected range in the viewport

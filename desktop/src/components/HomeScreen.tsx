@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { ExerciseSettings } from '../types';
 import { SettingsAction } from '../settingsStore';
 import { TooltipIcon } from './Tooltip';
+import { preferredMidiLabel } from '../music';
 
 interface Props {
   settings: ExerciseSettings;
@@ -36,8 +37,6 @@ const WHITE_KEY_W = 22;
 const BLACK_KEY_W = 14;
 const WHITE_KEY_H = 80;
 const BLACK_KEY_H = 52;
-const HANDLE_R = 9;
-const HANDLE_AREA = 22;
 
 function isWhite(midi: number) { return WHITE_KEY_CLASSES.has(midi % 12); }
 function whiteIndex(midi: number) {
@@ -48,10 +47,6 @@ function totalWhiteKeys() {
   let n = 0;
   for (let m = PIANO_MIDI_MIN; m <= PIANO_MIDI_MAX; m++) if (isWhite(m)) n++;
   return n;
-}
-function keyX(midi: number): number {
-  if (isWhite(midi)) return whiteIndex(midi) * WHITE_KEY_W + WHITE_KEY_W / 2;
-  return whiteIndex(midi - 1) * WHITE_KEY_W + WHITE_KEY_W - BLACK_KEY_W / 2;
 }
 function midiLabel(midi: number): string {
   if (!Number.isFinite(midi)) return '–';
@@ -73,11 +68,12 @@ function PianoRangePicker({ rangeStart: rangeStartProp, rangeEnd: rangeEndProp, 
 }) {
   const [rangeStart, rangeEnd] = safeRange(rangeStartProp, rangeEndProp);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const fitRef = useRef<HTMLDivElement>(null);
+  // Shrinks the whole keyboard to fit the available height (the window is fixed-size, so
+  // it cannot scroll or be resized — same fit-to-screen idea as Android/iOS keyScale).
+  const [scale, setScale] = useState(1);
   const totalW = totalWhiteKeys() * WHITE_KEY_W;
-  const totalH = HANDLE_AREA + WHITE_KEY_H;
-  const dragging = useRef<null | 0 | 1>(null);
-  const primary = '#3F51B5';
+  const totalH = WHITE_KEY_H;
 
   const xToMidi = useCallback((x: number, yInKeys: number): number => {
     if (yInKeys >= 0 && yInKeys < BLACK_KEY_H) {
@@ -102,7 +98,7 @@ function PianoRangePicker({ rangeStart: rangeStartProp, rangeEnd: rangeEndProp, 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, totalW, totalH);
-    const keyTop = HANDLE_AREA;
+    const keyTop = 0;
 
     // White keys
     for (let m = PIANO_MIDI_MIN; m <= PIANO_MIDI_MAX; m++) {
@@ -133,16 +129,6 @@ function PianoRangePicker({ rangeStart: rangeStartProp, rangeEnd: rangeEndProp, 
       ctx.fillStyle = (m >= rangeStart && m <= rangeEnd) ? '#3F51B5' : '#555';
       ctx.fillText(`C${oct}`, left + WHITE_KEY_W / 2, keyTop + WHITE_KEY_H - 4);
     }
-    // Handles
-    const hy = HANDLE_AREA / 2;
-    const sx = keyX(rangeStart);
-    const ex = keyX(rangeEnd);
-    ctx.strokeStyle = primary;
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(sx, hy); ctx.lineTo(ex, hy); ctx.stroke();
-    ctx.fillStyle = primary;
-    ctx.beginPath(); ctx.arc(sx, hy, HANDLE_R, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(ex, hy, HANDLE_R, 0, Math.PI * 2); ctx.fill();
   }, [rangeStart, rangeEnd, totalW, totalH]);
 
   // The canvas is drawn in its normal (horizontal) orientation, then rotated 90deg via
@@ -151,73 +137,53 @@ function PianoRangePicker({ rangeStart: rangeStartProp, rangeEnd: rangeEndProp, 
   // getBoundingClientRect() reflects the POST-rotation box, so mouse coordinates read off
   // it have to be mapped back: for rotate(90deg), original (x,y) <-> rotated-box (bx,by)
   // via x = by, y = totalH - bx (the inverse of the forward mapping x'=totalH-y, y'=x).
+  // The box is also CSS-scaled by `scale`, so box offsets are divided by it first.
   const getPos = (e: React.MouseEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const bx = e.clientX - rect.left;
-    const by = e.clientY - rect.top;
+    const bx = (e.clientX - rect.left) / scale;
+    const by = (e.clientY - rect.top) / scale;
     return { x: by, y: totalH - bx };
   };
 
+  // A click moves whichever endpoint (start or end) is nearer to the clicked key. No drag
+  // handles: the range is set by clicking keys only (issue #44).
   const onMouseDown = (e: React.MouseEvent) => {
     const { x, y } = getPos(e);
-    const hy = HANDLE_AREA / 2;
-    const dS = Math.hypot(x - keyX(rangeStart), y - hy);
-    const dE = Math.hypot(x - keyX(rangeEnd), y - hy);
-    if (dS <= HANDLE_R * 2.5) dragging.current = 0;
-    else if (dE <= HANDLE_R * 2.5) dragging.current = 1;
-    else {
-      // Tap away from either handle: move whichever endpoint (start or end) is nearer to
-      // the tapped key directly there, instead of requiring a precise drag on a small
-      // handle — a single click sets start or end.
-      const yInKeys = y - HANDLE_AREA;
-      const tapped = xToMidi(x, yInKeys);
-      if (Math.abs(tapped - rangeStart) <= Math.abs(tapped - rangeEnd)) {
-        onChange(Math.max(PIANO_MIDI_MIN, Math.min(rangeEnd - 12, tapped)), rangeEnd);
-      } else {
-        onChange(rangeStart, Math.max(rangeStart + 12, Math.min(PIANO_MIDI_MAX, tapped)));
-      }
+    const tapped = xToMidi(x, Math.max(0, y));
+    if (Math.abs(tapped - rangeStart) <= Math.abs(tapped - rangeEnd)) {
+      onChange(Math.max(PIANO_MIDI_MIN, Math.min(rangeEnd - 12, tapped)), rangeEnd);
+    } else {
+      onChange(rangeStart, Math.max(rangeStart + 12, Math.min(PIANO_MIDI_MAX, tapped)));
     }
   };
-  const onMouseMove = (e: React.MouseEvent) => {
-    if (dragging.current === null) return;
-    const { x } = getPos(e);
-    const m = xToMidi(x, BLACK_KEY_H / 2);
-    if (dragging.current === 0) onChange(Math.max(PIANO_MIDI_MIN, Math.min(rangeEnd - 12, m)), rangeEnd);
-    else onChange(rangeStart, Math.max(rangeStart + 12, Math.min(PIANO_MIDI_MAX, m)));
-  };
-  const onMouseUp = () => { dragging.current = null; };
 
-  // Center scroll on initial render. Rotated display: a key's position along the
-  // original x-axis (keyX) maps directly to vertical position in the rotated,
-  // scrollable box — see getPos's comment for the rotation math.
+  // Fit the keyboard's long axis (totalW, shown vertically) into the container's height.
   useEffect(() => {
-    const el = scrollContainerRef.current;
+    const el = fitRef.current;
     if (!el) return;
-    const cy = (keyX(rangeStart) + keyX(rangeEnd)) / 2;
-    el.scrollTop = Math.max(0, cy - el.clientHeight / 2);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const fit = () => setScale(Math.min(1, el.clientHeight / totalW));
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [totalW]);
 
-  // Outer box is sized to the POST-rotation (swapped) dimensions; the canvas keeps its
-  // original totalW x totalH size and is centered + rotated 90deg to exactly fill it,
-  // showing the keyboard sideways (low notes at top) so its long axis fits the popup's
-  // vertical space instead of needing wide horizontal scrolling.
+  // Outer box is sized to the POST-rotation (swapped) dimensions times `scale`; the canvas
+  // keeps its original totalW x totalH size and is centered, rotated 90deg and scaled to
+  // exactly fill it, showing the keyboard sideways (low notes at top) with no scrolling.
   return (
-    <div ref={scrollContainerRef} style={{ width: totalH, height: 'auto', maxHeight: '100%', overflowY: 'auto', overflowX: 'hidden', margin: '0 auto' }}>
-      <div style={{ position: 'relative', width: totalH, height: totalW }}>
+    <div ref={fitRef} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ position: 'relative', width: totalH * scale, height: totalW * scale, flexShrink: 0 }}>
         <canvas
           ref={canvasRef}
           width={totalW}
           height={totalH}
           style={{
             position: 'absolute', top: '50%', left: '50%',
-            transform: 'translate(-50%, -50%) rotate(90deg)',
+            transform: `translate(-50%, -50%) rotate(90deg) scale(${scale})`,
             cursor: 'pointer',
           }}
           onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={onMouseUp}
-          onMouseLeave={onMouseUp}
         />
       </div>
     </div>
@@ -281,7 +247,14 @@ function RangeTextInputs({ rangeStart, rangeEnd, onChange, disabled }: {
 
 // ─── Full-screen overlay for the range picker — the keyboard needs all the room it can
 // get to be tappable, so this fills the viewport rather than sizing to content. ─────────
-function FullScreenModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+function FullScreenModal({ title, subtitle, onCancel, onClose, children }: {
+  title: string;
+  subtitle?: string;
+  onCancel: () => void;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const textButton: React.CSSProperties = { background: 'none', border: 'none', padding: 0, color: '#3F51B5', fontSize: 16, fontWeight: 600, cursor: 'pointer' };
   return (
     <div
       style={{
@@ -289,16 +262,16 @@ function FullScreenModal({ title, onClose, children }: { title: string; onClose:
         display: 'flex', flexDirection: 'column',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid #eee', flexShrink: 0 }}>
-        <span style={{ fontSize: 17, fontWeight: 600 }}>{title}</span>
-        <button
-          type="button"
-          onClick={onClose}
-          style={{ background: 'none', border: 'none', padding: 0, color: '#3F51B5', fontSize: 16, fontWeight: 600, cursor: 'pointer' }}
-        >
-          Done
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', flexShrink: 0 }}>
+        <button type="button" onClick={onCancel} style={textButton}>Cancel</button>
+        <span style={{ fontSize: 14, color: '#757575' }}>{title}</span>
+        <button type="button" onClick={onClose} style={textButton}>Done</button>
       </div>
+      {subtitle && (
+        <div style={{ textAlign: 'center', fontSize: 16, fontWeight: 600, color: '#3F51B5', padding: '0 16px 8px', borderBottom: '1px solid #eee', flexShrink: 0 }}>
+          {subtitle}
+        </div>
+      )}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 16 }}>
         {children}
       </div>
@@ -322,14 +295,18 @@ function HomeScreen({ settings, onAction, onStart }: Props) {
   const [showRangePicker, setShowRangePicker] = useState(false);
 
   const [instrKeyTranspose, setInstrKeyTranspose] = useState(0);
+  const [instrSemitones, setInstrSemitones] = useState(0);
+  // Range when the picker opened, so Cancel can put it back (the picker edits live).
+  const rangeAtOpen = useRef<[number, number]>([0, 0]);
   useEffect(() => {
     invoke<string>('cmd_instrument_list')
       .then(json => {
         const list = JSON.parse(json) as { semitones: number }[];
         const sem = list[settings.instrumentIndex]?.semitones ?? 0;
         setInstrKeyTranspose(((sem % 12) + 12) % 12);
+        setInstrSemitones(sem);
       })
-      .catch(() => setInstrKeyTranspose(0));
+      .catch(() => { setInstrKeyTranspose(0); setInstrSemitones(0); });
   }, [settings.instrumentIndex]);
 
   // Scale labels in written pitch for the selected instrument
@@ -343,6 +320,16 @@ function HomeScreen({ settings, onAction, onStart }: Props) {
       })
     )).then(setScaleLabels).catch(() => {});
   }, [settings.rootNote, settings.instrumentIndex]);
+
+  // Range-picker note text: "C4", or "D4 (concert C4)" when the instrument transposes.
+  const pickerKeyChroma = (() => {
+    const offset = IMPLIED_MAJOR_OFFSETS[settings.scaleId];
+    return offset === null || offset === undefined ? settings.rootNote : (settings.rootNote + offset) % 12;
+  })();
+  const pickerNoteLabel = (m: number) => {
+    const concert = preferredMidiLabel(m, pickerKeyChroma);
+    return instrSemitones !== 0 ? `${midiLabel(m + instrSemitones)} (concert ${concert})` : concert;
+  };
 
   // Rust enforces the diatonic rule (always a 3-note arpeggio).
   const handleTestTypeChange = (newType: number) => onAction({ type: 'setTestType', value: newType });
@@ -412,7 +399,7 @@ function HomeScreen({ settings, onAction, onStart }: Props) {
         />
         <button
           type="button"
-          onClick={() => setShowRangePicker(true)}
+          onClick={() => { rangeAtOpen.current = [settings.rangeStart, settings.rangeEnd]; setShowRangePicker(true); }}
           title="Pick range on a keyboard"
           aria-label="Pick range on a keyboard"
           style={{ fontSize: 22, lineHeight: 1, padding: '6px 10px', borderRadius: 6, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}
@@ -421,7 +408,15 @@ function HomeScreen({ settings, onAction, onStart }: Props) {
         </button>
       </div>
       {showRangePicker && (
-        <FullScreenModal title="Note Range" onClose={() => setShowRangePicker(false)}>
+        <FullScreenModal
+          title="Note Range"
+          subtitle={`${pickerNoteLabel(settings.rangeStart)} – ${pickerNoteLabel(settings.rangeEnd)}`}
+          onCancel={() => {
+            if (!isMelodyMode) onAction({ type: 'setRange', start: rangeAtOpen.current[0], end: rangeAtOpen.current[1] });
+            setShowRangePicker(false);
+          }}
+          onClose={() => setShowRangePicker(false)}
+        >
           <PianoRangePicker
             rangeStart={settings.rangeStart}
             rangeEnd={settings.rangeEnd}

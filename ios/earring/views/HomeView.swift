@@ -185,6 +185,8 @@ struct HomeView: View {
 
     @State private var instrKeyTranspose: Int = 0
     @State private var showRangePicker: Bool = false
+    /// Range when the picker opened, so Cancel can put it back (the picker edits live).
+    @State private var rangeAtOpen: (start: Int, end: Int) = (0, 0)
 
     private var isIPad: Bool { hsc == .regular }
     private var keyScale: CGFloat { isIPad ? 1.35 : 1.0 }
@@ -284,6 +286,7 @@ struct HomeView: View {
                         // and not yet blurred could be silently lost. Mirrors the equivalent
                         // fix on Android (LocalFocusManager.clearFocus()).
                         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                        rangeAtOpen = (model.rangeStart, model.rangeEnd)
                         showRangePicker = true
                     } label: {
                         Text("🎹")
@@ -344,7 +347,12 @@ struct HomeView: View {
             PianoRangePickerFullScreen(
                 rangeStart: model.rangeStart,
                 rangeEnd: model.rangeEnd,
+                noteLabel: pickerNoteLabel,
                 onRangeChange: model.testType == 1 ? { _, _ in } : { s, e in model.setRange(start: s, end: e) },
+                onCancel: {
+                    if model.testType != 1 { model.setRange(start: rangeAtOpen.start, end: rangeAtOpen.end) }
+                    showRangePicker = false
+                },
                 onDone: { showRangePicker = false }
             )
         }
@@ -362,6 +370,16 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.bottom, 6)
+    }
+
+    /// "C4", or "D4 (concert C4)" when the instrument transposes.
+    private func pickerNoteLabel(_ midi: Int) -> String {
+        let keyChroma = EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId)
+        let concert = EarRingCore.preferredMidiLabel(midi: midi, rootChroma: keyChroma)
+        if EarRingCore.transposeDisplayMidi(midi, instrumentIndex: model.instrumentIndex) != midi {
+            return "\(EarRingCore.writtenMidiLabel(concertMidi: midi, instrumentIndex: model.instrumentIndex)) (concert \(concert))"
+        }
+        return concert
     }
 
     private func loadInstrTranspose() {

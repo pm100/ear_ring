@@ -56,6 +56,8 @@ fun HomeScreen(
     // pre-resize constraints, silently mispositioned no matter what alignment was tried.
     // An in-tree overlay gets correct full-size constraints from the very first frame.
     var showRangePicker by remember { mutableStateOf(false) }
+    // Range when the picker opened, so Cancel can put it back (the picker edits live).
+    var rangeAtOpen by remember { mutableStateOf(0 to 0) }
 
     Box(modifier = Modifier.fillMaxSize()) {
     Column(
@@ -231,6 +233,7 @@ fun HomeScreen(
                     // picker opens over them — otherwise a value just typed and not yet
                     // blurred could be silently lost.
                     focusManager.clearFocus()
+                    rangeAtOpen = state.rangeStart to state.rangeEnd
                     showRangePicker = true
                 },
                 // Match the range fields' corner radius — OutlinedButton defaults to
@@ -266,10 +269,22 @@ fun HomeScreen(
     }  // Column
 
     if (showRangePicker) {
+        val keyChroma = EarRingCore.effectiveKeyChroma(state.rootNote, state.scaleId)
         PianoRangePickerScreen(
             rangeStart = state.rangeStart,
             rangeEnd = state.rangeEnd,
+            // "C4", or "D4 (concert C4)" when the instrument transposes.
+            noteLabel = { m ->
+                val concert = EarRingCore.preferredMidiLabel(m, keyChroma)
+                if (EarRingCore.transposeDisplayMidi(m, state.instrumentIndex) != m)
+                    "${EarRingCore.writtenMidiLabel(m, state.instrumentIndex)} (concert $concert)"
+                else concert
+            },
             onRangeChange = if (state.testType != 1) { s, e -> viewModel.setRange(s, e) } else { _, _ -> },
+            onCancel = {
+                if (state.testType != 1) viewModel.setRange(rangeAtOpen.first, rangeAtOpen.second)
+                showRangePicker = false
+            },
             onDone = { showRangePicker = false }
         )
     }
