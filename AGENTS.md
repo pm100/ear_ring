@@ -195,13 +195,28 @@ Service account JSON: Play Console → Setup → API access → Service accounts
 
 The iOS `just` recipes run on Paul's MacBook Air, reachable via the `mac` SSH alias
 (`~/.ssh/config` on Windows → `pauls-macbook-air.local`, user `pm100`, key auth).
-The repo lives at `~/work/ear_ring` on the Mac; keep it synced via git (never edit
-files directly on the Mac).
+The repo lives at `~/work/ear_ring` on the Mac as a scratch build copy (never edit files
+directly on the Mac, and never commit there).
+
+**Sync by file copy, NOT git.** Do not commit/push (or `git pull` on the Mac) just to test
+an iOS build — that litters GitHub history with throwaway commits. Copy the working-tree
+changes over instead. Use tar + scp: the Chocolatey `rsync` on Windows is installed but
+doesn't work with our ssh setup (Windows OpenSSH → `dup() in/out/err failed`; its bundled
+ssh → `Host key verification failed`, different known_hosts):
 
 ```powershell
-# Typical flow: push from Windows, pull + build on the Mac
-ssh mac "cd ~/work/ear_ring && git pull --ff-only && just ios"
+# From C:\work\ear_ring: pack modified + untracked files (skips deleted ones, honours .gitignore)
+git ls-files -m -o --exclude-standard | Where-Object { Test-Path $_ } | Set-Content $env:TEMP\ios-sync.txt
+tar -cf $env:TEMP\ios-sync.tar -T $env:TEMP\ios-sync.txt
+scp $env:TEMP\ios-sync.tar mac:/tmp/ios-sync.tar
+ssh mac "cd ~/work/ear_ring && tar -xf /tmp/ios-sync.tar && just ios"
 ```
+
+Caveats: this assumes the Mac copy is already at the same base commit as Windows HEAD
+(if not, get the user's OK, then `git fetch && git reset --hard origin/master` on the Mac
+first). Files you deleted or renamed on Windows must be removed by hand on the Mac
+(`ssh mac "rm ~/work/ear_ring/<path>"`). For a one- or two-file change, plain
+`scp <file> mac:work/ear_ring/<file>` is enough.
 
 `just ios-archive`/`just ios-testflight` pick the iOS build number (`CFBundleVersion`)
 automatically via `scripts/release_ios.js` — see that file's header comment for how it
