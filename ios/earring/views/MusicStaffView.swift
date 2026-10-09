@@ -66,6 +66,10 @@ struct MusicStaffView: View {
     var rootChroma: Int = 0
     var keySignatureMode: Int = 0
 
+    // The staff inverts in dark mode (issue #53): ink is dark on light, light on dark.
+    @Environment(\.colorScheme) private var colorScheme
+    private var isDark: Bool { colorScheme == .dark }
+
     // Preloaded UIImage cache so Canvas GraphicsContext can draw them reliably.
     private static let accImages: [String: UIImage] = {
         var d: [String: UIImage] = [:]
@@ -84,6 +88,9 @@ struct MusicStaffView: View {
     }()
 
     var body: some View {
+        let ink: Color = isDark ? Color(white: 0.9) : Color(white: 0.2)
+        let ledgerInk: Color = isDark ? Color(white: 0.75) : Color(red: 0.333, green: 0.333, blue: 0.333)
+        let paper: Color = isDark ? .black : .white
         Canvas { ctx, size in
             // lineSpacing scales with the view height so the staff fills
             // the frame correctly on both iPhone (160pt) and iPad (220pt).
@@ -133,7 +140,14 @@ struct MusicStaffView: View {
             func drawAcc(_ name: String, leftX: CGFloat, targetY: CGFloat, displayH: CGFloat, displayW: CGFloat) {
                 guard let ui = MusicStaffView.accImages[name] else { return }
                 let r = CGRect(x: leftX, y: targetY - displayH / 2, width: displayW, height: displayH)
-                ctx.draw(Image(uiImage: ui), in: r)
+                if name.contains("_") {
+                    ctx.draw(Image(uiImage: ui), in: r)
+                } else {
+                    // The plain (black) glyphs are tinted with the staff ink so they show in dark mode.
+                    var img = ctx.resolve(Image(uiImage: ui).renderingMode(.template))
+                    img.shading = .color(ink)
+                    ctx.draw(img, in: r)
+                }
             }
 
             // ── Staff lines ──────────────────────────────────────────────────
@@ -142,12 +156,12 @@ struct MusicStaffView: View {
                 var p = Path()
                 p.move(to: CGPoint(x: 5, y: y))
                 p.addLine(to: CGPoint(x: size.width - 16, y: y))
-                ctx.stroke(p, with: .color(Color(white: 0.2)), lineWidth: 1.5)
+                ctx.stroke(p, with: .color(ink), lineWidth: 1.5)
             }
 
             // ── Treble clef (text — reliable on iOS) ────────────────────────
             ctx.draw(
-                Text("𝄞").font(.system(size: lineSpacing * 7)),
+                Text("𝄞").font(.system(size: lineSpacing * 7)).foregroundColor(ink),
                 at: CGPoint(x: 4, y: staffTop - lineSpacing * 2.5),
                 anchor: .topLeading
             )
@@ -188,7 +202,7 @@ struct MusicStaffView: View {
                 let y = noteY(staffPos)
                 let noteColor: Color = {
                     switch displayNote.state {
-                    case .expected:  return Color(white: 0.2)
+                    case .expected:  return ink
                     case .correct:   return .erSuccess
                     case .incorrect: return .erError
                     case .active:    return .erPrimary
@@ -235,7 +249,7 @@ struct MusicStaffView: View {
                     var lp = Path()
                     lp.move(to: CGPoint(x: x - hw, y: ledgerBelow))
                     lp.addLine(to: CGPoint(x: x + hw, y: ledgerBelow))
-                    ctx.stroke(lp, with: .color(Color(red: 0.333, green: 0.333, blue: 0.333)), lineWidth: 1.5)
+                    ctx.stroke(lp, with: .color(ledgerInk), lineWidth: 1.5)
                     ledgerBelow += lineSpacing
                 }
                 var ledgerAbove = staffTop - lineSpacing
@@ -244,7 +258,7 @@ struct MusicStaffView: View {
                     var lp = Path()
                     lp.move(to: CGPoint(x: x - hw, y: ledgerAbove))
                     lp.addLine(to: CGPoint(x: x + hw, y: ledgerAbove))
-                    ctx.stroke(lp, with: .color(Color(red: 0.333, green: 0.333, blue: 0.333)), lineWidth: 1.5)
+                    ctx.stroke(lp, with: .color(ledgerInk), lineWidth: 1.5)
                     ledgerAbove -= lineSpacing
                 }
 
@@ -264,7 +278,7 @@ struct MusicStaffView: View {
                     .translatedBy(x: -x, y: -y)
                 let noteHead = Path(ellipseIn: noteRect).applying(rotation)
                 if openHead {
-                    ctx.fill(noteHead, with: .color(.white))
+                    ctx.fill(noteHead, with: .color(paper))
                     ctx.stroke(noteHead, with: .color(noteColor), lineWidth: 1.5)
                 } else {
                     ctx.fill(noteHead, with: .color(noteColor))

@@ -160,7 +160,7 @@ struct PianoRangePickerFullScreen: View {
             .padding(.vertical, 12)
             Text("\(noteLabel(rangeStart)) \u{2013} \(noteLabel(rangeEnd))")
                 .font(.headline)
-                .foregroundColor(Color(red: 0.247, green: 0.318, blue: 0.710)) // #3F51B5
+                .foregroundColor(.erPrimary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 4)

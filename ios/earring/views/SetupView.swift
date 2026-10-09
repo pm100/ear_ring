@@ -64,7 +64,7 @@ struct SetupView: View {
                     .font(.system(size: 28))
                 Text("Listening…")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundColor(Color(red: 0.247, green: 0.318, blue: 0.710))
+                    .foregroundColor(.erPrimary)
                 Spacer()
             }
 

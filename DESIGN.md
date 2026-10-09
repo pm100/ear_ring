@@ -846,6 +846,23 @@ when a note is confirmed.
 | Surface text | #333333 | Staff lines, expected note heads |
 | Muted text | #BDBDBD / onSurfaceVariant | Labels, secondary text, pitch meter when idle |
 
+### Dark mode (issue #53)
+
+iOS follows the system appearance (Android and desktop have no dark theme yet; Android is
+issue #54). Colours that must change are defined with `Color(light:dark:)` in `HomeView.swift`:
+
+| Token | Light | Dark |
+|-------|-------|------|
+| `erPrimary` | #3F51B5 | #7986CB |
+| `erCaption` (labels, captions) | #49454F | #CAC4D0 |
+| `erDark` (note name in the pitch meter) | #212121 | #EDEDED |
+| Tonal button fill | #E8EAF6 | #2A2E4A |
+
+The music staff inverts: lines, expected notes, stems, flags, the clef and the plain
+sharp/flat/natural glyphs (tinted as templates) are near-white in dark mode (white 0.9, ledger
+lines 0.75), and open note heads fill with the background colour. Correct (green), incorrect
+(red) and active (primary) notes keep their colours.
+
 ---
 
 ## Audio

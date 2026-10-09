@@ -4,19 +4,27 @@ import UIKit
 // MARK: - Brand colours
 
 extension Color {
-    static let erPrimary = Color(red: 0.247, green: 0.318, blue: 0.710)  // #3F51B5
+    /// A colour that switches with the system appearance (issue #53).
+    init(light: Color, dark: Color) {
+        self.init(UIColor { $0.userInterfaceStyle == .dark ? UIColor(dark) : UIColor(light) })
+    }
+
+    static let erPrimary = Color(light: Color(red: 0.247, green: 0.318, blue: 0.710),   // #3F51B5
+                                 dark: Color(red: 0.475, green: 0.525, blue: 0.796))    // #7986CB
     static let erSuccess = Color(red: 0.298, green: 0.686, blue: 0.314)  // #4CAF50
     static let erError   = Color(red: 0.957, green: 0.263, blue: 0.212)  // #F44336
     static let erWarning = Color(red: 1.000, green: 0.596, blue: 0.000)  // #FF9800
     static let erMuted   = Color(red: 0.741, green: 0.741, blue: 0.741)  // #BDBDBD
-    static let erDark    = Color(red: 0.129, green: 0.129, blue: 0.129)  // #212121
+    static let erDark    = Color(light: Color(red: 0.129, green: 0.129, blue: 0.129),  // #212121
+                                 dark: Color(white: 0.93))
     // Matches Android's Material3 onSurfaceVariant default (#49454F) exactly, for
     // labels/captions/status text that must stay legible — erMuted (#BDBDBD) is a
     // light gray meant for borders/icons/idle-state visuals, not text meant to be
     // read; SwiftUI's semantic .secondary renders noticeably lighter than Android's
     // onSurfaceVariant on this app's background, so a literal color match is used
     // here instead of relying on it.
-    static let erCaption = Color(red: 0.286, green: 0.271, blue: 0.310)  // #49454F
+    static let erCaption = Color(light: Color(red: 0.286, green: 0.271, blue: 0.310),  // #49454F
+                                 dark: Color(red: 0.792, green: 0.769, blue: 0.816))   // #CAC4D0
 }
 
 // MARK: - Chip style (selected = filled primary, unselected = outlined primary)
@@ -104,7 +112,8 @@ struct TonalButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: fontSize, weight: .semibold))
             .frame(maxWidth: .infinity, minHeight: height)
-            .background(RoundedRectangle(cornerRadius: 12).fill(Color(red: 0.910, green: 0.918, blue: 0.965)))
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color(light: Color(red: 0.910, green: 0.918, blue: 0.965),
+                                                                    dark: Color(red: 0.165, green: 0.180, blue: 0.290))))
             .foregroundColor(.erPrimary)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
