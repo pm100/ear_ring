@@ -46,7 +46,7 @@ const STEPS: [Step; 4] = [
     Step {
         id: "ready",
         title: "You're ready",
-        body: "On the Home tab, choose a key, scale and range, then tap Start Exercise.\n\nYou can change anything later in Settings, and the Help tab has a full guide.",
+        body: "You can change anything later in Settings, and the Help tab has a full guide.",
         primary_label: "Done",
         hint: "",
         success: "",

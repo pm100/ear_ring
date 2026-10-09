@@ -344,7 +344,7 @@ function HomeScreen({ settings, onAction, onStart }: Props) {
         <img src="/icon.png" alt="Ear Ring" style={{ width: 48, height: 48, borderRadius: 10 }} />
         <h1 className="app-title" style={{ margin: 0 }}>Ear Ring</h1>
       </div>
-      <p className="app-subtitle">Ear Training</p>
+      <p className="app-subtitle">Choose a key, scale and range, then tap Start Exercise.</p>
 
       <span className="section-label">Test Type<TooltipIcon tooltipKey="test_type" /></span>
       <select

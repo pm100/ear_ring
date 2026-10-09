@@ -206,8 +206,9 @@ struct HomeView: View {
                             .font(.system(size: 32, weight: .bold))
                             .foregroundColor(.erPrimary)
                     }
-                    Text("Ear Training")
-                        .font(.system(size: 16))
+                    Text("Choose a key, scale and range, then tap Start Exercise.")
+                        .font(.system(size: 14))
+                        .multilineTextAlignment(.center)
                         .foregroundColor(.erCaption)
                 }
                 .frame(maxWidth: .infinity)
