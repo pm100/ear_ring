@@ -105,7 +105,7 @@ async function getNextBuildNumber({ keyId, issuerId, keyPath, appId } = {}) {
   return highest + 1;
 }
 
-module.exports = { getNextBuildNumber };
+module.exports = { getNextBuildNumber, makeToken };
 
 if (require.main === module) {
   (async () => {

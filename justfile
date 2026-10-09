@@ -289,6 +289,8 @@ ios-archive: _ios-version _ios-keychain-unlock
 # API) and self-corrects if Apple rejects it as already-used — see
 # scripts/release_ios.js. Override with IOS_BUILD_NUMBER=<n> to force a
 # specific value.
+# After the upload it waits for Apple's processing and adds the build to the
+# external TestFlight groups (scripts/testflight_distribute.js).
 # Requires ~/.private_keys/AuthKey_<KeyID>.p8 on the Mac (download once from
 # App Store Connect → Users & Access → Integrations → App Store Connect API).
 # Key ID/Issuer ID default to the team key above; override via env vars if
@@ -324,6 +326,12 @@ android-play: _android-version
 [doc("Upload existing AAB to Play Store without rebuilding")]
 android-play-upload:
     Push-Location scripts; node publish_android.js; Pop-Location
+
+# Tag the current commit as a production release on GitHub, e.g. `just tag-release 1.0`.
+# Test uploads (TestFlight / Play closed testing) are tagged build-ios-N / build-android-N automatically.
+[doc("Tag HEAD as release-<version> on GitHub")]
+tag-release version:
+    node scripts/tag_release.js release-{{version}} "Release {{version}}"
 
 # Count lines of code
 [doc("Count lines of code")]

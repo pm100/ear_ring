@@ -18,7 +18,8 @@
  *
  * Usage (run on macOS, via `just ios-archive` / `just ios-testflight`):
  *   node release_ios.js            archive + export only
- *   node release_ios.js --upload   archive + export + upload to TestFlight
+ *   node release_ios.js --upload   archive + export + upload to TestFlight, then add the
+ *                                  build to external groups (testflight_distribute.js)
  *
  * Required:
  *   APP_STORE_KEY_ID, APP_STORE_ISSUER_ID   same App Store Connect API key
@@ -127,6 +128,10 @@ async function main() {
     if (status === 0) {
       console.log('');
       console.log(`✅ Build ${buildNumber} uploaded to TestFlight!`);
+      require('./tag_release').tagRelease(`build-ios-${buildNumber}`, `iOS TestFlight build ${buildNumber}`);
+      // Add the build to the external tester groups (waits for Apple processing).
+      const d = spawnSync(process.execPath, [path.join(__dirname, 'testflight_distribute.js'), String(buildNumber)], { stdio: 'inherit' });
+      if (d.status !== 0) console.warn('⚠️  Build is uploaded, but adding external testers failed — add them in App Store Connect.');
       return;
     }
 

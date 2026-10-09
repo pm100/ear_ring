@@ -101,6 +101,7 @@ async function main() {
 
   console.log('');
   console.log(`✅ Version ${versionCode} published to ${TRACK} testing track!`);
+  require('./tag_release').tagRelease(`build-android-${versionCode}`, `Android ${TRACK} build ${versionCode}`);
   console.log('   Testers will see the update in the Play Store within a few minutes.');
 }
 
