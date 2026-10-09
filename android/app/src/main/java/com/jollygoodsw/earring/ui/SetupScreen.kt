@@ -16,7 +16,7 @@ import com.jollygoodsw.earring.ExerciseViewModel
 import com.jollygoodsw.earring.ui.components.MusicStaff
 import com.jollygoodsw.earring.ui.components.NoteState
 import com.jollygoodsw.earring.ui.components.StaffNote
-import com.jollygoodsw.earring.ui.components.TunerMeter
+import com.jollygoodsw.earring.ui.components.PitchMeter
 import kotlin.math.roundToInt
 import org.json.JSONArray
 
@@ -131,16 +131,17 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
             }
         }
 
-        // Always the tuner needle (TunerMeter) — the classic note-name circle
-        // (PitchMeter) is still used by the Exercise screen and kept around here too
-        // (unused) in case this ever needs to be user-choosable again, but Mic Setup
-        // no longer offers a Display toggle for it.
-        // The meter is the only detected-note readout below the staff — the large
-        // note-name/Hz text that used to sit here was removed to make room for the
-        // always-visible Pitch Detection controls, without this screen needing to
-        // scroll. TunerMeter reads liveHz directly (not gated on note confirmation) so
-        // it behaves like a real tuner — see TunerMeter's doc.
-        TunerMeter(hz = liveHz, instrumentIndex = instrumentIndex, rootChroma = concertKeyChroma)
+        // The classic note-name circle (PitchMeter), same as the Exercise screen. The TunerMeter
+        // dial stays in the codebase but is not shown here for now (issue #49).
+        val liveMidi = if (liveHz > 0f) EarRingCore.freqToMidi(liveHz) else -1
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            PitchMeter(
+                detectedMidi = liveMidi,
+                detectedHz = liveHz,
+                instrumentIndex = instrumentIndex,
+                rootChroma = concertKeyChroma
+            )
+        }
         Spacer(Modifier.height(16.dp))
 
         // Mic Sensitivity lives here rather than in Settings — this screen already

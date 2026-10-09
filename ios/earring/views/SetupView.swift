@@ -29,8 +29,7 @@ struct SetupView: View {
 
     private var isIPad: Bool { hsc == .regular }
     private var staffHeight: CGFloat { isIPad ? 220 : 130 }
-    private var meterWidth: CGFloat { isIPad ? 300 : 200 }
-    private var meterHeight: CGFloat { isIPad ? 165 : 110 }
+    private var pitchMeterSize: CGFloat { isIPad ? 130 : 90 }
 
     private var displayHistory: [Int] {
         concertHistory.map { min(127, max(0, $0 + transpSemitones)) }
@@ -93,25 +92,17 @@ struct SetupView: View {
             }
 
             // ── Meter ─────────────────────────────────────────────────────
-            // Always the tuner needle (TunerMeterView) — the classic note-name
-            // circle (PitchMeterView) is still used by the Exercise screen and kept
-            // around here too (unused) in case this ever needs to be user-choosable
-            // again, but Mic Setup no longer offers a Display toggle for it.
-            // The only detected-note readout below the staff — the large
-            // note-name/Hz text that used to sit here was removed to make room
-            // for the always-visible Pitch Detection controls, without this
-            // screen needing to scroll. TunerMeterView reads the model's live
-            // midi/cents directly (not gated on note confirmation) so it behaves
-            // like a real tuner — see TunerMeterView's doc.
+            // The classic note-name circle (PitchMeterView), same as the Exercise screen. The
+            // TunerMeterView dial stays in the codebase but is not shown here for now (issue #49).
             Spacer().frame(height: 10)
             HStack {
                 Spacer()
-                TunerMeterView(
-                    midi: model.liveMidi, cents: model.liveCents,
+                PitchMeterView(
+                    midi: model.liveMidi, isActive: true,
                     instrumentIndex: model.instrumentIndex,
-                    rootChroma: EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId),
-                    width: meterWidth, height: meterHeight
+                    rootChroma: EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId)
                 )
+                .frame(width: pitchMeterSize, height: pitchMeterSize)
                 Spacer()
             }
 

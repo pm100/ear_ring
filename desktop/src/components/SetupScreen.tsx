@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
-import TunerMeter from './TunerMeter';
+import PitchMeter from './PitchMeter';
 import MusicStaff from './MusicStaff';
 import { useAudioCapture, TrackerFrame } from '../hooks/useAudioCapture';
 import { ExerciseSettings } from '../types';
@@ -140,17 +140,10 @@ export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, ro
         <button className="btn-back" onClick={() => setNoteHistory([])}>Clear</button>
       </div>
 
-      {/* Always the tuner needle (TunerMeter) — the classic note-name circle
-          (PitchMeter) is still used by the Exercise screen and kept around here too
-          (unused) in case this ever needs to be user-choosable again, but Mic Setup
-          no longer offers a Display toggle for it.
-          The meter is the only detected-note readout below the staff — the large
-          note-name/Hz text that used to sit here was removed to make room for the
-          always-visible Pitch Detection controls, without this screen needing to
-          scroll. TunerMeter reads hz directly (not gated on note confirmation) so it
-          behaves like a real tuner — see TunerMeter's doc. */}
+      {/* The classic note-name circle (PitchMeter), same as the Exercise screen. TunerMeter stays
+          in the codebase but is not shown here for now (issue #49). */}
       <div className="pitch-meter-circle">
-        <TunerMeter hz={hz} transposeSemitones={transpSemitones} keyChroma={effectiveKeyChroma(rootChroma, scaleId)} />
+        <PitchMeter hz={hz} transposeSemitones={transpSemitones} keyChroma={effectiveKeyChroma(rootChroma, scaleId)} />
       </div>
 
       <div style={{ marginTop: 16 }}>

@@ -414,19 +414,14 @@ staff history above (not the live meter, which keeps tracking whatever the mic h
 next). Associated with the staff by position, not placed in the title row.
 
 [10dp space]
-TunerMeter             — semicircular guitar-tuner-style dial (replaced the old
-                        PitchMeter circle here — PitchMeter is still what the
-                        Exercise screen uses; see the Pitch Meter Specification
-                        section below for both). A needle sweeps continuously with
-                        the live pitch: green/amber/red bands at ±5¢/±20¢/±50¢ from
-                        dead-on, note name + optional written/concert dual label
-                        below the dial, and a cents readout ("in tune" or "+n¢"/"-n¢")
-                        below that. Unlike the rest of the detection pipeline it
-                        reads every frame's raw Hz directly — not gated behind the
-                        note-stability confirmation used everywhere else — so it
-                        responds instantly like a real clip-on tuner. There is no
-                        user-facing toggle between this and PitchMeter; which
-                        widget appears is fixed per screen.
+PitchMeter             — the same 90dp (130dp iPad) note-name circle the Exercise screen uses
+                        (see the Pitch Meter Specification section below), centred.
+                        Issue #49: this screen briefly used the TunerMeter dial instead,
+                        but first-time users could not tell what to aim for, so it went
+                        back to the classic circle. TunerMeter (`TunerMeter.tsx` / `.kt` /
+                        `.swift`) is kept, unused, in case it returns. There is no
+                        user-facing toggle between the two; which widget appears is fixed
+                        per screen.
 
 [12dp space]
 Mic Sensitivity — the only detection control always visible (no chevron, no
@@ -816,7 +811,9 @@ Circular widget, **90dp/px diameter**. Only updates on a confirmed (stability-ga
   "—" — a bare dash read as a misplaced divider rather than "no note
   detected yet" (fixed during the UI review, issue #30)
 
-### TunerMeter (Mic Setup screen)
+### TunerMeter (not currently shown)
+
+Issue #49: Mic Setup uses PitchMeter again; this widget is kept in the codebase but unused.
 
 Semicircular dial, ~200×110 (desktop SVG units; Android/iOS scale equivalently),
 implemented identically on all three platforms (`TunerMeter.tsx` / `.kt` / `.swift`).
@@ -1021,8 +1018,8 @@ The three Voice instruments also default to a wider Pitch Tolerance (80 cents vs
 every other instrument) — real voices drift with natural vibrato, unlike an instrument
 with a mechanical pitch stop. This is what the `use_tuner_meter`/`useTunerMeter` field
 (any instrument's tolerance above `FIXED_PITCH_TOLERANCE_CENTS` = 50 flips it on) was
-originally for, though nothing currently reads that flag now that Mic Setup always shows
-TunerMeter regardless of instrument (see Pitch Meter Specification). See **Premium**
+originally for, though nothing currently reads that flag now that Mic Setup always shows the
+PitchMeter regardless of instrument (see Pitch Meter Specification). See **Premium**
 under the Settings Screen section above for the entitlement gate itself.
 
 ---
@@ -1049,7 +1046,7 @@ step). **Skip setup** stays top right.
 |---|----|---------|----------------|
 | 1 | `welcome` | What the app does, green/red meaning | Get started |
 | 2 | `instrument` | Instrument dropdown (premium-filtered, same list and `setInstrument` action as Settings) and a "Range: X to Y" line in concert pitch, the same as the Range on Home; text warns that the device will next ask for microphone permission | Next |
-| 3 | `mic` | System mic-permission prompt appears here. Embeds the real **Mic Setup screen** (same code as the Mic tab, in an `embedded` mode without its title and instruction line): listening indicator, staff, tuner meter, Mic Sensitivity slider and Advanced. Below it, a hint after 10 s of silence, and a tick plus success text on the first note that registers on the staff (confirmed and inside the instrument's range) | Next (disabled until a note is heard) |
+| 3 | `mic` | System mic-permission prompt appears here. Embeds the real **Mic Setup screen** (same code as the Mic tab, in an `embedded` mode without its title and instruction line): listening indicator, staff, pitch meter, Mic Sensitivity slider and Advanced. Below it, a hint after 10 s of silence, and a tick plus success text on the first note that registers on the staff (confirmed and inside the instrument's range) | Next (disabled until a note is heard) |
 | 4 | `ready` | Reminder that everything can be changed later in Settings (the how-to for the Home screen lives on Home itself, issue #50) | Done (lands on Home) |
 
 - Step 3 has no skip of its own: Next stays disabled until a note registers on the staff, so a user
