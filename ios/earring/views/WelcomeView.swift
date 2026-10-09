@@ -36,6 +36,7 @@ struct WelcomeView: View {
         } else {
             let step = steps[min(index, steps.count - 1)]
             let isMic = step.id == "mic"
+            let isWelcome = index == 0
             // The content scrolls; the buttons stay pinned below it so Next and Back are
             // always visible, even beside the tall embedded Mic Setup screen.
             VStack(spacing: 0) {
@@ -50,11 +51,15 @@ struct WelcomeView: View {
 
                 ScrollView {
                     VStack(spacing: 0) {
-                        Text("Step \(index + 1) of \(steps.count)")
-                            .font(.caption).foregroundColor(.secondary)
+                        if isWelcome {
+                            Image("AppLogo")
+                                .resizable()
+                                .frame(width: 96, height: 96)
+                                .clipShape(RoundedRectangle(cornerRadius: 20))
+                                .padding(.bottom, 24)
+                        }
                         Text(step.title)
                             .font(.title2.bold()).multilineTextAlignment(.center)
-                            .padding(.top, 16)
                         VStack(spacing: 8) {
                             ForEach(step.body.components(separatedBy: "\n\n"), id: \.self) { para in
                                 Text(para.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -75,24 +80,35 @@ struct WelcomeView: View {
                     .frame(maxWidth: .infinity)
                 }
 
-                VStack(spacing: 4) {
-                    Button {
-                        advance()
-                    } label: {
-                        Text(step.primaryLabel).font(.headline).frame(maxWidth: .infinity).padding(.vertical, 14)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.erPrimary)
-                    .disabled(isMic && !micHeard)
-
-                    HStack {
-                        if index > 0 {
-                            Button("\u{2190} Back") { index -= 1 }
+                Group {
+                    if isWelcome {
+                        Button {
+                            advance()
+                        } label: {
+                            Text(step.primaryLabel).font(.headline).frame(maxWidth: .infinity).padding(.vertical, 14)
                         }
-                        Spacer()
+                        .buttonStyle(.borderedProminent)
+                        .tint(.erPrimary)
+                    } else {
+                        // Back, progress dots (every step after Welcome), Next.
+                        HStack {
+                            Button("Back") { index -= 1 }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            HStack(spacing: 8) {
+                                ForEach(0..<(steps.count - 1), id: \.self) { i in
+                                    Circle()
+                                        .fill(i == index - 1 ? Color.erPrimary : Color.secondary.opacity(0.35))
+                                        .frame(width: 10, height: 10)
+                                }
+                            }
+                            Button { advance() } label: { Text(step.primaryLabel).bold() }
+                                .disabled(isMic && !micHeard)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                        }
+                        .frame(minHeight: 44)
                     }
-                    .frame(minHeight: 36)
                 }
+                .frame(height: 56)
                 .frame(maxWidth: 520)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 8)
@@ -100,6 +116,13 @@ struct WelcomeView: View {
                 .background(Color(.systemBackground))
             }
             .background(Color(.systemBackground))
+            // Swipe left for Next, right for Back; the sensitivity slider takes its own drags.
+            .gesture(DragGesture(minimumDistance: 40).onEnded { v in
+                let dx = v.translation.width, dy = v.translation.height
+                guard abs(dx) > 80, abs(dx) > 2 * abs(dy) else { return }
+                if dx < 0, index < steps.count - 1, !(isMic && !micHeard) { advance() }
+                else if dx > 0, index > 0 { index -= 1 }
+            })
         }
     }
 

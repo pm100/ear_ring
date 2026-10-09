@@ -1023,8 +1023,16 @@ flow instead of Home (or Help). Android is the reference; iOS and desktop match 
 Step text, labels and hints come from the Rust core (`rust/src/onboarding.rs`, exposed as
 `onboarding_steps_json()` / `ear_ring_onboarding_steps` / `nativeOnboardingSteps` /
 `cmd_onboarding_steps`); platforms only render them. Centered column, max 520 wide on
-iPad/desktop, 24dp padding, "Step N of 4" caption, title, centered body paragraphs, an
-optional step widget, then a full-width primary button, then optional text buttons.
+iPad/desktop, 24dp padding, title, centered body paragraphs, an optional step widget,
+then the navigation (below). There is no "Step N of 4" caption (issues #46, #47, #48).
+
+**Navigation.** Step 1 (`welcome`) shows the app logo (96dp, 20dp corner radius, the same
+image as the Home title row: `R.mipmap.ic_launcher` / `AppLogo` / `/icon.png`) above the
+title, then a single full-width primary **Get started** button, no Back and no dots. Every
+later step shows one row: text **Back** on the left, **progress dots** centred (one dot per
+step after Welcome, 10dp, current in the primary colour, others a muted tint), and a bold
+text **Next** (**Done** on the last step) on the right. Next is dimmed while disabled (mic
+step). **Skip setup** stays top right.
 
 | # | id | Content | Primary button |
 |---|----|---------|----------------|
@@ -1038,7 +1046,8 @@ optional step widget, then a full-width primary button, then optional text butto
   permission is denied, Android and iOS show an explanation (enable it in system settings, or
   replay from Help) instead of the staff.
 - Steps 1 to 3 have a **Skip setup** text button (top right) that leaves the flow at once and lands on Home, setting the first-launch flag like finishing does. Its label (`exitLabel`) comes from the Rust core. Skipping before step 3 means the microphone prompt is not shown by the flow; Android then asks at the next app start, and iOS and desktop ask when capture first starts.
-- Back goes to the previous step (system back on Android, a "← Back" text button elsewhere). On iOS and desktop the Next and Back buttons are pinned below a scrolling content area, so they stay visible beside the tall embedded Mic Setup screen.
+- Swiping left goes to Next and swiping right to Back, on every platform (a horizontal drag of 80+ pt/px, at least twice as far across as down; touch only on desktop). Swiping left does nothing on the last step, and does not pass the mic step until a note is heard. Drags that start on the Mic Sensitivity slider belong to the slider.
+- Back goes to the previous step (system back or the Back text button on every platform). On iOS and desktop the Next and Back buttons are pinned below a scrolling content area, so they stay visible beside the tall embedded Mic Setup screen.
 - Finishing or skipping sets the first-launch flag (see below). Quitting mid-flow leaves it
   unset, so the flow restarts at step 1 next launch.
 - Help ends with a **Replay welcome** button that reopens the flow; finishing it returns to Home.

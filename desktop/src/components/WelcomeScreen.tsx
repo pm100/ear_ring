@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import SetupScreen from './SetupScreen';
 import { ExerciseSettings } from '../types';
@@ -30,6 +30,7 @@ export default function WelcomeScreen({ settings, onAction, isPremium, onFinishe
   const [index, setIndex] = useState(0);
   const [micHeard, setMicHeard] = useState(false);
   const markHeard = useCallback(() => setMicHeard(true), []);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     invoke<string>('cmd_onboarding_steps')
@@ -40,16 +41,35 @@ export default function WelcomeScreen({ settings, onAction, isPremium, onFinishe
   if (steps.length === 0) return null;
   const step = steps[index];
   const isMic = step.id === 'mic';
+  const isWelcome = index === 0;
   const next = () => (index >= steps.length - 1 ? onFinished() : setIndex(index + 1));
 
+  // Swipe left for Next, right for Back (touch screens); drags on the sensitivity slider are ignored.
+  const onTouchStart = (e: React.TouchEvent) => {
+    const onSlider = (e.target as HTMLElement).closest('input[type="range"]');
+    touchStart.current = onSlider ? null : { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const s0 = touchStart.current;
+    touchStart.current = null;
+    if (!s0) return;
+    const dx = e.changedTouches[0].clientX - s0.x;
+    const dy = e.changedTouches[0].clientY - s0.y;
+    if (Math.abs(dx) < 80 || Math.abs(dx) < 2 * Math.abs(dy)) return;
+    if (dx < 0 && index < steps.length - 1 && !(isMic && !micHeard)) next();
+    else if (dx > 0 && index > 0) setIndex(index - 1);
+  };
+
   return (
-    <div className="screen" style={{ maxWidth: isMic ? 640 : 520, margin: '0 auto', textAlign: 'center', padding: 24 }}>
+    <div className="screen" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ maxWidth: isMic ? 640 : 520, margin: '0 auto', textAlign: 'center', padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', minHeight: 32 }}>
         {step.exitLabel && (
           <button type="button" className="btn-back" onClick={onFinished}>{step.exitLabel}</button>
         )}
       </div>
-      <div style={{ fontSize: 12, color: '#757575' }}>Step {index + 1} of {steps.length}</div>
+      {isWelcome && (
+        <img src="/icon.png" alt="Ear Ring" style={{ width: 96, height: 96, borderRadius: 20, marginTop: 8 }} />
+      )}
       <h1 style={{ fontSize: 24, margin: '16px 0' }}>{step.title}</h1>
       {step.body.split('\n\n').map((para, i) => (
         <p key={i} style={{ fontSize: 16, lineHeight: 1.6, margin: '8px 0' }}>{para.trim()}</p>
@@ -63,15 +83,30 @@ export default function WelcomeScreen({ settings, onAction, isPremium, onFinishe
       </div>
 
       {/* Pinned so Next and Back stay visible beside the tall embedded Mic Setup screen. */}
-      <div style={{ position: 'sticky', bottom: 0, background: '#fff', padding: '8px 0 12px' }}>
-        <button type="button" className="btn-primary" disabled={isMic && !micHeard}
-          style={isMic && !micHeard ? { opacity: 0.5, cursor: 'default' } : undefined}
-          onClick={next}>{step.primaryLabel}</button>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-          {index > 0
-            ? <button type="button" className="btn-back" onClick={() => setIndex(index - 1)}>{'\u2190'} Back</button>
-            : <span />}
-        </div>
+      <div style={{ position: 'sticky', bottom: 0, marginTop: 'auto', background: '#fff', padding: '8px 0 12px', minHeight: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        {isWelcome ? (
+          <button type="button" className="btn-primary" onClick={next}>{step.primaryLabel}</button>
+        ) : (
+          // Back, progress dots (every step after Welcome), Next.
+          <div style={{ display: 'flex', alignItems: 'center', minHeight: 44 }}>
+            <div style={{ flex: 1, textAlign: 'left' }}>
+              <button type="button" className="btn-back" onClick={() => setIndex(index - 1)}>Back</button>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {steps.slice(1).map((st, i) => (
+                <span key={st.id} style={{
+                  width: 10, height: 10, borderRadius: '50%',
+                  background: i === index - 1 ? '#3F51B5' : '#c5cae9',
+                }} />
+              ))}
+            </div>
+            <div style={{ flex: 1, textAlign: 'right' }}>
+              <button type="button" className="btn-back" disabled={isMic && !micHeard}
+                style={{ fontWeight: 700, ...(isMic && !micHeard ? { opacity: 0.5, cursor: 'default' } : {}) }}
+                onClick={next}>{step.primaryLabel}</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

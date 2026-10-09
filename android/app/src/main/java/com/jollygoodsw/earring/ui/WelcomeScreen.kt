@@ -5,7 +5,12 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -13,7 +18,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -21,6 +30,7 @@ import androidx.core.content.ContextCompat
 import com.jollygoodsw.earring.EarRingCore
 import com.jollygoodsw.earring.ExerciseViewModel
 import com.jollygoodsw.earring.MusicTheory
+import com.jollygoodsw.earring.R
 import kotlinx.coroutines.delay
 import org.json.JSONArray
 
@@ -59,6 +69,7 @@ fun WelcomeScreen(viewModel: ExerciseViewModel, onFinished: () -> Unit) {
     }
     val step = steps[index.coerceIn(0, steps.lastIndex)]
     val isMic = step.id == "mic"
+    val isWelcome = index == 0
     var micHeard by rememberSaveable { mutableStateOf(false) }
 
     fun next() {
@@ -67,28 +78,52 @@ fun WelcomeScreen(viewModel: ExerciseViewModel, onFinished: () -> Unit) {
 
     BackHandler(enabled = index > 0) { index-- }
 
-    // The mic step embeds the real Mic Setup screen, which scrolls by itself, so only the
-    // other steps get an outer scroll.
+    // Swipe left for Next, right for Back; inner controls (the sensitivity slider) consume their own drags.
+    val swipePx = with(LocalDensity.current) { 80.dp.toPx() }
+    val canNext = index < steps.lastIndex && (!isMic || micHeard)
+
+    // Skip on top and the nav pinned at the bottom (same place on every step); the content between
+    // them scrolls, except on the mic step, which embeds the real Mic Setup screen (it scrolls itself).
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .then(if (isMic) Modifier else Modifier.verticalScroll(rememberScrollState()))
+            .pointerInput(index, canNext) {
+                var total = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { total = 0f },
+                    onDragCancel = { total = 0f },
+                    onDragEnd = {
+                        if (total < -swipePx && canNext) next()
+                        else if (total > swipePx && index > 0) index--
+                    }
+                ) { _, delta -> total += delta }
+            }
             .padding(horizontal = 24.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Text(
-                "Step ${index + 1} of ${steps.size}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        Box(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) {
             if (step.exitLabel.isNotEmpty()) {
-                TextButton(onClick = onFinished, modifier = Modifier.align(Alignment.CenterEnd)) {
-                    Text(step.exitLabel)
-                }
+                TextButton(onClick = onFinished) { Text(step.exitLabel) }
             }
         }
-        Spacer(Modifier.height(12.dp))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .then(if (isMic) Modifier else Modifier.verticalScroll(rememberScrollState())),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+        if (isWelcome) {
+            Spacer(Modifier.height(16.dp))
+            Image(
+                painter = painterResource(R.mipmap.ic_launcher),
+                contentDescription = "Ear Ring icon",
+                modifier = Modifier.size(96.dp).clip(RoundedCornerShape(20.dp))
+            )
+            Spacer(Modifier.height(24.dp))
+        } else {
+            Spacer(Modifier.height(12.dp))
+        }
         Text(
             step.title,
             style = MaterialTheme.typography.headlineSmall,
@@ -113,15 +148,62 @@ fun WelcomeScreen(viewModel: ExerciseViewModel, onFinished: () -> Unit) {
 
         if (isMic) {
             MicCheck(viewModel, step, heard = micHeard, onHeard = { micHeard = true }, modifier = Modifier.weight(1f))
-        } else {
-            Spacer(Modifier.height(12.dp))
+        }
         }
 
-        Button(
-            onClick = { next() },
-            enabled = !isMic || micHeard,
-            modifier = Modifier.fillMaxWidth()
-        ) { Text(step.primaryLabel) }
+        Spacer(Modifier.height(8.dp))
+        Box(modifier = Modifier.fillMaxWidth().height(56.dp), contentAlignment = Alignment.Center) {
+            if (isWelcome) {
+                Button(onClick = { next() }, modifier = Modifier.fillMaxWidth()) { Text(step.primaryLabel) }
+            } else {
+                NavRow(
+                    dots = steps.size - 1,
+                    current = index - 1,
+                    nextLabel = step.primaryLabel,
+                    nextEnabled = !isMic || micHeard,
+                    onBack = { index-- },
+                    onNext = { next() }
+                )
+            }
+        }
+    }
+}
+
+/** Back (left), progress dots (centre), Next (right); the dots cover every step after Welcome. */
+@Composable
+private fun NavRow(
+    dots: Int,
+    current: Int,
+    nextLabel: String,
+    nextEnabled: Boolean,
+    onBack: () -> Unit,
+    onNext: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            TextButton(onClick = onBack) { Text("Back") }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(dots) { i ->
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (i == current) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outlineVariant
+                        )
+                )
+            }
+        }
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+            TextButton(onClick = onNext, enabled = nextEnabled) {
+                Text(nextLabel, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
 
