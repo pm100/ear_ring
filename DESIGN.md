@@ -536,20 +536,30 @@ shows the title via its standard `screen-header` bar, which also has a back butt
 there since desktop's Settings is reached by navigating away from Home rather than
 via a persistent tab).
 
-A flat list of three collapsible sections, all starting collapsed — no group
-headers above them (an earlier iteration grouped sections under "User"/"Advanced"
-headings, but with the section count this small the grouping added a layer of
-structure without adding clarity, so it was dropped; see the UI review, issue
-#30). Tapping a section's header row toggles it — the header shows only the
-section title, with no value summary (an earlier iteration also tried a
-"Title · current value" summary on each collapsed header, but it didn't scale
-once a section held more than one or two settings, so that was dropped too).
-Expanded content is indented with a thin left rule, and every section (collapsed
-or expanded) is separated from the next by a divider.
+**Per-platform native layout (issue #52, an exception to the UI Consistency Rule).**
+The Settings root is a short list of three category rows that each open that category's
+settings; the rows are drawn in each mobile platform's own convention rather than one
+shared look. Android is therefore not the visual reference for this screen. Desktop is
+unchanged (three collapsible sections).
 
-Each section groups several related settings under one heading — deliberately
-fewer, larger sections rather than one section per setting, so the accordion
-doesn't fragment into a dozen near-empty entries:
+- **Android — Settings root:** Material list. Each row is a `ListItem` with a leading
+  primary-coloured icon (music note, speaker, timer), the category title, the current
+  value as supporting text where cheap (Instrument & Playback shows the instrument name)
+  and a trailing chevron, separated by dividers. Tapping a row shows that category in
+  place (page state, system back returns), under a back arrow + title header. Reset to
+  Defaults is a plain row with error-coloured text between dividers, and the build string
+  sits below it as small centred text.
+- **iOS — Settings root:** a native `List` with `.insetGrouped` style on the system
+  grouped background. The three categories share one rounded card; each row is a
+  `NavigationLink` with a 29pt coloured SF Symbol tile (blue `music.note`, orange
+  `speaker.wave.2.fill`, green `timer`), the title in normal case, and the instrument name
+  on the right for Instrument & Playback. Each category pushes a native inset-grouped
+  screen with a standard inline navigation title and back button; pickers, toggles, chip
+  grids and the slider sit in their own rows or cards. Reset to Defaults is its own card
+  with red centred text, and the build string is that card's footer.
+
+Each category groups several related settings under one heading, deliberately fewer,
+larger categories rather than one per setting:
 
 - **Instrument & Playback** — outlined dropdown, full width: Piano | Guitar |
   Transposed Guitar | Soprano Sax | Alto Sax | Tenor Sax | Trumpet | Clarinet

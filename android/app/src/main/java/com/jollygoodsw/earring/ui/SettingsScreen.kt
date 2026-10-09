@@ -1,18 +1,18 @@
 package com.jollygoodsw.earring.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
@@ -26,59 +26,6 @@ import com.jollygoodsw.earring.BuildConfig
 import com.jollygoodsw.earring.EarRingCore
 import com.jollygoodsw.earring.ExerciseViewModel
 import org.json.JSONArray
-
-/** A section that starts collapsed; tapping the header title toggles it open/closed.
- *  Expanded content is indented with a left rule, and every section is followed by
- *  a divider — a section groups several related settings under one heading, so no
- *  collapsed-value summary is shown (a summary can't stay short once a section holds
- *  more than one or two settings). */
-@Composable
-internal fun ExpandableSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    val borderColor = MaterialTheme.colorScheme.outlineVariant
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { expanded = !expanded }
-                .padding(vertical = 10.dp)
-        ) {
-            Text(
-                title,
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = if (expanded) "Collapse" else "Expand",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        AnimatedVisibility(
-            visible = expanded,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut()
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(start = 12.dp, bottom = 12.dp)
-                    .drawBehind {
-                        drawLine(
-                            color = borderColor,
-                            start = androidx.compose.ui.geometry.Offset(0f, 0f),
-                            end = androidx.compose.ui.geometry.Offset(0f, size.height),
-                            strokeWidth = 2.dp.toPx()
-                        )
-                    }
-                    .padding(start = 12.dp),
-                content = content
-            )
-        }
-        HorizontalDivider(color = borderColor.copy(alpha = 0.4f))
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,6 +53,9 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
     val selectableInstruments = allInstruments.filter { (_, _, premium) -> !premium || state.isPremium }
     val currentInstrumentName = allInstruments.firstOrNull { it.first == state.instrumentIndex }?.second ?: "Piano"
     var instrumentExpanded by remember { mutableStateOf(false) }
+    // 0 = the list of categories; 1..3 = one category's settings.
+    var page by rememberSaveable { mutableIntStateOf(0) }
+    BackHandler(enabled = page != 0) { page = 0 }
 
     Column(
         modifier = Modifier
@@ -115,18 +65,34 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
     ) {
         Spacer(Modifier.height(8.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Spacer(Modifier.weight(1f))
-            Text("Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.weight(1f))
+        if (page == 0) {
+            Text(
+                "Settings",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(Modifier.height(16.dp))
+            // The usual Material settings list: icon, title, current value, chevron.
+            SettingsCategoryRow(Icons.Default.MusicNote, "Instrument & Playback", currentInstrumentName) { page = 1 }
+            SettingsCategoryRow(Icons.AutoMirrored.Filled.VolumeUp, "Sound & Display", null) { page = 2 }
+            SettingsCategoryRow(Icons.Default.Timer, "Exercise & Timing", null) { page = 3 }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { page = 0 }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+                Text(
+                    when (page) { 1 -> "Instrument & Playback"; 2 -> "Sound & Display"; else -> "Exercise & Timing" },
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.height(8.dp))
         }
 
-        Spacer(Modifier.height(16.dp))
-
-        ExpandableSection("Instrument & Playback") {
+        if (page == 1) {
             SectionLabel("Instrument", tooltipKey = "instrument")
             ExposedDropdownMenuBox(
                 expanded = instrumentExpanded,
@@ -162,7 +128,7 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             )
         }
 
-        ExpandableSection("Sound & Display") {
+        if (page == 2) {
             // Switch, not Checkbox — a checkbox reads as "select from a list," a
             // switch as "toggle a setting," and Switch is what every other on/off
             // preference on the platform (including this app's own OS settings)
@@ -207,7 +173,7 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             }
         }
 
-        ExpandableSection("Exercise & Timing") {
+        if (page == 3) {
             // Explanatory captions removed under each label here — redundant now that
             // every label has a tooltip icon (issue #11). Pause Before Playing keeps its
             // live ms readout since the Slider itself shows no value of its own.
@@ -247,7 +213,7 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
             )
         }
 
-        if (BuildConfig.DEBUG) {
+        if (page == 0 && BuildConfig.DEBUG) {
             // Debug-build-only: excluded from release/Play Store builds. Nothing else can
             // set isPremium true yet (no billing/gifting wired up), so this is the only way
             // to test the premium gate before that lands.
@@ -273,25 +239,39 @@ fun SettingsScreen(viewModel: ExerciseViewModel) {
                 }
             )
         }
-        Button(
-            onClick = { showResetConfirm = true },
-            modifier = Modifier.fillMaxWidth(),
-            // .error/.onError — see ExerciseScreen.kt's Stop Testing button for why not
-            // the errorContainer/onErrorContainer pair (issue #30).
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-        ) {
-            Text("Reset to Defaults", color = MaterialTheme.colorScheme.onError)
+        if (page == 0) {
+            HorizontalDivider()
+            ListItem(
+                headlineContent = { Text("Reset to Defaults", color = MaterialTheme.colorScheme.error) },
+                modifier = Modifier.clickable { showResetConfirm = true }
+            )
+            HorizontalDivider()
         }
 
-        Spacer(Modifier.height(16.dp))
-        Text(
+        if (page == 0) Text(
             "Build ${EarRingCore.gitHash()}",
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
         )
 
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun SettingsCategoryRow(icon: ImageVector, title: String, value: String?, onClick: () -> Unit) {
+    Column {
+        ListItem(
+            leadingContent = { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            headlineContent = { Text(title) },
+            supportingContent = value?.let { { Text(it) } },
+            trailingContent = {
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
+            modifier = Modifier.clickable(onClick = onClick)
+        )
+        HorizontalDivider()
     }
 }
