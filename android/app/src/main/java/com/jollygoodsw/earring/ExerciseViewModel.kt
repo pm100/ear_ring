@@ -212,7 +212,6 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     }
 
     val audioPlayback = AudioPlayback(application)
-    private var sessionPersisted = false
 
     private val vibrator: Vibrator by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -278,7 +277,6 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
 
     fun startExercise() {
         audioPlayback.cancelPlayback()
-        sessionPersisted = false
         _state.value = _state.value.copy(
             sequence = emptyList(),
             detected = emptyList(),
@@ -619,6 +617,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
             testsCompleted = state.testsCompleted + 1,
             cumulativeScorePercent = state.cumulativeScorePercent + scorePercent
         )
+        saveSessionSummary()
         val mySession = state.sessionId
         viewModelScope.launch {
             delay(_state.value.wrongNotePauseMs)
@@ -662,7 +661,6 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     }
 
     private fun saveSessionSummary() {
-        if (sessionPersisted) return
         val state = _state.value
         if (state.testsCompleted <= 0) return
         val context = getApplication<Application>()
@@ -677,7 +675,6 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
                 sessionId = state.sessionId
             )
         )
-        sessionPersisted = true
     }
 
     private fun vibrate(success: Boolean) {

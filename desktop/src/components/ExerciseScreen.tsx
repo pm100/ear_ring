@@ -33,10 +33,13 @@ function averageScore(cumulativeScorePercent: number, testsCompleted: number): n
   return testsCompleted === 0 ? 0 : Math.floor(cumulativeScorePercent / testsCompleted);
 }
 
+// Upsert by sessionId: written after every test so an interrupted session is kept (issue #55).
 function appendSessionRecord(exercise: ExerciseState, score: number) {
-  const existing = JSON.parse(localStorage.getItem('ear_ring_sessions') || '[]');
+  const all = JSON.parse(localStorage.getItem('ear_ring_sessions') || '[]');
+  const prior = all.find((s: { sessionId?: number }) => s.sessionId === exercise.sessionId);
+  const existing = all.filter((s: { sessionId?: number }) => s.sessionId !== exercise.sessionId);
   existing.unshift({
-    date: new Date().toISOString(),
+    date: prior?.date ?? new Date().toISOString(),
     scale: SCALE_NAMES[exercise.scaleId],
     root: NOTE_NAMES[exercise.rootNote],
     score,
@@ -95,7 +98,6 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   // between the note-confirmed and invoke-resolved moments would save a summary that's
   // missing the test currently completing (not just the very first test — any test).
   const pendingCompletionsRef = useRef(0);
-  const sessionSavedRef = useRef(false);
   const sessionRunningRef = useRef(true);
   const timersRef = useRef<number[]>([]);
   const handleFrameRef = useRef<(frame: TrackerFrame) => void>(() => {});
@@ -366,18 +368,16 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
     void retryCurrentTest(currentAttemptRef.current);
   }, [status, stopCapture, retryCurrentTest]);
 
-  // Issue #25: the single place a session summary gets written, whether triggered by
-  // Stop or by a completeTest() completion that resolves after Stop already ran. Reads
-  // the refs (always current) rather than testsCompleted/cumulativeScorePercent state
-  // (which can still be one test behind while completeTest's async work is in flight),
-  // and sessionSavedRef guards it from running twice however the two call sites race.
+  // Issues #25, #55: the single place a session summary gets written — after every
+  // completed test and again on Stop. Reads the refs (always current) rather than state
+  // (which can lag while completeTest's async work is in flight); the write is an upsert
+  // by sessionId, so repeating it is harmless.
   const maybeSaveSession = useCallback(() => {
-    if (sessionSavedRef.current || testsCompletedRef.current === 0) return;
+    if (testsCompletedRef.current === 0) return;
     appendSessionRecord(
       { ...exercise, testsCompleted: testsCompletedRef.current, cumulativeScorePercent: cumulativeScorePercentRef.current } as ExerciseState,
       averageScore(cumulativeScorePercentRef.current, testsCompletedRef.current)
     );
-    sessionSavedRef.current = true;
   }, [exercise]);
 
   const completeTest = useCallback((passed: boolean, attemptNotes: DetectedNote[], attemptsUsed: number) => {
@@ -422,13 +422,8 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       testsCompletedRef.current += 1;
       cumulativeScorePercentRef.current += testScore;
       pendingCompletionsRef.current -= 1;
-      if (!sessionRunningRef.current) {
-        // Stop already ran. If it saw a pending completion (this one) it deliberately
-        // deferred the save to avoid missing this test's result — do it now that the
-        // refs are current, but only once every such completion has landed.
-        if (pendingCompletionsRef.current === 0) maybeSaveSession();
-        return;
-      }
+      maybeSaveSession();
+      if (!sessionRunningRef.current) return;
       setTestsCompleted(testsCompletedRef.current);
       setCumulativeScorePercent(cumulativeScorePercentRef.current);
       setStatus('retry_delay');

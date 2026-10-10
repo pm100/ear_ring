@@ -35,6 +35,7 @@ class ProgressViewModel(application: Application) : AndroidViewModel(application
 
     private fun loadSessions() {
         val context = getApplication<Application>()
+        ProgressStorage.reconcileSessions(context)
         updateState(
             sessions = ProgressStorage.loadSessions(context),
             tests = ProgressStorage.loadTests(context)

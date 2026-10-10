@@ -61,9 +61,27 @@ object ProgressStorage {
         }
     }
 
+    /** Upsert by sessionId: written after every test so an interrupted session is kept (issue #55). */
     fun appendSession(context: Context, record: SessionRecord) {
-        val sessions = loadSessions(context) + record
-        saveSessions(context, sessions)
+        val all = loadSessions(context)
+        val prior = all.firstOrNull { it.sessionId == record.sessionId }
+        val kept = all.filter { it.sessionId != record.sessionId }
+        saveSessions(context, kept + (prior?.let { record.copy(timestamp = it.timestamp) } ?: record))
+    }
+
+    /** Rebuilds a session for any test whose session was never saved (app killed mid-session
+     *  before issue #55's per-test save) so those tests show up in history. */
+    fun reconcileSessions(context: Context) {
+        val known = loadSessions(context).map { it.sessionId }.toSet()
+        loadTests(context).filter { it.sessionId != 0L && it.sessionId !in known }
+            .groupBy { it.sessionId }.forEach { (sid, group) ->
+                val first = group.minByOrNull { it.timestamp }!!
+                appendSession(context, SessionRecord(
+                    scaleName = first.scaleName, rootLabel = first.rootLabel,
+                    score = group.map { it.scorePercent }.average().toFloat() / 100f,
+                    sequenceLength = first.sequenceLength, testsCompleted = group.size,
+                    timestamp = first.timestamp, sessionId = sid))
+            }
     }
 
     fun loadTests(context: Context): List<TestRecord> {

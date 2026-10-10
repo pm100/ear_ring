@@ -61,7 +61,7 @@ struct ProgressScreen: View {
                 Spacer().frame(height: 12)
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("\(progressModel.tests.count) recorded tests")
+                        Text("\(progressModel.tests.count) recorded \(progressModel.tests.count == 1 ? "test" : "tests")")
                             .font(.system(size: 22, weight: .bold))
                         Text("Average test score \(progressModel.averageTestScore)%")
                             .font(.caption)
@@ -78,7 +78,7 @@ struct ProgressScreen: View {
                 // ── Session history — tap a session to see its individual test details ──
                 Spacer().frame(height: 24)
 
-                if progressModel.history.isEmpty {
+                if progressModel.history.isEmpty && progressModel.tests.isEmpty {
                     Text("No sessions yet. Complete an exercise to see your progress!")
                         .font(.body)
                         .foregroundColor(.erCaption)
@@ -91,7 +91,7 @@ struct ProgressScreen: View {
                         selectedTab = 0
                     }
                     .buttonStyle(PrimaryButtonStyle(height: 52, fontSize: 17))
-                } else {
+                } else if !progressModel.history.isEmpty {
                     Text("Session History")
                         .font(.title3.weight(.semibold))
                     Spacer().frame(height: 12)
@@ -103,7 +103,7 @@ struct ProgressScreen: View {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text("\(record.rootLabel) \(record.scaleName)")
                                             .font(.body.weight(.medium))
-                                        Text("\(Self.dateFormatter.string(from: record.date))  •  \(record.testsCompleted) tests  •  \(record.length) notes")
+                                        Text("\(Self.dateFormatter.string(from: record.date))  •  \(record.testsCompleted) \(record.testsCompleted == 1 ? "test" : "tests")  •  \(record.length) \(record.length == 1 ? "note" : "notes")")
                                             .font(.caption)
                                             .foregroundColor(.erCaption)
                                     }

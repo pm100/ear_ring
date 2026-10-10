@@ -108,7 +108,7 @@ fun ProgressScreen(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "${state.tests.size} recorded tests",
+                        "${state.tests.size} recorded ${if (state.tests.size == 1) "test" else "tests"}",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -142,7 +142,7 @@ fun ProgressScreen(
         Text("Session History", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
 
-        if (state.sessions.isEmpty()) {
+        if (state.sessions.isEmpty() && state.tests.isEmpty()) {
             Text(
                 "No sessions yet. Complete an exercise to see your history!",
                 style = MaterialTheme.typography.bodyMedium,
@@ -263,7 +263,7 @@ private fun SessionCard(session: SessionRecord, onClick: () -> Unit) {
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    "${session.dateString}  •  ${session.testsCompleted} tests  •  ${session.sequenceLength} notes",
+                    "${session.dateString}  •  ${session.testsCompleted} ${if (session.testsCompleted == 1) "test" else "tests"}  •  ${session.sequenceLength} ${if (session.sequenceLength == 1) "note" else "notes"}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -21,6 +21,27 @@ export default function ProgressScreen({ onBack, onClearProgress, onStartExercis
     const testRaw = localStorage.getItem('ear_ring_tests');
     const parsedSessions: SessionRecord[] = sessionRaw ? JSON.parse(sessionRaw) : [];
     const parsedTests: TestRecord[] = testRaw ? JSON.parse(testRaw) : [];
+    // Rebuild a session for tests whose session was never saved (app closed mid-session
+    // before issue #55's per-test save), so they show up in history.
+    const known = new Set(parsedSessions.map(s => s.sessionId));
+    const orphans = new Map<number, TestRecord[]>();
+    for (const t of parsedTests) {
+      if (t.sessionId !== undefined && !known.has(t.sessionId)) {
+        orphans.set(t.sessionId, [...(orphans.get(t.sessionId) ?? []), t]);
+      }
+    }
+    if (orphans.size > 0) {
+      for (const [sessionId, group] of orphans) {
+        const first = group.reduce((a, b) => (a.date <= b.date ? a : b));
+        parsedSessions.unshift({
+          date: first.date, scale: first.scale, root: first.root, length: first.length, sessionId,
+          score: Math.floor(group.reduce((sum, t) => sum + t.score, 0) / group.length),
+          testsCompleted: group.length,
+        });
+      }
+      parsedSessions.sort((a, b) => b.date.localeCompare(a.date));
+      localStorage.setItem('ear_ring_sessions', JSON.stringify(parsedSessions.slice(0, 200)));
+    }
     setSessions(parsedSessions);
     setTests(parsedTests);
     const dates = parsedSessions.map(s => s.date.slice(0, 10));
@@ -121,7 +142,7 @@ export default function ProgressScreen({ onBack, onClearProgress, onStartExercis
 
       <div className="card">
         <h3 className="section-label">Session History</h3>
-        {sessions.length === 0 ? (
+        {sessions.length === 0 && tests.length === 0 ? (
           <>
             <p className="empty-state">No sessions yet. Complete an exercise to see history!</p>
             <button type="button" className="btn-primary" onClick={onStartExercise}>
@@ -140,8 +161,8 @@ export default function ProgressScreen({ onBack, onClearProgress, onStartExercis
                   <span className="session-scale">{s.root} {s.scale}</span>
                   <span className="session-date">
                     {new Date(s.date).toLocaleDateString()}
-                    {s.testsCompleted !== undefined ? `  •  ${s.testsCompleted} tests` : ''}
-                    {`  •  ${s.length} notes`}
+                    {s.testsCompleted !== undefined ? `  •  ${s.testsCompleted} ${s.testsCompleted === 1 ? 'test' : 'tests'}` : ''}
+                    {`  •  ${s.length} ${s.length === 1 ? 'note' : 'notes'}`}
                   </span>
                 </div>
                 <div className={`session-score ${s.score >= 80 ? 'score-good' : s.score >= 50 ? 'score-ok' : 'score-bad'}`}>

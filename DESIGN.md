@@ -371,7 +371,7 @@ Exercise control flow (canonical state machine):
      - if retries are exhausted, record the failed test with `0%`, update the running session percentage, generate a fresh test, and begin again at Attempt start
 6. **Stopping**
    - `Stop Testing`, on-screen Back, or system Back ends the continuous session immediately.
-   - If one or more tests were completed, persist the session summary plus per-test history to local storage before returning Home.
+   - Per-test history and the session summary are written after every completed test (issue #55), so stopping only needs to leave Exercise.
 
 ---
 
@@ -487,10 +487,10 @@ Streak card:
                         during the UI review, issue #30)
 
 Recorded tests summary:
-  Show total recorded test count and average test score
+  Show total recorded test count ("1 recorded test" / "N recorded tests") and average test score
 
 Session history:
-  If empty:
+  If empty (no sessions AND no recorded tests — issue #55):
     "No sessions yet. Complete an exercise to see history!"
     [▶ Start your first exercise]  — full-width filled PRIMARY button below the
                                      message, routes to Home (fixed during the UI
@@ -972,7 +972,8 @@ Every individual completed test must also be stored locally as history for futur
 
 Persistence rules:
 - Save a `TestRecord` every time a test ends, whether passed or failed.
-- Save the session summary when the user stops/leaves Exercise after completing at least one test.
+- Save (upsert by session id) the session summary after every completed test, so an app kill mid-session still leaves a session and streak (issue #55).
+- On loading Progress, any test whose session was never saved (older builds, or an app kill before the per-test save) gets a session rebuilt from its tests (issue #55). Counts read "1 test" / "N tests", "1 note" / "N notes".
 - Continuous testing mode has no post-test summary screen; users inspect outcomes from Home -> Progress.
 
 Streak = number of consecutive calendar days with at least one session.

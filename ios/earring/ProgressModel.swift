@@ -44,11 +44,33 @@ enum ProgressStore {
         return (try? JSONDecoder().decode([TestRecord].self, from: data)) ?? []
     }
 
+    /// Upsert by sessionId: written after every test so an interrupted session is kept (issue #55).
     static func appendSession(_ record: SessionRecord) {
         var history = loadSessions()
+        var record = record
+        if let sid = record.sessionId, let i = history.firstIndex(where: { $0.sessionId == sid }) {
+            record.date = history[i].date
+            history.remove(at: i)
+        }
         history.insert(record, at: 0)
         if let data = try? JSONEncoder().encode(Array(history.prefix(200))) {
             UserDefaults.standard.set(data, forKey: historyKey)
+        }
+    }
+
+    /// Rebuilds a session record for any test whose session was never saved (the app was killed
+    /// mid-session before issue #55's per-test save), so those tests show up in history (issue #55).
+    static func reconcileSessions() {
+        let sessions = loadSessions()
+        let known = Set(sessions.compactMap(\.sessionId))
+        let orphans = Dictionary(grouping: loadTests().filter { $0.sessionId != nil && !known.contains($0.sessionId!) },
+                                 by: { $0.sessionId! })
+        for (sid, group) in orphans {
+            let first = group.min { $0.date < $1.date }!
+            appendSession(SessionRecord(
+                id: UUID(), date: first.date, scaleName: first.scaleName, rootLabel: first.rootLabel,
+                score: group.map(\.score).reduce(0, +) / group.count, length: first.length,
+                testsCompleted: group.count, sessionId: sid))
         }
     }
 
@@ -117,6 +139,7 @@ class ProgressModel: ObservableObject {
     }
 
     private func load() {
+        ProgressStore.reconcileSessions()
         history = ProgressStore.loadSessions()
         tests = ProgressStore.loadTests()
     }

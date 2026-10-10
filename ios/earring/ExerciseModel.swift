@@ -286,7 +286,6 @@ class ExerciseModel: ObservableObject {
     private let audioPlayback = AudioPlayback()
 
     private var cumulativeScore: Int = 0
-    private var sessionPersisted = false
     /// Set once per startExerciseSession() call — correlates persisted TestRecords to their SessionRecord.
     private var sessionId = UUID()
     private var diagFrameCount: Int = 0
@@ -314,7 +313,6 @@ class ExerciseModel: ObservableObject {
 
     func startExerciseSession() {
         cleanup()
-        sessionPersisted = false
         sessionId = UUID()
         cumulativeScore = 0
         testsCompleted = 0
@@ -330,7 +328,7 @@ class ExerciseModel: ObservableObject {
 
     func stopExerciseSession() {
         cleanup()
-        saveSessionIfNeeded()
+        saveSession()
         detectedNotes = []
         currentNoteIndex = 0
         status = .stopped
@@ -676,6 +674,7 @@ class ExerciseModel: ObservableObject {
         score = testsCompleted == 0 ? 0 : cumulativeScore / testsCompleted
         status = .retryDelay
         persistTestRecord(score: testScore, attemptsUsed: attemptsUsed, passed: passed, attemptNotes: attemptNotes)
+        saveSession()
 
         let mySession = sessionId
         Task {
@@ -704,8 +703,8 @@ class ExerciseModel: ObservableObject {
         )
     }
 
-    private func saveSessionIfNeeded() {
-        guard !sessionPersisted, testsCompleted > 0 else { return }
+    private func saveSession() {
+        guard testsCompleted > 0 else { return }
         ProgressStore.appendSession(
             SessionRecord(
                 id: UUID(),
@@ -718,7 +717,6 @@ class ExerciseModel: ObservableObject {
                 sessionId: sessionId
             )
         )
-        sessionPersisted = true
     }
 
     /** Resets all settings to their defaults. Does NOT affect progress history, the
