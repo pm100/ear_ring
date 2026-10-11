@@ -108,6 +108,37 @@ the task complete. This keeps the spec accurate for future agents.**
 
 ---
 
+## Where the App Is Described — Keep Them in Step
+
+**The same facts about the app are written down in several places. When behaviour, a setting, a
+default, a range or a screen changes, update every place that mentions it, in the same change.**
+A stale copy gives users (and the setup assistant, "sage") wrong answers. Check this list each time.
+
+| Place | What it holds | Notes |
+|---|---|---|
+| `DESIGN.md` | The full product/UI spec | The developer reference; update first. |
+| `rust/src/help.md` | The in-app Help screen text | Shared by all platforms. |
+| `rust/src/tooltips.md` | The ⓘ tooltip for each control, keyed by name | Also the description sage is given for most settings (via `assistant.rs`). |
+| `rust/src/assistant.rs` | Which settings sage can change, and any description override (Mic Sensitivity has its own) | Defaults and ranges also live in `rust/src/settings.rs`. |
+| `assistant-proxy/src/guide.ts` | How the app works, written for sage: dynamics, scoring, relationships, symptoms and fixes | Shipped with the proxy, so a text change needs a worker deploy, not an app release. Wins over the settings schema on "how it behaves". |
+| `assistant-proxy/src/prompt.ts` | Sage's rules and examples | |
+| `assistant-proxy/test/fixtures/context.json` | A copy of the settings schema the apps send, used by the live tests | Refresh it when settings change. |
+| `docs/website/help.md` | Source copy of the website Help page, with its anchor scheme | Mirrors the live WordPress page below. |
+| jollygoodsw.com, WordPress.com | Help page (page id 509, draft until published), Home, Ear Ring, About, Contact and Privacy Policy pages | Not in git: edit in the WordPress admin, then update `docs/website/help.md` to match. The Home and Ear Ring pages list the test types and platforms. |
+| App Store Connect and Google Play listings | Description, keywords, promo text, screenshots, App Privacy / Data safety answers | Not in git. See the memory notes on both stores. |
+| `ios/earring/PrivacyInfo.xcprivacy`, the privacy policy page | What data the app collects or sends | Change both whenever the data sent to the assistant changes. |
+| `CHANGELOG.md` | User-visible changes per release | |
+
+Rules of thumb:
+- Do not describe a control that does not exist. Check the code, not just another description
+  (the website draft once listed a "Pitch Meter" setting that only had a tooltip).
+- Describe direction and numbers from the code. The YIN Threshold tooltip had higher and lower
+  reversed; the detector accepts a sound when its score is *below* the threshold.
+- After changing sage's prompt, guide or schema text, run the live suite (`npm run test:prompts`
+  in `assistant-proxy/`) and read the "explaining" cases.
+
+---
+
 ## UI Debugging Guide
 
 ### Debugging the Android App (Emulator)

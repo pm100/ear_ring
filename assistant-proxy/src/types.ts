@@ -28,6 +28,8 @@ export interface Env {
   OPENAI_MAX_TOKENS_FIELD?: string;
   /** 0 to 2. Lower is steadier tool use; unset for models that reject it. */
   OPENAI_TEMPERATURE?: string;
+  /** Review runs only: token budget for Anthropic extended thinking (see scripts/live-prompts.mjs). Leave unset in production. */
+  THINKING_BUDGET?: string;
 }
 
 export interface Turn {
@@ -77,6 +79,8 @@ export interface Feedback {
 }
 
 export interface ModelResult {
+  /** The model's own reasoning, when the provider returns it. For review runs only: never sent to the apps. */
+  reasoning?: string;
   reply: string;
   proposal: Proposal[] | null;
   feedback: Feedback[];

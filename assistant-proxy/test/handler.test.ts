@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import worker from '../src/index';
-import { handleAsk } from '../src/handler';
+import { FEEDBACK_FALLBACK_REPLY, handleAsk, PROPOSAL_FALLBACK_REPLY } from '../src/handler';
 import { MAX_BODY_BYTES } from '../src/validate';
 import { askBody, askRequest, CONTEXT, INSTALL_ID, makeEnv, stubProvider } from './helpers';
 
@@ -53,6 +53,34 @@ describe('POST /v1/ask', () => {
     expect(stored).toEqual([
       { at: NOW.toISOString(), installId: INSTALL_ID, platform: 'android', category: 'feature_request', summary: 'Wants dark mode.', sent: false },
     ]);
+  });
+
+  it('fills in a reply when the model only submitted feedback', async () => {
+    const { json } = await ask(makeEnv(), [
+      { reply: '', feedback: [{ category: 'feature_request', summary: 'Wants dark mode.' }] },
+    ]);
+    expect(json.reply).toBe(FEEDBACK_FALLBACK_REPLY);
+    expect(json.feedbackSent).toBe(true);
+  });
+
+  it('fills in a reply when the model only proposed a change', async () => {
+    const { json } = await ask(makeEnv(), [{ reply: '  ', proposal: [{ setting: 'noteRetries', value: 5 }] }]);
+    expect(json.reply).toBe(PROPOSAL_FALLBACK_REPLY);
+    expect(json.proposal).toEqual([{ setting: 'noteRetries', value: 5 }]);
+  });
+
+  it('never claims feedback was passed on when it could not be stored', async () => {
+    const env = makeEnv();
+    env.FEEDBACK.failPuts = true;
+    const { json } = await ask(env, [{ reply: '', feedback: [{ category: 'bug', summary: 'It crashed.' }] }]);
+    expect(json.reply).toBe('');
+  });
+
+  it('keeps a reply the model wrote', async () => {
+    const { json } = await ask(makeEnv(), [
+      { reply: 'Custom.', proposal: [{ setting: 'noteRetries', value: 5 }], feedback: [{ category: 'bug', summary: 'x' }] },
+    ]);
+    expect(json.reply).toBe('Custom.');
   });
 
   it('still answers when feedback cannot be stored', async () => {

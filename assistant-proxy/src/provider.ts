@@ -21,7 +21,12 @@ export function makeProvider(env: Env, fetchFn: typeof fetch = fetch): ModelProv
   const provider = (env.PROVIDER || 'anthropic').toLowerCase();
   if (provider === 'anthropic') {
     if (!env.ANTHROPIC_API_KEY) throw new Error('provider misconfigured: ANTHROPIC_API_KEY is not set');
-    return makeAnthropicProvider(new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }), env.MODEL || DEFAULT_ANTHROPIC_MODEL);
+    const budget = Number(env.THINKING_BUDGET);
+    return makeAnthropicProvider(
+      new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }),
+      env.MODEL || DEFAULT_ANTHROPIC_MODEL,
+      Number.isFinite(budget) && budget >= 1024 ? budget : undefined,
+    );
   }
   if (provider === 'openai') {
     const missing = (['OPENAI_BASE_URL', 'OPENAI_API_KEY', 'MODEL'] as const).filter((name) => !env[name]);

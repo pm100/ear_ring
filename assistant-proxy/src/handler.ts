@@ -8,6 +8,10 @@ export interface Deps {
   now: () => Date;
 }
 
+/** Shown when the model answered with only a tool call, so the user never sees a blank reply. */
+export const FEEDBACK_FALLBACK_REPLY = "I've passed that on to the developer.";
+export const PROPOSAL_FALLBACK_REPLY = "Here's what I suggest.";
+
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -70,8 +74,14 @@ export async function handleAsk(request: Request, env: Env, deps: Deps): Promise
     }
   }
 
+  let reply = result.reply;
+  if (!reply.trim()) {
+    if (stored > 0) reply = FEEDBACK_FALLBACK_REPLY;
+    else if (result.proposal) reply = PROPOSAL_FALLBACK_REPLY;
+  }
+
   return json(200, {
-    reply: result.reply,
+    reply,
     proposal: result.proposal,
     feedbackSent: stored > 0,
     quota: { remaining: Math.max(0, limit - (used + 1)), resetsAt: quota.resetsAt },

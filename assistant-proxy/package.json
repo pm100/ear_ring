@@ -7,7 +7,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test:live": "vitest run --config vitest.live.config.ts",
+    "test:prompts": "node scripts/live-prompts.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0"

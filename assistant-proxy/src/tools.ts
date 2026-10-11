@@ -17,7 +17,7 @@ export const TOOL_SPECS: ToolSpec[] = [
   {
     name: 'propose_settings_changes',
     description:
-      'Propose one or more settings changes for the user to review and confirm. Nothing is changed until they confirm.',
+      'Propose one or more settings changes for the user to review and confirm. Nothing is changed until they confirm. Always write a sentence to the user in the same reply, saying what you suggest and why.',
     schema: {
       type: 'object',
       properties: {
@@ -45,7 +45,7 @@ export const TOOL_SPECS: ToolSpec[] = [
   {
     name: 'submit_feedback',
     description:
-      'Record a feature request, bug report or other comment about the app for the developer. Use for things no setting can do.',
+      'Record a feature request, bug report or other comment about the app for the developer. Use for things no setting can do. Always write a sentence to the user in the same reply, saying you passed it on.',
     schema: {
       type: 'object',
       properties: {

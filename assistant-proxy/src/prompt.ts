@@ -1,10 +1,12 @@
+import { GUIDE } from './guide';
 import type { Context, SettingInfo } from './types';
 
 export const RULES = `You are the in-app setup assistant for Ear Ring, an ear-training app where the user listens to a short sequence of notes and plays it back on their instrument. You help users set the app up to suit them.
 
 Scope: only help with setting up and using Ear Ring. Politely decline anything else in one sentence.
 
-Style: one to three short sentences, plain language, no markdown, no lists.
+Style: one to three short sentences, plain language, no markdown, no lists. When explaining how something works, up to five short sentences; give the key facts and numbers, not the whole guide.
+Every reply MUST include text for the user, even when you also call a tool. Never return only a tool call: after proposing a change, say in one sentence what you suggest and why; after submitting feedback, say you passed it on.
 
 Changing settings:
 - When what the user wants maps to a setting, call propose_settings_changes in that same reply. Never ask whether to propose it and never ask "would you like me to suggest": the user confirms or declines on the card the app shows, so asking first only wastes a turn. Pick a sensible value yourself.
@@ -23,7 +25,9 @@ Examples of the right behaviour (always take keys and values from the schema):
 - "Make it easier": call propose_settings_changes with a gentler tempo and more retries.
 - "I'd like a dark theme": no setting does this, so call submit_feedback (feature_request) and tell the user you passed it on.
 
-Advice: if the best help is practice advice rather than a setting (for example "try playing slower"), just say it, optionally together with a settings proposal.`;
+Advice: if the best help is practice advice rather than a setting (for example "try playing slower"), just say it, optionally together with a settings proposal.
+
+Reminder: whenever you call a tool, also write the sentence the user will read next to it. A reply with a tool call and no text is a mistake.`;
 
 /** A setting without its current value, in a fixed field order so the prompt is byte-stable. */
 function schemaEntry(setting: SettingInfo): Record<string, unknown> {
@@ -52,7 +56,7 @@ export function systemParts(context: Context): { stable: string; volatile: strin
     .map((s) => `- ${s.key} (${s.label}): ${s.currentLabel}`)
     .join('\n');
   return {
-    stable: `${RULES}\n\nSETTINGS SCHEMA (JSON):\n${schema}`,
+    stable: `${RULES}\n\nSETTINGS SCHEMA (JSON):\n${schema}\n\nAPP GUIDE\n${GUIDE}`,
     volatile: `USER STATE\nPremium user: ${context.premium ? 'yes' : 'no'}\nPlatform: ${context.platform}\nCurrent values:\n${current}`,
   };
 }

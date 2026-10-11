@@ -22,13 +22,19 @@ const TOOLS: Anthropic.Tool[] = TOOL_SPECS.map((tool) => ({
  * the app, not executed here). The system prompt is two blocks, the stable one carrying the
  * cache breakpoint; below the model's minimum cacheable length the breakpoint is simply ignored.
  */
-export function makeAnthropicProvider(client: MessagesClient, model: string = DEFAULT_ANTHROPIC_MODEL): ModelProvider {
+export function makeAnthropicProvider(
+  client: MessagesClient,
+  model: string = DEFAULT_ANTHROPIC_MODEL,
+  /** Extended thinking token budget (review runs only; changes the model's behaviour). */
+  thinkingBudget?: number,
+): ModelProvider {
   return {
     async ask(body: AskBody) {
       const { stable, volatile } = systemParts(body.context);
       const message = await client.messages.create({
         model,
-        max_tokens: MAX_TOKENS,
+        max_tokens: thinkingBudget ? MAX_TOKENS + thinkingBudget : MAX_TOKENS,
+        ...(thinkingBudget ? { thinking: { type: 'enabled' as const, budget_tokens: thinkingBudget } } : {}),
         system: [{ type: 'text', text: stable, cache_control: { type: 'ephemeral' } }, { type: 'text', text: volatile }],
         tools: TOOLS,
         tool_choice: { type: 'auto' },
@@ -46,12 +52,15 @@ export function makeAnthropicProvider(client: MessagesClient, model: string = DE
       if ((message.stop_reason as string) === 'refusal') return REFUSAL_RESULT;
 
       const texts: string[] = [];
+      const thoughts: string[] = [];
       const calls: ToolCall[] = [];
       for (const block of message.content) {
         if (block.type === 'text') texts.push(block.text);
+        else if (block.type === 'thinking') thoughts.push(block.thinking);
         else if (block.type === 'tool_use') calls.push({ name: block.name, input: block.input });
       }
-      return interpret(texts, calls);
+      const result = interpret(texts, calls);
+      return thoughts.length > 0 ? { ...result, reasoning: thoughts.join('\n\n') } : result;
     },
   };
 }

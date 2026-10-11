@@ -19,6 +19,9 @@ interface ChatResponse {
   choices?: {
     message?: {
       content?: string | null;
+      /** Reasoning models served by llama.cpp, vLLM and others return their thinking here (or as `reasoning`). */
+      reasoning_content?: string | null;
+      reasoning?: string | null;
       refusal?: string | null;
       tool_calls?: { function?: { name?: string; arguments?: string } }[];
     };
@@ -91,7 +94,9 @@ export function makeOpenAIProvider(config: OpenAIConfig, fetchFn: typeof fetch =
       const calls: ToolCall[] = (message.tool_calls ?? []).flatMap((call) =>
         call.function?.name ? [{ name: call.function.name, input: parseArguments(call.function.arguments) }] : [],
       );
-      return interpret(message.content ? [message.content] : [], calls);
+      const result = interpret(message.content ? [message.content] : [], calls);
+      const reasoning = message.reasoning_content || message.reasoning;
+      return reasoning ? { ...result, reasoning } : result;
     },
   };
 }
