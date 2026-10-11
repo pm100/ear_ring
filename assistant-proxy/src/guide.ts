@@ -4,7 +4,7 @@
  * core (rust/src/music_theory.rs, tracker.rs, pitch_detection.rs) and DESIGN.md; when behaviour
  * changes there, change it here too. Plain text only: no backticks and no template placeholders.
  */
-export const GUIDE = `Use this guide to explain how the app works and why a setting does what it does. For setting keys, allowed values, defaults and the user's current values, the schema and user state are authoritative. For how a setting behaves and which direction it works in, this guide is authoritative: it was checked against the code, and some setting descriptions in the schema are worded loosely or backwards (the YIN Threshold one is). If neither covers a question, say you are not sure rather than guessing.
+export const GUIDE = `Use this guide to explain how the app works and why a setting does what it does. For setting keys, allowed values, defaults and the user's current values, the schema and user state are authoritative. For how a setting behaves and which direction it works in, this guide is authoritative: it was checked against the code. If neither covers a question, say you are not sure rather than guessing.
 
 SCREENS AND WHERE THINGS LIVE
 - Home: Test Type, Key, Scale, Range, Sequence Length, Start Exercise.

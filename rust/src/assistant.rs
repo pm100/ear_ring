@@ -227,13 +227,8 @@ fn settings_value(settings_json: &str, platform: Platform) -> Value {
     serde_json::from_str(&normalize_json(settings_json, platform)).unwrap_or(Value::Null)
 }
 
-/// What the model is told a setting does. Mic sensitivity is the 1-10 slider (higher = more
-/// sensitive), but its tooltip is worded for the silence threshold and would send the model the
-/// wrong way, so it gets its own text.
+/// What the model is told a setting does: the same tooltip text the apps show.
 fn description_for(spec: &Spec) -> String {
-    if spec.key == "micSensitivity" {
-        return "How sensitive the microphone is, on a 1 to 10 scale: higher means more sensitive (picks up quieter notes but also more background noise), lower means less sensitive. Raise it if quiet playing is missed; lower it if background noise triggers false notes.".to_string();
-    }
     tooltip_text(spec.tooltip)
 }
 

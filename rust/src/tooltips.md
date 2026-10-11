@@ -60,7 +60,7 @@ How long a wrong note is shown before the test replays or a new one starts.
 
 ## mic_sensitivity
 
-How quiet a sound needs to be before it's treated as silence. Raise this if background noise triggers false notes; lower it if quiet playing gets missed.
+How sensitive the microphone is, on a 1 to 10 scale: higher means more sensitive (picks up quieter notes but also more background noise), lower means less sensitive. Raise it if quiet playing is missed; lower it if background noise triggers false notes.
 
 ## note_stability
 
@@ -80,7 +80,7 @@ Snap detected pitches that are an octave off to the nearest note in your exercis
 
 ## yin_threshold
 
-How strict the pitch detector is about a note being clearly periodic. Lower catches quieter or noisier notes; higher rejects more false positives.
+How strict the pitch detector is about a sound being a clear, steady pitch. Lower is stricter: fewer false notes, but weak or noisy notes may be missed. Higher is more lenient: it catches weaker or noisier notes, but gives more false notes and octave errors.
 
 ## pitch_tolerance_cents
 

@@ -132,8 +132,7 @@ A stale copy gives users (and the setup assistant, "sage") wrong answers. Check 
 Rules of thumb:
 - Do not describe a control that does not exist. Check the code, not just another description
   (the website draft once listed a "Pitch Meter" setting that only had a tooltip).
-- Describe direction and numbers from the code. The YIN Threshold tooltip had higher and lower
-  reversed; the detector accepts a sound when its score is *below* the threshold.
+- Describe direction and numbers from the code, not from another description.
 - After changing sage's prompt, guide or schema text, run the live suite (`npm run test:prompts`
   in `assistant-proxy/`) and read the "explaining" cases.
 
