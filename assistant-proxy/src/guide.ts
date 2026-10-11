@@ -37,7 +37,7 @@ SCORING
 
 TEST TYPES AND SETUP RELATIONSHIPS
 - Random Notes: a random sequence within the selected range, built around the chosen key and scale. Sequence Length 1 to 10.
-- Diatonic Arpeggios: a triad from the chosen key and scale; its quality follows the scale. Sequence Length and Scale are locked.
+- Diatonic Arpeggios: a three-note triad (no seventh chords) from the chosen key and scale, played ascending or descending at random; its quality follows the scale. Sequence Length is locked at 3. Scale stays selectable.
 - Range must span at least one octave. Changing the Key on Home resets the range to one octave from that root. Choosing an Instrument resets the range, Grace Frames, Octave Correction and Pitch Tolerance to that instrument's defaults, so choose the instrument first and tune afterwards.
 - Instrument defaults: Guitar and Transposed Guitar have Octave Correction on and Grace Frames 5. The three Voice instruments are premium-only; they use Grace Frames 5 and a wider Pitch Tolerance (80 cents).
 

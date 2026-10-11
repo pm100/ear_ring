@@ -4,13 +4,12 @@
 
 A "Diatonic Arpeggios" exercise type (Test Type = 2), selected from the Test Type
 dropdown on the Home screen. Instead of a random melody, each test plays a single
-diatonic chord (triad or 7th) arpeggiated ascending or descending.
+diatonic triad arpeggiated ascending or descending. (Seventh chords are not offered; see below.)
 
 ## Home Screen Behaviour
 
-- Sequence Length chips: only **3** and **4** are enabled; chips 1, 2, 5, 6, 7, 8 are
-  disabled (opacity 0.38, non-interactive).
-- Default chip selection in this mode: 3.
+- Sequence Length is fully locked at 3: every chip is disabled (opacity 0.38, non-interactive),
+  including 3, and the Rust core forces the length to 3 (`DIATONIC_SEQUENCE_LENGTH`).
 - Scale and Key dropdowns remain active (they define the diatonic pool).
 - Piano range picker remains active.
 
@@ -21,7 +20,11 @@ diatonic chord (triad or 7th) arpeggiated ascending or descending.
   scale degrees.
 - Example in C Major: C-E-G, D-F-A, E-G-B, F-A-C, G-B-D, A-C-E, B-D-F.
 
-### 4-note (Seventh Chord)
+### 4-note (Seventh Chord) — not offered
+
+No screen lets the user pick a 4-note length, so seventh chords are never played. The Rust core
+still supports `note_count` 4; the UI suppresses it for now. The notes below describe that
+dormant path.
 - Chord tones: scale degrees **1, 3, 5, 7** of a diatonic chord rooted on any of the
   7 scale degrees.
 - Example in C Major: Cmaj7, Dm7, Em7, Fmaj7, G7, Am7, Bm7b5.

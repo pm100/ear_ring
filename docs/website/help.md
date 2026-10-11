@@ -82,7 +82,7 @@ A note is correct if it is the right note name (the octave does not matter) and 
 ## 4. Test types
 
 - **Random Notes.** An arbitrary sequence of notes within your chosen range, in the key and scale you picked.
-- **Diatonic Arpeggios.** A triad built from your chosen key and scale. Its quality (major, minor or diminished) follows the scale automatically. Scale and Sequence Length are locked in this mode, because the triad fixes them.
+- **Diatonic Arpeggios.** A triad built from your chosen key and scale. Its quality (major, minor or diminished) follows the scale automatically. Sequence Length is locked to 3 in this mode, because a triad has three notes. Scale is still your choice: it decides whether the triad is major, minor or diminished.
 
 ## 5. Settings reference
 

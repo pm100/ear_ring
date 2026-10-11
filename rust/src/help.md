@@ -18,7 +18,7 @@ Your question and current settings are sent to a server to get an answer. No aud
 
 Random Notes plays an arbitrary sequence within your selected range.
 
-Diatonic Arpeggios plays a triad (three notes) built from your selected key and scale — its quality (major, minor, or diminished) follows the scale automatically. Scale and Sequence Length are locked in this mode since the triad determines them.
+Diatonic Arpeggios plays a triad (three notes) built from your selected key and scale — its quality (major, minor, or diminished) follows the scale automatically. Sequence Length is locked to 3 in this mode. Scale stays your choice: it decides whether the triad is major, minor or diminished.
 
 ## Mic Setup
 

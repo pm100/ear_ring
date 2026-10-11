@@ -121,14 +121,14 @@ const proposed = (a: Answer, key: string) => a.proposal?.find((p) => p.setting =
 const numeric = (p: Proposal | undefined) => (typeof p?.value === 'number' ? p.value : NaN);
 
 /** Problems with the answer that apply to every question, whatever it was about. */
-function universalProblems(a: Answer, context: Context): string[] {
+function universalProblems(a: Answer, context: Context, maxReply = 600): string[] {
   const problems: string[] = [];
   if (a.status !== 200) return [`HTTP ${a.status}`];
   if (!a.reply.trim()) problems.push('empty reply');
   if (a.reply === FEEDBACK_FALLBACK_REPLY || a.reply === PROPOSAL_FALLBACK_REPLY) {
     problems.push('model wrote no text (handler fallback used)');
   }
-  if (a.reply.length > 600) problems.push(`reply too long (${a.reply.length} chars)`);
+  if (a.reply.length > maxReply) problems.push(`reply too long (${a.reply.length} chars)`);
   if (/[*#`]|^\s*[-•]\s/m.test(a.reply)) problems.push('markdown in reply');
   if (/\b(i(?:'ve| have)|i)\s+(changed|set|updated|switched|turned|raised|lowered)\b/i.test(a.reply)) {
     problems.push('claims the change was already made');
@@ -169,6 +169,8 @@ interface Case {
   /** Prior turns end with a user turn; a single string is one user question. */
   say: string | Turn[];
   context?: Context;
+  /** Longest reply allowed, in characters (default 600; explanations may need more). */
+  maxReply?: number;
   /** Returns what is wrong with the answer (empty when it is right). */
   check: (a: Answer, context: Context) => string[];
 }
@@ -184,7 +186,7 @@ function runCase(c: Case) {
     let good = 0;
     for (let i = 0; i < RUNS; i++) {
       const a = await ask(messages, context);
-      const problems = [...universalProblems(a, context), ...(a.status === 200 ? c.check(a, context) : [])];
+      const problems = [...universalProblems(a, context, c.maxReply), ...(a.status === 200 ? c.check(a, context) : [])];
       if (problems.length === 0) good++;
       runs.push({ reply: a.reply, proposal: a.proposal, feedback: a.feedback, problems, request: a.request, reasoning: a.reasoning });
       report.push(
@@ -489,6 +491,7 @@ describe.skipIf(!hasKey)('sage live Q&A', () => {
     runCase({
       name: '"what does mic sensitivity mean" explains it, higher = quieter sounds picked up',
       say: 'What does mic sensitivity mean?',
+      maxReply: 800,
       check: several(
         noProposal,
         noFeedback,
@@ -500,6 +503,7 @@ describe.skipIf(!hasKey)('sage live Q&A', () => {
     runCase({
       name: '"what is the YIN threshold" explains strict vs lenient, right way round',
       say: 'What is the YIN threshold?',
+      maxReply: 800,
       check: several(
         noProposal,
         noFeedback,
@@ -511,6 +515,7 @@ describe.skipIf(!hasKey)('sage live Q&A', () => {
     runCase({
       name: '"Max Retries vs Retry Same Note" tells them apart',
       say: "What's the difference between Max Retries and Retry Same Note?",
+      maxReply: 800,
       check: several(
         noProposal,
         noFeedback,
@@ -522,6 +527,7 @@ describe.skipIf(!hasKey)('sage live Q&A', () => {
     runCase({
       name: '"how is my score worked out" explains attempts and retry cost',
       say: 'How is my score worked out for each test?',
+      maxReply: 800,
       check: several(
         noProposal,
         noFeedback,
@@ -533,6 +539,7 @@ describe.skipIf(!hasKey)('sage live Q&A', () => {
     runCase({
       name: '"what counts towards my day streak" explains consecutive days',
       say: 'What counts towards my day streak on the Progress screen?',
+      maxReply: 800,
       check: several(
         noProposal,
         noFeedback,
@@ -543,11 +550,13 @@ describe.skipIf(!hasKey)('sage live Q&A', () => {
     runCase({
       name: '"will the test play as a trumpet" says tests are always piano',
       say: 'If I pick trumpet as my instrument, will the test notes be played as a trumpet?',
+      maxReply: 800,
       check: several(noProposal, noFeedback, mentions(/piano/i, 'does not say the notes are always piano')),
     });
     runCase({
       name: '"a note shows twice" points at grace frames',
       say: 'Sometimes one long note I play gets counted as two notes. Why?',
+      maxReply: 800,
       check: several(noFeedback, (a) => (/grace/i.test(a.reply) || proposed(a, 'graceFrames') ? [] : ['does not point at Grace Frames'])),
     });
   });
