@@ -4,7 +4,8 @@ paste into the page editor. Defaults and ranges are from the settings schema
 (assistant-proxy/test/fixtures/context.json); re-check them when settings change.
 Items marked [verify] need a check against the app before publishing.
 
-Page: https://jollygoodsw.com/ear-ring-help/ (WordPress page id 509, draft). Section anchors, set
+Page: https://jollygoodsw.com/ear-ring-help/ (WordPress page id 509, published 2026-10-11, in the main menu
+between Ear Ring and About). Section anchors, set
 on the headings in WordPress and linked from the Contents list; keep them stable because the apps
 may deep-link to them (…/ear-ring-help/#microphone):
   1 #getting-started  2 #microphone  3 #running-an-exercise  4 #test-types  5 #settings
@@ -172,7 +173,7 @@ The Help tab includes an assistant for setup questions. Type what you want, for 
 - If you ask for something the app can't do, the assistant passes it on to the developer as a feature request.
 - You get a limited number of questions each day.
 
-**What is sent.** Your question and your current settings go to our server and an AI provider, to produce the answer. No audio and no practice history is sent. [verify: update this paragraph if the history-based advice design goes ahead. See the privacy policy.]
+**What is sent.** Your question and your current settings go to our server and an AI provider, to produce the answer. No audio and no practice history is sent.
 
 ## 9. Troubleshooting
 
