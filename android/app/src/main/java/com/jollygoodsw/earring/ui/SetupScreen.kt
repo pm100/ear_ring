@@ -163,12 +163,15 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(Modifier.height(8.dp))
-        TextButton(
-            onClick = { advancedOpen = true },
-            modifier = Modifier.align(Alignment.Start)
-        ) {
-            Text("Advanced")
+        // No Advanced in the welcome flow: keep first-run setup simple.
+        if (!embedded) {
+            Spacer(Modifier.height(8.dp))
+            TextButton(
+                onClick = { advancedOpen = true },
+                modifier = Modifier.align(Alignment.Start)
+            ) {
+                Text("Advanced")
+            }
         }
     }
 

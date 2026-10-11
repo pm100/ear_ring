@@ -3,7 +3,6 @@ import { invoke } from '@tauri-apps/api/tauri';
 import SetupScreen from './SetupScreen';
 import { ExerciseSettings } from '../types';
 import { SettingsAction } from '../settingsStore';
-import { midiToLabel } from '../music';
 
 interface Step {
   id: string;
@@ -120,7 +119,6 @@ function InstrumentChoice({ settings, onAction, isPremium }: Pick<Props, 'settin
       .catch(() => setInstruments([]));
   }, []);
   return (
-    <>
       <select
         value={settings.instrumentIndex}
         onChange={e => onAction({ type: 'setInstrument', value: parseInt(e.target.value) })}
@@ -130,10 +128,6 @@ function InstrumentChoice({ settings, onAction, isPremium }: Pick<Props, 'settin
           <option key={i.id} value={i.id}>{i.name}</option>
         ))}
       </select>
-      <div style={{ marginTop: 8, fontSize: 14, color: '#757575' }}>
-        Range: {midiToLabel(settings.rangeStart)} to {midiToLabel(settings.rangeEnd)}
-      </div>
-    </>
   );
 }
 

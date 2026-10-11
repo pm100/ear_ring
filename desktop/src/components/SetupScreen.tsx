@@ -156,10 +156,12 @@ export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, ro
           <span style={{ minWidth: 40, fontSize: 13, color: '#212121' }}>{Math.round((0.011 - silenceThreshold) / 0.001)} / 10</span>
         </div>
 
-        <button type="button" className="advanced-toggle" onClick={() => setAdvancedOpen(o => !o)}>
-          {advancedOpen ? '▾' : '▸'} Advanced
-        </button>
-        {advancedOpen && (
+        {!embedded && (
+          <button type="button" className="advanced-toggle" onClick={() => setAdvancedOpen(o => !o)}>
+            {advancedOpen ? '▾' : '▸'} Advanced
+          </button>
+        )}
+        {advancedOpen && !embedded && (
           <div className="advanced-section">
             <span className="section-label">Note Stability (frames to confirm)<TooltipIcon tooltipKey="note_stability" /></span>
             <div className="chip-row">

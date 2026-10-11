@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.jollygoodsw.earring.EarRingCore
 import com.jollygoodsw.earring.ExerciseViewModel
-import com.jollygoodsw.earring.MusicTheory
 import com.jollygoodsw.earring.R
 import kotlinx.coroutines.delay
 import org.json.JSONArray
@@ -242,15 +241,6 @@ private fun InstrumentChoice(viewModel: ExerciseViewModel) {
             }
         }
     }
-    Spacer(Modifier.height(8.dp))
-    // Concert pitch, the same as the Range on Home.
-    val low = MusicTheory.midiToLabel(state.rangeStart)
-    val high = MusicTheory.midiToLabel(state.rangeEnd)
-    Text(
-        "Range: $low to $high",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
 }
 
 /** Asks for the mic, then shows the real Mic Setup screen (staff, tuner meter, sensitivity). */

@@ -116,10 +116,13 @@ struct SetupView: View {
                 set: { model.silenceThreshold = Float(max(0.001, min(0.010, 0.011 - $0 * 0.001))) }
             ), in: 1...10, step: 1)
 
-            Spacer().frame(height: 8)
-            Button("Advanced") { advancedOpen = true }
-                .font(.subheadline.weight(.semibold))
-                .sheet(isPresented: $advancedOpen) { advancedSheet }
+            // No Advanced in the welcome flow: keep first-run setup simple.
+            if !embedded {
+                Spacer().frame(height: 8)
+                Button("Advanced") { advancedOpen = true }
+                    .font(.subheadline.weight(.semibold))
+                    .sheet(isPresented: $advancedOpen) { advancedSheet }
+            }
 
             Spacer()
         }

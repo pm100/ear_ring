@@ -146,18 +146,13 @@ private struct InstrumentChoice: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
-            Picker("Instrument", selection: Binding(
-                get: { model.instrumentIndex },
-                set: { model.instrumentIndex = $0 }
-            )) {
-                ForEach(instruments, id: \.id) { Text($0.name).tag($0.id) }
-            }
-            .pickerStyle(.menu)
-            // Concert pitch, the same as the Range on Home.
-            Text("Range: \(MusicTheory.midiToLabel(model.rangeStart)) to \(MusicTheory.midiToLabel(model.rangeEnd))")
-                .font(.subheadline).foregroundColor(.secondary)
-        }
+        // Boxed full-width dropdown, the same as Settings and Android.
+        OutlinedDropdown(
+            selectedLabel: instruments.first { $0.id == model.instrumentIndex }?.name ?? "Piano",
+            options: instruments.map { DropdownOption(value: $0.id, label: $0.name) },
+            enabled: true,
+            onSelect: { model.instrumentIndex = $0 }
+        )
     }
 }
 

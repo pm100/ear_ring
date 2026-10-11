@@ -149,21 +149,17 @@ private struct InstrumentPlaybackSettings: View {
         let instruments = loadInstrumentList(premium: model.isPremium)
         List {
             Section {
-                HStack(spacing: 4) {
-                    // Binding(get:set:) rather than $model.instrumentIndex: that sugar needs a real
-                    // @Published property, but instrumentIndex is a computed proxy onto the Rust-owned
-                    // settings blob (see ExerciseModel.swift).
-                    Picker("Instrument", selection: Binding(
-                        get: { model.instrumentIndex },
-                        set: { model.instrumentIndex = $0 }
-                    )) {
-                        ForEach(instruments) { inst in
-                            Text(inst.name).tag(inst.id)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    TooltipIcon(key: "instrument")
+                // Boxed full-width dropdown like Android's, not a bare Picker(.menu) (issue #30).
+                VStack(alignment: .leading, spacing: 8) {
+                    sectionLabel("Instrument", tooltipKey: "instrument")
+                    OutlinedDropdown(
+                        selectedLabel: instruments.first { $0.id == model.instrumentIndex }?.name ?? "Piano",
+                        options: instruments.map { DropdownOption(value: $0.id, label: $0.name) },
+                        enabled: true,
+                        onSelect: { model.instrumentIndex = $0 }
+                    )
                 }
+                .padding(.vertical, 6)
             }
             Section {
                 VStack(alignment: .leading, spacing: 12) {

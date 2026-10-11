@@ -556,7 +556,8 @@ unchanged (three collapsible sections).
 Each category groups several related settings under one heading, deliberately fewer,
 larger categories rather than one per setting:
 
-- **Instrument & Playback** — outlined dropdown, full width: Piano | Guitar |
+- **Instrument & Playback** — outlined dropdown, full width, labelled "Instrument" above
+  (iOS uses the shared `OutlinedDropdown`, same as Home, not a bare menu Picker): Piano | Guitar |
   Transposed Guitar | Soprano Sax | Alto Sax | Tenor Sax | Trumpet | Clarinet
   (default: Piano, index 0), plus Soprano Voice | Alto Voice | Tenor Voice
   **only for a premium user** — the three Voice instruments are filtered out of
@@ -1063,8 +1064,8 @@ step). **Skip setup** stays top right.
 | # | id | Content | Primary button |
 |---|----|---------|----------------|
 | 1 | `welcome` | What the app does, green/red meaning | Get started |
-| 2 | `instrument` | Instrument dropdown (premium-filtered, same list and `setInstrument` action as Settings) and a "Range: X to Y" line in concert pitch, the same as the Range on Home; text warns that the device will next ask for microphone permission | Next |
-| 3 | `mic` | System mic-permission prompt appears here. Embeds the real **Mic Setup screen** (same code as the Mic tab, in an `embedded` mode without its title and instruction line): listening indicator, staff, pitch meter, Mic Sensitivity slider and Advanced. Below it, a hint after 10 s of silence, and a tick plus success text on the first note that registers on the staff (confirmed and inside the instrument's range) | Next (disabled until a note is heard) |
+| 2 | `instrument` | Instrument dropdown (premium-filtered, same list and `setInstrument` action as Settings) (iOS and Android: the same boxed full-width dropdown as Settings); no range line; text warns that the device will next ask for microphone permission | Next |
+| 3 | `mic` | System mic-permission prompt appears here. Embeds the real **Mic Setup screen** (same code as the Mic tab, in an `embedded` mode without its title and instruction line): listening indicator, staff, pitch meter and Mic Sensitivity slider (no Advanced button in this embedded mode). Below it, a hint after 10 s of silence, and a tick plus success text on the first note that registers on the staff (confirmed and inside the instrument's range) | Next (disabled until a note is heard) |
 | 4 | `ready` | Reminder that everything can be changed later in Settings (the how-to for the Home screen lives on Home itself, issue #50) | Done (lands on Home) |
 
 - Step 3 has no skip of its own: Next stays disabled until a note registers on the staff, so a user
