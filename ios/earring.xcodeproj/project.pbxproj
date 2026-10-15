@@ -283,7 +283,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/build/generated/rust/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -317,7 +317,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/build/generated/rust/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
