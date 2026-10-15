@@ -31,7 +31,29 @@ function tagRelease(tag, message, commit = 'HEAD') {
   return true;
 }
 
-module.exports = { tagRelease };
+/** Aborts (exit 1) unless HEAD is committed, pushed, and matches the working tree, so the
+ *  tag tagRelease() puts on HEAD points at what was actually built. Bypass: ALLOW_DIRTY_RELEASE=1.
+ *  A changed CFBundleVersion in Info.plist is ignored (release_ios.js rewrites it). */
+function requireReleasableHead() {
+  if (process.env.ALLOW_DIRTY_RELEASE === '1') return;
+  const problems = [];
+  const norm = t => t.trim().replace(/\r\n/g, '\n').replace(/(<key>CFBundleVersion<\/key>\s*<string>)[^<]*/, '$1');
+  const dirty = spawnSync('git', ['diff', '--name-only', 'HEAD'], { cwd: REPO, encoding: 'utf8' }).stdout.split('\n').filter(Boolean).filter(f => {
+    if (!f.endsWith('Info.plist')) return true;
+    const work = require('fs').readFileSync(path.join(REPO, f), 'utf8');
+    return norm(git('show', `HEAD:${f}`).out) !== norm(work);
+  });
+  if (dirty.length) problems.push(`uncommitted changes in tracked files: ${dirty.join(', ')}`);
+  if (!git('branch', '-r', '--contains', 'HEAD').out.trim()) problems.push('HEAD is not pushed to origin');
+  if (problems.length) {
+    console.error(`Refusing to release: ${problems.join('; ')}.\n` +
+      'Commit and push first (on the Mac: git pull), so the release tag matches what is built.\n' +
+      'Override with ALLOW_DIRTY_RELEASE=1.');
+    process.exit(1);
+  }
+}
+
+module.exports = { tagRelease, requireReleasableHead };
 
 if (require.main === module) {
   const [tag, message, commit] = process.argv.slice(2);

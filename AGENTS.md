@@ -218,6 +218,14 @@ first). Files you deleted or renamed on Windows must be removed by hand on the M
 (`ssh mac "rm ~/work/ear_ring/<path>"`). For a one- or two-file change, plain
 `scp <file> mac:work/ear_ring/<file>` is enough.
 
+**Real uploads are the exception — never sync by file copy for `ios-testflight`.** The release
+scripts tag `HEAD` (`build-ios-N`, `build-android-N`), so uploading from copied, uncommitted
+files tags the wrong commit (this happened with `build-ios-17`). For a TestFlight/Play upload:
+commit and push on Windows (when the user says to), `git pull` on the Mac, then run the recipe.
+The scripts now refuse to upload if tracked files are modified or HEAD isn't pushed
+(`requireReleasableHead` in `scripts/tag_release.js`; a changed `CFBundleVersion` alone is fine).
+`ALLOW_DIRTY_RELEASE=1` bypasses it, only with the user's OK.
+
 `just ios-archive`/`just ios-testflight` pick the iOS build number (`CFBundleVersion`)
 automatically via `scripts/release_ios.js` — see that file's header comment for how it
 guesses and self-corrects. Override with `IOS_BUILD_NUMBER=<n>` to force a specific value.

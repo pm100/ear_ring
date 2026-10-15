@@ -106,6 +106,7 @@ function looksLikeBuildNumberConflict(output) {
 }
 
 async function main() {
+  if (UPLOAD) require('./tag_release').requireReleasableHead();
   if (!KEY_ID || !ISSUER_ID) {
     console.error('APP_STORE_KEY_ID and APP_STORE_ISSUER_ID must be set.');
     process.exit(1);

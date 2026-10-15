@@ -125,6 +125,7 @@ function parseConflictVersionCode(message) {
 }
 
 async function main() {
+  if (UPLOAD) require('./tag_release').requireReleasableHead();
   let versionCode = process.env.VERSION_CODE
     ? parseInt(process.env.VERSION_CODE, 10)
     : await getNextVersionCode(getPublisher());

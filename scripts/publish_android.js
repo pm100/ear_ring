@@ -27,6 +27,7 @@ const RELEASE_NOTES = process.env.PLAY_RELEASE_NOTES || 'Bug fixes and improveme
 const LANGUAGE = process.env.PLAY_LANGUAGE || 'en-US';
 
 async function main() {
+  require('./tag_release').requireReleasableHead();
   const keyFile = process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
   if (!keyFile) {
     console.error('Error: GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is not set.');
