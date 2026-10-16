@@ -70,3 +70,6 @@ screen_keydrop.png
 
 # graphify knowledge-graph output
 graphify-out/
+
+# Store/dev screenshots (local only)
+screenshots/
