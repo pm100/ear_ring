@@ -19,6 +19,7 @@
       "active": true,
       "targets": "all",
       "identifier": "com.earring.desktop",
+      "macOS": { "entitlements": "Entitlements.plist", "minimumSystemVersion": "10.15" },
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",

@@ -321,6 +321,51 @@ gen_accidental_symbols.js uses PowerShell GDI+ (System.Drawing, Segoe UI Symbol 
 Output PNGs have transparent backgrounds (RGBA). Do NOT use sharp's SVG renderer —
 libvips/rsvg cannot access Windows system fonts and renders a fallback glyph.
 
+### Desktop Release Builds (Windows + macOS)
+
+**Windows** (on the Windows machine): `cd desktop; cargo tauri build` produces
+`desktop/src-tauri/target/release/bundle/nsis/EarRing_<ver>_x64-setup.exe` and
+`msi/EarRing_<ver>_x64_en-US.msi`. These are **not code-signed** (SmartScreen warns).
+
+**macOS** (on the Mac, via the `mac` SSH alias; sync files by copy as described above,
+the Mac copy must have `desktop/src-tauri/Info.plist`, `Entitlements.plist`,
+`tauri.conf.json` and the `justfile`):
+```powershell
+ssh mac "cd ~/work/ear_ring && just desktop-mac"
+scp mac:/tmp/earring_desktop/EarRing_<ver>_aarch64.dmg .
+```
+`just desktop-mac` builds with `--bundles app`, signs with the **Developer ID
+Application: Paul Moore (9A4PVL859F)** identity, notarizes via the App Store Connect API
+key (`~/.private_keys/AuthKey_<KeyID>.p8`, same key as iOS), then builds the DMG itself
+with `hdiutil`, signs/notarizes/staples it and runs an `spctl` check. Output is
+Apple Silicon (arm64) only.
+
+Things that bit us — don't re-learn them:
+- **Unsigned/badly-signed downloads show "app is damaged"** on Apple Silicon. The cargo
+  linker's ad-hoc signature is not enough; only the Developer ID + notarized build is.
+- **Tauri's own DMG step fails over SSH** (`bundle_dmg.sh` drives Finder). Hence
+  `--bundles app` + `hdiutil` in the recipe.
+- **`desktop/src-tauri/Info.plist` (`NSMicrophoneUsageDescription`) and
+  `Entitlements.plist` (`com.apple.security.device.audio-input`) are required**; with
+  hardened runtime and without them the app gets no microphone access. Referenced from
+  `tauri.conf.json` (`tauri.bundle.macOS.entitlements`).
+- **Mac tooling:** `cargo install tauri-cli --version 1.5.9 --locked` fails (old `time`
+  crate vs current Rust); unlocked 1.5.9 also fails. Installed with
+  `cargo install tauri-cli --version "^1"` (latest 1.x). `npm`/Node on the Mac fails TLS
+  (`UNABLE_TO_GET_ISSUER_CERT_LOCALLY`) while curl works — use curl for network calls.
+- **Developer ID certificate** was created at developer.apple.com (Account Holder only —
+  the API key gets 403) from a CSR generated on the Mac. The private key + CSR + cert
+  live in `~/.config/earring/devid/` on the Mac and the identity is in the
+  `earring-build` keychain. Renewing: make a new CSR, create the cert in the portal,
+  import both into that keychain. A pending Program License Agreement update makes
+  Apple APIs return `PLA_NOT_ACCEPTED` until the Account Holder accepts it.
+- **Publishing:** upload the three files to a GitHub release tagged `desktop-v<ver>`
+  (`gh release create ... --target master`); the jollygoodsw.com Ear Ring page links to
+  `.../releases/download/desktop-v<ver>/<file>` (update the version in those links for
+  a new release). Desktop is on Tauri 1; migration to Tauri 2 is issue #57.
+
+---
+
 ---
 
 ### Reading Android ADB Screenshots — Common Pitfalls

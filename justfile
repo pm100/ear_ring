@@ -185,6 +185,39 @@ _ios-keychain-unlock:
       security unlock-keychain -p "$(cat "$KCPASS")" "$KC"
     fi
 
+# Build the macOS desktop app, sign it (Developer ID), notarize, and package a
+# stapled DMG. macOS only (run on the Mac, e.g. `ssh mac "cd ~/work/ear_ring && just desktop-mac"`).
+# Requires on the Mac: cargo-tauri 1.x, the "Developer ID Application" identity in the
+# earring-build keychain, and ~/.private_keys/AuthKey_<KeyID>.p8 (same key as iOS).
+# Uses `--bundles app` and builds the DMG with hdiutil: Tauri's own DMG script drives
+# Finder via AppleScript and fails in headless SSH sessions.
+# Output: /tmp/earring_desktop/EarRing_<version>_aarch64.dmg
+# Override identity with DEVID_IDENTITY="Developer ID Application: ..." if the cert changes.
+[doc("Build, sign, notarize and package the macOS desktop DMG — macOS only")]
+desktop-mac: _ios-keychain-unlock
+    #!/bin/sh
+    set -eu
+    export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.cargo/bin"
+    ID="${DEVID_IDENTITY:-Developer ID Application: Paul Moore (9A4PVL859F)}"
+    KEY="$HOME/.private_keys/AuthKey_{{apple_key_id}}.p8"
+    [ -f "$KEY" ] || { echo "Missing $KEY" >&2; exit 1; }
+    security find-identity -v -p codesigning | grep -qF "$ID" || { echo "Signing identity not found: $ID" >&2; exit 1; }
+    cd "{{justfile_directory()}}/desktop"
+    ver=$(node -p "require('./package.json').version")
+    echo "Desktop version $ver — git $(git -C "{{justfile_directory()}}" rev-parse --short=7 HEAD)"
+    APPLE_SIGNING_IDENTITY="$ID" APPLE_API_ISSUER={{apple_issuer_id}} APPLE_API_KEY={{apple_key_id}} APPLE_API_KEY_PATH="$KEY"       cargo tauri build --bundles app
+    app="src-tauri/target/release/bundle/macos/EarRing.app"
+    out=/tmp/earring_desktop; stage=$out/stage; dmg="$out/EarRing_${ver}_aarch64.dmg"
+    rm -rf "$out"; mkdir -p "$stage"
+    cp -R "$app" "$stage/"; ln -s /Applications "$stage/Applications"
+    hdiutil create -volname "Ear Ring" -srcfolder "$stage" -ov -format UDZO "$dmg" >/dev/null
+    rm -rf "$stage"
+    codesign --force --sign "$ID" --timestamp "$dmg"
+    xcrun notarytool submit "$dmg" --key "$KEY" --key-id {{apple_key_id}} --issuer {{apple_issuer_id}} --wait
+    xcrun stapler staple "$dmg"
+    spctl -a -vvv -t open --context context:primary-signature "$dmg"
+    echo "Built $dmg"
+
 # Print the iOS MARKETING_VERSION/CURRENT_PROJECT_VERSION (from the Xcode
 # project) and current git commit hash before building. Not listed in
 # `just --list`.
