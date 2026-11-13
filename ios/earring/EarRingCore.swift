@@ -209,6 +209,13 @@ struct EarRingCore {
         return String(cString: ptr)
     }
 
+    /// Staff clef ("treble" | "bass" | "alto") for an instrument, from the shared Rust table.
+    static func clef(forInstrument index: Int) -> String {
+        guard let arr = try? JSONSerialization.jsonObject(with: Data(instrumentList().utf8)) as? [[String: Any]],
+              arr.indices.contains(index) else { return "treble" }
+        return (arr[index]["clef"] as? String) ?? "treble"
+    }
+
     /// Returns the short git commit hash the binary was built from.
     static func gitHash() -> String {
         guard let ptr = ear_ring_git_hash() else { return "unknown" }

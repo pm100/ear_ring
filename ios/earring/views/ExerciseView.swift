@@ -98,7 +98,8 @@ struct ExerciseView: View {
             notes: staffNotes,
             fixedSpacing: 44,
             rootChroma: (EarRingCore.effectiveKeyChroma(rootChroma: model.rootNote, scaleId: model.scaleId) + ((transpSemitones % 12) + 12) % 12) % 12,
-            keySignatureMode: model.keySignatureMode
+            keySignatureMode: model.keySignatureMode,
+            clef: EarRingCore.clef(forInstrument: model.instrumentIndex)
         )
         .frame(height: staffHeight)
     }

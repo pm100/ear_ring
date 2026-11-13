@@ -889,20 +889,32 @@ pub struct InstrumentInfo {
     /// Gated behind the paid entitlement (see each platform's `isPremium`). Not a
     /// detection-tuning parameter — purely which instruments the picker offers.
     pub premium: bool,
+    /// Clef the staff is drawn in for this instrument (display only).
+    pub clef: Clef,
+}
+
+/// Staff clef. Platforms shift note/key-signature positions by clef (see DESIGN.md).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Clef { Treble, Bass, Alto }
+
+impl Clef {
+    pub fn as_str(self) -> &'static str {
+        match self { Clef::Treble => "treble", Clef::Bass => "bass", Clef::Alto => "alto" }
+    }
 }
 
 pub const INSTRUMENTS: &[InstrumentInfo] = &[
-    InstrumentInfo { name: "Piano",             semitones:  0, range_start: 60, range_end: 72, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0, premium: false },
-    InstrumentInfo { name: "Guitar",            semitones:  0, range_start: 52, range_end: 64, grace_frames: 5, octave_correction: true,  pitch_tolerance_cents: 50.0, premium: false },
-    InstrumentInfo { name: "Transposed Guitar", semitones: 12, range_start: 52, range_end: 64, grace_frames: 5, octave_correction: true,  pitch_tolerance_cents: 50.0, premium: false },
-    InstrumentInfo { name: "Soprano Sax",       semitones:  2, range_start: 58, range_end: 70, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0, premium: false },
-    InstrumentInfo { name: "Alto Sax",          semitones:  9, range_start: 51, range_end: 63, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0, premium: false },
+    InstrumentInfo { name: "Piano",             semitones:  0, range_start: 60, range_end: 72, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0, premium: false, clef: Clef::Treble },
+    InstrumentInfo { name: "Guitar",            semitones:  0, range_start: 52, range_end: 64, grace_frames: 5, octave_correction: true,  pitch_tolerance_cents: 50.0, premium: false, clef: Clef::Treble },
+    InstrumentInfo { name: "Transposed Guitar", semitones: 12, range_start: 52, range_end: 64, grace_frames: 5, octave_correction: true,  pitch_tolerance_cents: 50.0, premium: false, clef: Clef::Treble },
+    InstrumentInfo { name: "Soprano Sax",       semitones:  2, range_start: 58, range_end: 70, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0, premium: false, clef: Clef::Treble },
+    InstrumentInfo { name: "Alto Sax",          semitones:  9, range_start: 51, range_end: 63, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0, premium: false, clef: Clef::Treble },
     // +14 (a major ninth), not +2: real tenor sax notation is written an octave above
     // Soprano Sax/Trumpet/Clarinet's plain major-second Bb transposition, since tenor
     // sits a physical octave lower and would otherwise sit deep in ledger lines.
-    InstrumentInfo { name: "Tenor Sax",         semitones: 14, range_start: 46, range_end: 58, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0, premium: false },
-    InstrumentInfo { name: "Trumpet",           semitones:  2, range_start: 55, range_end: 67, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0, premium: false },
-    InstrumentInfo { name: "Clarinet",          semitones:  2, range_start: 55, range_end: 67, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0, premium: false },
+    InstrumentInfo { name: "Tenor Sax",         semitones: 14, range_start: 46, range_end: 58, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0, premium: false, clef: Clef::Treble },
+    InstrumentInfo { name: "Trumpet",           semitones:  2, range_start: 55, range_end: 67, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0, premium: false, clef: Clef::Treble },
+    InstrumentInfo { name: "Clarinet",          semitones:  2, range_start: 55, range_end: 67, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 50.0, premium: false, clef: Clef::Treble },
     // Voice has no mechanical stop pinning pitch to an exact value — natural vibrato
     // (~±30-100 cents, see roadmap.md) routinely crosses a semitone boundary frame-to-
     // frame. 80 cents tolerates typical vibrato swing while still being narrower than
@@ -918,12 +930,23 @@ pub const INSTRUMENTS: &[InstrumentInfo] = &[
     // above in the same dropdown. All three are premium — see each platform's isPremium.
     // Soprano/Alto Voice show sounding pitch (semitones: 0, like Piano/Guitar) — the
     // note shown is the note sung, which is what ear training wants.
-    InstrumentInfo { name: "Soprano Voice",     semitones:  0, range_start: 60, range_end: 72, grace_frames: 5, octave_correction: false, pitch_tolerance_cents: 80.0, premium: true },
-    InstrumentInfo { name: "Alto Voice",        semitones:  0, range_start: 55, range_end: 67, grace_frames: 5, octave_correction: false, pitch_tolerance_cents: 80.0, premium: true },
+    InstrumentInfo { name: "Soprano Voice",     semitones:  0, range_start: 60, range_end: 72, grace_frames: 5, octave_correction: false, pitch_tolerance_cents: 80.0, premium: true, clef: Clef::Treble },
+    InstrumentInfo { name: "Alto Voice",        semitones:  0, range_start: 55, range_end: 67, grace_frames: 5, octave_correction: false, pitch_tolerance_cents: 80.0, premium: true, clef: Clef::Treble },
     // Tenor Voice is +12 (an octave), not 0: real tenor vocal parts are conventionally
     // written an octave above sounding pitch (treble clef with an implied 8vb) to avoid
     // the excessive ledger lines below the staff a sounding-pitch tenor line would need.
-    InstrumentInfo { name: "Tenor Voice",       semitones: 12, range_start: 48, range_end: 60, grace_frames: 5, octave_correction: false, pitch_tolerance_cents: 80.0, premium: true },
+    InstrumentInfo { name: "Tenor Voice",       semitones: 12, range_start: 48, range_end: 60, grace_frames: 5, octave_correction: false, pitch_tolerance_cents: 80.0, premium: true, clef: Clef::Treble },
+    // ── Strings & low brass ────────────────────────────────────────────────────
+    // Appended (never inserted) so persisted instrument indices stay valid.
+    // Fretless/slide instruments share voice's wide 80-cent tolerance; fretted Bass
+    // Guitar keeps 50 like Guitar. Bass Guitar/Fretless Bass are written an octave above
+    // sounding pitch (+12), standard bass notation. Viola uses alto clef.
+    InstrumentInfo { name: "Bass Guitar",       semitones: 12, range_start: 28, range_end: 40, grace_frames: 5, octave_correction: true,  pitch_tolerance_cents: 50.0, premium: false, clef: Clef::Bass },
+    InstrumentInfo { name: "Fretless Bass",     semitones: 12, range_start: 28, range_end: 40, grace_frames: 5, octave_correction: true,  pitch_tolerance_cents: 80.0, premium: true,  clef: Clef::Bass },
+    InstrumentInfo { name: "Violin",            semitones:  0, range_start: 55, range_end: 67, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 80.0, premium: true,  clef: Clef::Treble },
+    InstrumentInfo { name: "Viola",             semitones:  0, range_start: 48, range_end: 60, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 80.0, premium: true,  clef: Clef::Alto },
+    InstrumentInfo { name: "Cello",             semitones:  0, range_start: 36, range_end: 48, grace_frames: 5, octave_correction: false, pitch_tolerance_cents: 80.0, premium: true,  clef: Clef::Bass },
+    InstrumentInfo { name: "Trombone",          semitones:  0, range_start: 40, range_end: 52, grace_frames: 3, octave_correction: false, pitch_tolerance_cents: 80.0, premium: true,  clef: Clef::Bass },
 ];
 
 /// Convert a concert MIDI number to the written/display MIDI for a given instrument.
@@ -1590,5 +1613,26 @@ mod tests {
             }
         }
         assert!(found_dim_minor, "Did not encounter a Bø chord in 200 seeds for A natural minor");
+    }
+
+    #[test]
+    fn string_and_low_brass_instruments() {
+        let by = |n: &str| INSTRUMENTS.iter().find(|i| i.name == n).unwrap_or_else(|| panic!("missing {n}"));
+        // Fretted bass is strict like Guitar; every fretless/slide instrument is wide.
+        assert_eq!(by("Bass Guitar").pitch_tolerance_cents, 50.0);
+        for n in ["Fretless Bass", "Violin", "Viola", "Cello", "Trombone"] {
+            assert_eq!(by(n).pitch_tolerance_cents, 80.0, "{n}");
+        }
+        for n in ["Bass Guitar", "Fretless Bass", "Cello", "Trombone"] {
+            assert_eq!(by(n).clef, Clef::Bass, "{n}");
+        }
+        assert_eq!(by("Viola").clef, Clef::Alto);
+        assert_eq!(by("Violin").clef, Clef::Treble);
+        // Every range is a one-octave span, and the original instruments keep their indices.
+        for i in INSTRUMENTS { assert_eq!(i.range_end - i.range_start, 12, "{}", i.name); }
+        assert_eq!(INSTRUMENTS[8].name, "Soprano Voice");
+        assert_eq!(INSTRUMENTS[10].name, "Tenor Voice");
+        // Bass notation is written an octave above sounding pitch.
+        assert_eq!(transpose_display_midi(28, INSTRUMENTS.iter().position(|i| i.name == "Bass Guitar").unwrap()), 40);
     }
 }

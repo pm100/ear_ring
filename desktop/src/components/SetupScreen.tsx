@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import PitchMeter from './PitchMeter';
-import MusicStaff from './MusicStaff';
+import MusicStaff, { Clef } from './MusicStaff';
 import { useAudioCapture, TrackerFrame } from '../hooks/useAudioCapture';
 import { ExerciseSettings } from '../types';
 import { SettingsAction } from '../settingsStore';
@@ -10,7 +10,7 @@ import { TooltipIcon } from './Tooltip';
 const STABILITY_OPTIONS = [2, 3, 4, 5];
 const WARMUP_OPTIONS = [0, 1, 2, 3, 4, 5, 6];
 
-interface InstrumentInfo { id: number; name: string; semitones: number; premium: boolean; }
+interface InstrumentInfo { id: number; name: string; semitones: number; premium: boolean; clef?: Clef; }
 
 // Semitones to add to root chroma to get the implied major key (the major key sharing
 // the scale's pitch classes) — mirrors ScaleType::implied_major_offset in music_theory.rs.
@@ -74,6 +74,7 @@ export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, ro
 
   // Load instrument transposition semitones and apply instrument-specific tracker params.
   const [transpSemitones, setTranspSemitones] = useState(0);
+  const [clef, setClef] = useState<Clef>('treble');
   // Pitch Tolerance is only meaningful for Voice (see pitch_tolerance_cents's doc in
   // rust/src/music_theory.rs) — hidden below for every other instrument.
   const [currentInstrumentIsPremium, setCurrentInstrumentIsPremium] = useState(false);
@@ -82,6 +83,7 @@ export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, ro
       .then(json => {
         const list = JSON.parse(json) as InstrumentInfo[];
         setTranspSemitones(list[instrumentIndex]?.semitones ?? 0);
+        setClef(list[instrumentIndex]?.clef ?? 'treble');
         setCurrentInstrumentIsPremium(list[instrumentIndex]?.premium ?? false);
         void invoke('cmd_tracker_apply_instrument', { instrumentIndex });
       })
@@ -133,6 +135,7 @@ export default function SetupScreen({ onBack, onAction, rangeStart, rangeEnd, ro
         fixedSpacing={NOTE_STEP}
         rootChroma={effChroma}
         keySignatureMode={keySignatureMode}
+        clef={clef}
       />
       {/* Clears only the rolling staff history above — the live meter is untouched
           and keeps tracking whatever the mic hears next. */}

@@ -50,6 +50,17 @@ private fun classifyDuration(beats: Float?): DurationType = when {
     else            -> DurationType.SIXTEENTH
 }
 
+// Per-clef geometry — same numbers on every platform (see DESIGN.md "Clefs").
+// noteOffset: diatonic steps added to the treble staff position; keySigOffset: shift for
+// key-signature symbols; h/top: clef image height and top offset in lineSpacings.
+private class ClefSpec(val drawable: Int, val noteOffset: Int, val keySigOffset: Int, val h: Float, val top: Float)
+
+private fun clefSpecFor(clef: String) = when (clef) {
+    "bass" -> ClefSpec(R.drawable.bass_clef, 12, -2, 3.54f, -0.1f)
+    "alto" -> ClefSpec(R.drawable.alto_clef, 6, -1, 4f, 0f)
+    else   -> ClefSpec(R.drawable.treble_clef, 0, 0, 8f, -2f)
+}
+
 @Composable
 fun MusicStaff(
     notes: List<StaffNote>,
@@ -58,13 +69,15 @@ fun MusicStaff(
     fixedSpacingDp: Dp? = null,
     rootChroma: Int = 0,
     keySignatureMode: Int = 0,
+    clef: String = "treble",
 ) {
     val context = LocalContext.current
+    val clefSpec = clefSpecFor(clef)
 
     // Pre-load all bitmaps once (clef + accidentals).
     // Each accidental PNG has its visual anchor at exactly 50% of the image height:
     //   top = targetY - displayH / 2
-    val clefBitmap = remember { BitmapFactory.decodeResource(context.resources, R.drawable.treble_clef) }
+    val clefBitmap = remember(clef) { BitmapFactory.decodeResource(context.resources, clefSpec.drawable) }
     val accBitmaps = remember {
         mapOf(
             "flat"          to BitmapFactory.decodeResource(context.resources, R.drawable.flat),
@@ -141,12 +154,13 @@ fun MusicStaff(
         }
 
         // ── Treble clef (PNG bitmap — same as Tauri) ────────────────────────
-        val clefH = lineSpacing * 8f
+        val clefH = lineSpacing * clefSpec.h
         val clefW = clefBitmap?.let { clefH * it.width.toFloat() / it.height.toFloat() } ?: (clefH * 149f / 307f)
+        val clefTopY = staffTop + lineSpacing * clefSpec.top
         drawIntoCanvas { canvas ->
             clefBitmap?.let {
                 canvas.nativeCanvas.drawBitmap(it, null,
-                    android.graphics.RectF(2f, staffTop - lineSpacing * 2f, 2f + clefW, staffTop - lineSpacing * 2f + clefH),
+                    android.graphics.RectF(2f, clefTopY, 2f + clefW, clefTopY + clefH),
                     null)
             }
         }
@@ -165,7 +179,7 @@ fun MusicStaff(
             val keySigPositions = EarRingCore.keySigPositions(rootChroma)
             drawIntoCanvas { canvas ->
                 keySigPositions.forEachIndexed { i, sp ->
-                    val targetY = staffCenter - (sp - 6) * (lineSpacing / 2f)
+                    val targetY = staffCenter - (sp + clefSpec.keySigOffset - 6) * (lineSpacing / 2f)
                     keySigBmp?.let { canvas.nativeCanvas.drawAcc(it, keySigStartX + i * keySigStep, targetY, keySigDisplayH) }
                 }
             }
@@ -181,7 +195,7 @@ fun MusicStaff(
 
         // ── Notes ────────────────────────────────────────────────────────────
         notes.forEachIndexed { index, staffNote ->
-            val staffPos = EarRingCore.staffPositionInKey(staffNote.midi, rootChroma)
+            val staffPos = EarRingCore.staffPositionInKey(staffNote.midi, rootChroma) + clefSpec.noteOffset
             val noteY = staffCenter - (staffPos - 6) * (lineSpacing / 2f)
             val noteX = noteAreaStart + index * noteStep + noteStep / 2f
 

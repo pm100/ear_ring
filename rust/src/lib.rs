@@ -124,7 +124,7 @@ pub fn instrument_list_json() -> String {
     for (i, inst) in INSTRUMENTS.iter().enumerate() {
         if i > 0 { json.push(','); }
         json.push_str(&format!(
-            "{{\"id\":{},\"name\":{},\"semitones\":{},\"rangeStart\":{},\"rangeEnd\":{},\"graceFrames\":{},\"octaveCorrection\":{},\"pitchToleranceCents\":{},\"premium\":{}}}",
+            "{{\"id\":{},\"name\":{},\"semitones\":{},\"rangeStart\":{},\"rangeEnd\":{},\"graceFrames\":{},\"octaveCorrection\":{},\"pitchToleranceCents\":{},\"premium\":{},\"clef\":\"{}\"}}",
             i,
             json_string(inst.name),
             inst.semitones,
@@ -133,7 +133,8 @@ pub fn instrument_list_json() -> String {
             inst.grace_frames,
             inst.octave_correction,
             inst.pitch_tolerance_cents,
-            inst.premium
+            inst.premium,
+            inst.clef.as_str()
         ));
     }
     json.push(']');

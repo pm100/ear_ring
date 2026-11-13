@@ -29,7 +29,20 @@ interface Props {
   fixedSpacing?: number;
   rootChroma?: number;
   keySignatureMode?: number;
+  clef?: Clef;
 }
+
+// Clef drives three things (same numbers on every platform — see DESIGN.md "Clefs"):
+//  - noteOffset: diatonic steps added to the treble staff position so the centre line
+//    (position 6) is that clef's middle line (treble B4, bass D3, alto C4)
+//  - keySigOffset: shift for key-signature symbols (bass/alto sit lower than treble's)
+//  - image: PNG + its aspect ratio, display height and top offset in lineSpacings
+export type Clef = 'treble' | 'bass' | 'alto';
+const CLEFS: Record<Clef, { noteOffset: number; keySigOffset: number; src: string; aspect: number; h: number; top: number }> = {
+  treble: { noteOffset: 0,  keySigOffset: 0,  src: '/treble_clef.png', aspect: 299 / 638, h: 8,    top: -2 },
+  bass:   { noteOffset: 12, keySigOffset: -2, src: '/bass_clef.png',   aspect: 432 / 496, h: 3.54, top: -0.1 },
+  alto:   { noteOffset: 6,  keySigOffset: -1, src: '/alto_clef.png',   aspect: 421 / 629, h: 4,    top: 0 },
+};
 
 // Map note state → colour-variant suffix used in PNG filenames.
 function accSuffix(state: StaffDisplayNote['state']): string {
@@ -41,7 +54,8 @@ function accSuffix(state: StaffDisplayNote['state']): string {
   }
 }
 
-export default function MusicStaff({ notes, fixedSpacing, rootChroma = 0, keySignatureMode = 0 }: Props) {
+export default function MusicStaff({ notes, fixedSpacing, rootChroma = 0, keySignatureMode = 0, clef = 'treble' }: Props) {
+  const clefSpec = CLEFS[clef];
   const svgWidth = 500;
   const svgHeight = 160;
   const lineSpacing = 12;
@@ -52,9 +66,9 @@ export default function MusicStaff({ notes, fixedSpacing, rootChroma = 0, keySig
 
   const calcNoteY = (staffPos: number) => staffCenter - (staffPos - 6) * (lineSpacing / 2);
 
-  const clefH = lineSpacing * 8;
-  const clefW = clefH * (299 / 638);
-  const clefImgY = staffTop - lineSpacing * 2;
+  const clefH = lineSpacing * clefSpec.h;
+  const clefW = clefH * clefSpec.aspect;
+  const clefImgY = staffTop + lineSpacing * clefSpec.top;
 
   // Accidental display sizes
   const flatDisplayH    = lineSpacing * FLAT_H_MULT;
@@ -159,12 +173,12 @@ export default function MusicStaff({ notes, fixedSpacing, rootChroma = 0, keySig
         return <line key={lineIdx} x1={5} y1={y} x2={svgWidth - 10} y2={y} stroke="#333333" strokeWidth="1.5" />;
       })}
 
-      {/* Treble clef */}
-      <image href="/treble_clef.png" x={2} y={clefImgY} width={clefW} height={clefH} />
+      {/* Clef */}
+      <image href={clefSpec.src} x={2} y={clefImgY} width={clefW} height={clefH} />
 
       {/* Key signature — PNG images, anchor@50% → top = targetY - displayH/2 */}
       {keySig && keySig.positions.map((staffPos, i) => {
-        const cy = calcNoteY(staffPos);
+        const cy = calcNoteY(staffPos + clefSpec.keySigOffset);
         const x = keySigStartX + i * keySigDisplayW;
         const href = keySig.isSharp ? '/sharp.png' : '/flat.png';
         return (
@@ -181,7 +195,7 @@ export default function MusicStaff({ notes, fixedSpacing, rootChroma = 0, keySig
 
       {/* Notes */}
       {notes.map((note, i) => {
-        const sp = staffPositionForMidi(note.midi, rootChroma);
+        const sp = staffPositionForMidi(note.midi, rootChroma) + clefSpec.noteOffset;
         const cx = calcNoteX(i);
         const cy = calcNoteY(sp);
         const color = colorForState(note.state);

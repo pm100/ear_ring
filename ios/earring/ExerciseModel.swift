@@ -225,7 +225,7 @@ class ExerciseModel: ObservableObject {
     /// settings blob (and outside resetSettings()'s reach), same as Android's separate
     /// PREF_IS_PREMIUM. Until real billing/gifting lands, only the DEBUG-only toggle in
     /// SettingsView sets this true.
-    @Published var isPremium: Bool = ud.object(forKey: "isPremium") != nil ? ud.bool(forKey: "isPremium") : false {
+    @Published var isPremium: Bool = ud.object(forKey: "isPremium") != nil ? ud.bool(forKey: "isPremium") : true {  // TEMP default on until billing lands
         didSet {
             UserDefaults.standard.set(isPremium, forKey: "isPremium")
             clampInstrumentIfLocked()

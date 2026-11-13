@@ -83,7 +83,7 @@ data class ExerciseState(
     val melodyDeck: List<Int> = emptyList(),
     val melodyDeckCursor: Int = 0,
     val chordLabel: String = "",  // Set for diatonic mode; shown below title
-    val isPremium: Boolean = false,  // Ad-free / paid entitlement; not a user "setting" — survives resetSettings()
+    val isPremium: Boolean = true,  // TEMP default on (no billing yet); Ad-free / paid entitlement; not a user "setting" — survives resetSettings()
 ) {
     /** MIDI of the root note at or just below rangeStart (used for intro chord). */
     val rootMidi: Int get() = rangeStart - ((rangeStart - rootNote + 12) % 12)
@@ -199,7 +199,7 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
     fun resetSettings() = dispatch(JSONObject().put("type", "reset"))
 
     private val _state = MutableStateFlow(
-        ExerciseState.fromSettings(settingsJson, isPremium = prefs.getBoolean(PREF_IS_PREMIUM, false))
+        ExerciseState.fromSettings(settingsJson, isPremium = prefs.getBoolean(PREF_IS_PREMIUM, true))
     )
     val state: StateFlow<ExerciseState> = _state.asStateFlow()
 

@@ -173,7 +173,8 @@ fun ExerciseScreen(
             modifier = Modifier.fillMaxWidth(),
             fixedSpacingDp = noteStepDp,
             rootChroma = (EarRingCore.effectiveKeyChroma(state.rootNote, state.scaleId) + instrKeyTranspose) % 12,
-            keySignatureMode = state.keySignatureMode
+            keySignatureMode = state.keySignatureMode,
+            clef = EarRingCore.clefFor(instrIdx)
         )
 
         Spacer(Modifier.height(12.dp))

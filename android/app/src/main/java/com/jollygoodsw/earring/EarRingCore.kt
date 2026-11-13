@@ -287,6 +287,11 @@ object EarRingCore {
     fun instrumentList(): String =
         if (loaded) nativeInstrumentList() else "[]"
 
+    /** Staff clef ("treble" | "bass" | "alto") for an instrument, from the shared Rust table. */
+    fun clefFor(instrumentIndex: Int): String = try {
+        org.json.JSONArray(instrumentList()).getJSONObject(instrumentIndex).optString("clef", "treble")
+    } catch (_: Exception) { "treble" }
+
     fun gitHash(): String =
         if (loaded) nativeGitHash() else "unknown"
 

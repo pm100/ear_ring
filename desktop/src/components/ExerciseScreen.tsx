@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { ExerciseState, DetectedNote, StaffDisplayNote, StaffNoteState, TestRecord } from '../types';
-import MusicStaff from './MusicStaff';
+import MusicStaff, { Clef } from './MusicStaff';
 import PitchMeter from './PitchMeter';
 import { useAudioCapture, TrackerFrame } from '../hooks/useAudioCapture';
 import { useAudioPlayback } from '../hooks/useAudioPlayback';
@@ -124,6 +124,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
   // can't let the table defaults land after (and silently override) the values this
   // exercise was actually configured with.
   const [transpSemitones, setTranspSemitones] = useState(0);
+  const [clef, setClef] = useState<Clef>('treble');
   useEffect(() => {
     const instrIdx = exercise.instrumentIndex ?? 0;
     let cancelled = false;
@@ -131,8 +132,9 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
       try {
         const json = await invoke<string>('cmd_instrument_list');
         if (cancelled) return;
-        const list = JSON.parse(json) as { id: number; semitones: number }[];
+        const list = JSON.parse(json) as { id: number; semitones: number; clef?: Clef }[];
         setTranspSemitones(list[instrIdx]?.semitones ?? 0);
+        setClef(list[instrIdx]?.clef ?? 'treble');
       } catch { /* keep the last known transposition */ }
       if (cancelled) return;
       try {
@@ -613,6 +615,7 @@ export default function ExerciseScreen({ exercise, onStop }: Props) {
         fixedSpacing={noteStep}
         rootChroma={(effectiveKeyChroma(exercise.rootNote, exercise.scaleId) + ((transpSemitones % 12) + 12) % 12) % 12}
         keySignatureMode={exercise.keySignatureMode}
+        clef={clef}
       />
 
       <div className="status-text">{statusText()}</div>

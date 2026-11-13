@@ -55,7 +55,7 @@ export default function App() {
 function AppContent({ settings, dispatch }: { settings: ExerciseSettings; dispatch: Dispatch }) {
   const [screen, setScreen] = useState<Screen>(getInitialScreen);
   const [exercise, setExercise] = useState<ExerciseState>(() => initialExercise(settings));
-  const [isPremium, setIsPremiumState] = useState(() => localStorage.getItem(IS_PREMIUM_KEY) === '1');
+  const [isPremium, setIsPremiumState] = useState(() => localStorage.getItem(IS_PREMIUM_KEY) !== '0'); // TEMP default on until billing lands
   const setIsPremium = useCallback((value: boolean) => {
     localStorage.setItem(IS_PREMIUM_KEY, value ? '1' : '0');
     setIsPremiumState(value);

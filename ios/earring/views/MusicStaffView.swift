@@ -60,11 +60,24 @@ private func accSuffix(_ state: StaffNoteState) -> String {
     }
 }
 
+// Per-clef geometry — same numbers on every platform (see DESIGN.md "Clefs").
+// noteOffset: diatonic steps added to the treble staff position; keySigOffset: shift for
+// key-signature symbols; h/top: clef image height and top offset in lineSpacings.
+private struct ClefSpec { let noteOffset: Int; let keySigOffset: Int; let h: CGFloat; let top: CGFloat }
+private func clefSpec(_ clef: String) -> ClefSpec {
+    switch clef {
+    case "bass": return ClefSpec(noteOffset: 12, keySigOffset: -2, h: 3.54, top: -0.1)
+    case "alto": return ClefSpec(noteOffset: 6, keySigOffset: -1, h: 4, top: 0)
+    default:     return ClefSpec(noteOffset: 0, keySigOffset: 0, h: 8, top: -2)
+    }
+}
+
 struct MusicStaffView: View {
     var notes: [StaffDisplayNote]
     var fixedSpacing: CGFloat? = nil
     var rootChroma: Int = 0
     var keySignatureMode: Int = 0
+    var clef: String = "treble"
 
     // The staff inverts in dark mode (issue #53): ink is dark on light, light on dark.
     @Environment(\.colorScheme) private var colorScheme
@@ -87,7 +100,18 @@ struct MusicStaffView: View {
         return d
     }()
 
+    // Bass/alto clefs are PNG assets (treble is the system-font glyph, see below).
+    private static let clefImages: [String: UIImage] = {
+        var d: [String: UIImage] = [:]
+        for name in ["bass", "alto"] {
+            if let img = UIImage(named: name + "_clef") { d[name] = img }
+            else { print("[MusicStaffView] missing image asset: " + name + "_clef") }
+        }
+        return d
+    }()
+
     var body: some View {
+        let spec = clefSpec(clef)
         let ink: Color = isDark ? Color(white: 0.9) : Color(white: 0.2)
         let ledgerInk: Color = isDark ? Color(white: 0.75) : Color(red: 0.333, green: 0.333, blue: 0.333)
         let paper: Color = isDark ? .black : .white
@@ -159,15 +183,24 @@ struct MusicStaffView: View {
                 ctx.stroke(p, with: .color(ink), lineWidth: 1.5)
             }
 
-            // ── Treble clef (text — reliable on iOS) ────────────────────────
-            ctx.draw(
-                Text("𝄞").font(.system(size: lineSpacing * 7)).foregroundColor(ink),
-                at: CGPoint(x: 4, y: staffTop - lineSpacing * 2.5),
-                anchor: .topLeading
-            )
-
-            let clefFont = UIFont.systemFont(ofSize: lineSpacing * 7)
-            let clefWidth = NSAttributedString(string: "𝄞", attributes: [.font: clefFont]).size().width
+            // ── Clef: treble is text (reliable on iOS); bass/alto are PNG assets ──
+            var clefWidth: CGFloat
+            if let ui = MusicStaffView.clefImages[clef] {
+                let h = lineSpacing * spec.h
+                let w = h * ui.size.width / ui.size.height
+                var img = ctx.resolve(Image(uiImage: ui).renderingMode(.template))
+                img.shading = .color(ink)
+                ctx.draw(img, in: CGRect(x: 4, y: staffTop + lineSpacing * spec.top, width: w, height: h))
+                clefWidth = w
+            } else {
+                ctx.draw(
+                    Text("𝄞").font(.system(size: lineSpacing * 7)).foregroundColor(ink),
+                    at: CGPoint(x: 4, y: staffTop - lineSpacing * 2.5),
+                    anchor: .topLeading
+                )
+                let clefFont = UIFont.systemFont(ofSize: lineSpacing * 7)
+                clefWidth = NSAttributedString(string: "𝄞", attributes: [.font: clefFont]).size().width
+            }
             let keySigStartX: CGFloat = 4 + clefWidth + 6
 
             // ── Key signature (PNG images) ───────────────────────────────────
@@ -179,7 +212,7 @@ struct MusicStaffView: View {
             if keySignatureMode == 1 {
                 let keySig = EarRingCore.keySigPositions(rootChroma: rootChroma)
                 for (i, staffPos) in keySig.positions.enumerated() {
-                    let targetY = noteY(staffPos)
+                    let targetY = noteY(staffPos + spec.keySigOffset)
                     let leftX = keySigStartX + CGFloat(i) * keySigDisplayW
                     drawAcc(keySigBase, leftX: leftX, targetY: targetY,
                             displayH: keySigDisplayH, displayW: keySigDisplayW)
@@ -197,7 +230,7 @@ struct MusicStaffView: View {
 
             // ── Notes ────────────────────────────────────────────────────────
             for (index, displayNote) in notes.enumerated() {
-                let staffPos = EarRingCore.staffPositionInKey(midi: displayNote.midi, rootChroma: rootChroma)
+                let staffPos = EarRingCore.staffPositionInKey(midi: displayNote.midi, rootChroma: rootChroma) + spec.noteOffset
                 let x = noteAreaStart + CGFloat(index) * noteStep + noteStep / 2
                 let y = noteY(staffPos)
                 let noteColor: Color = {

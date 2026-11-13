@@ -121,7 +121,8 @@ fun SetupScreen(viewModel: ExerciseViewModel, onBack: () -> Unit, rangeStart: In
             modifier = Modifier.fillMaxWidth(),
             fixedSpacingDp = noteStepDp,
             rootChroma = rootChroma,
-            keySignatureMode = keySignatureMode
+            keySignatureMode = keySignatureMode,
+            clef = remember(instrumentIndex) { EarRingCore.clefFor(instrumentIndex) }
         )
         // Clears only the rolling staff history above — the live meter is untouched
         // and keeps tracking whatever the mic hears next.
