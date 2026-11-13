@@ -260,7 +260,7 @@ ios-device: _ios-version _ios-keychain-unlock
       -allowProvisioningUpdates
     APP="build/DerivedData/Build/Products/Debug-iphoneos/earring.app"
     if [ -z "${IOS_DEVICE_ID:-}" ]; then
-      IOS_DEVICE_ID=$(xcrun devicectl list devices | grep -iEo '[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}' | head -n 1)
+      IOS_DEVICE_ID=$(xcrun devicectl list devices | grep -i ' physical' | grep -iEo '[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}|[0-9a-f]{40}' | head -n 1)
     fi
     if [ -z "$IOS_DEVICE_ID" ]; then
       echo "No iOS device found. Connect it via USB/Wi-Fi, trust this Mac, then retry." >&2
@@ -299,7 +299,8 @@ ios-sim: _ios-version
       -configuration Debug \
       -destination "id=$UDID" \
       -derivedDataPath build/DerivedData
-    open -a Simulator --args -CurrentDeviceUDID "$UDID"
+    # Xcode 27 ships no Simulator.app: fall back to a plain boot.
+    open -a Simulator --args -CurrentDeviceUDID "$UDID" || xcrun simctl boot "$UDID" 2>/dev/null || true
     xcrun simctl bootstatus "$UDID" -b
     APP="build/DerivedData/Build/Products/Debug-iphonesimulator/earring.app"
     xcrun simctl install "$UDID" "$APP"
